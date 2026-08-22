@@ -1,0 +1,38 @@
+{
+  "_note": "Categories are hardcoded in index.html and calendar.js CATEGORY_META; not loaded from site config.",
+  "slots": {
+    "max": 6,
+    "examples": [
+      "Morning", "Lunch", "Afternoon", "Evening", "Dinner",
+      "Day", "Night", "After work", "Red team", "Blue team",
+      "6 am", "9 am", "12 noon", "3 pm", "6 pm", "9 pm"
+    ],
+    "defaults": ["Morning", "Afternoon", "Evening"]
+  },
+  "options": {
+    "max": 5,
+    "presets": [
+      {"key": "yes",                     "label": "Yes",                          "items": [{"label":"Yes","weight":1}]},
+      {"key": "no",                      "label": "No",                           "items": [{"label":"No","weight":1}]},
+      {"key": "yes_no",                  "label": "Yes / No",                     "items": [{"label":"Yes","weight":2},{"label":"No","weight":0}]},
+      {"key": "yes_maybe_no",            "label": "Yes / No / Maybe (default)",   "items": [{"label":"Yes","weight":2},{"label":"Maybe","weight":1},{"label":"No","weight":0}]},
+      {"key": "available_unavailable",   "label": "Available / Unavailable",      "items": [{"label":"Available","weight":2},{"label":"Unavailable","weight":0}]},
+      {"key": "free_tentative_busy",     "label": "Free / Busy / Tentative",      "items": [{"label":"Free","weight":2},{"label":"Tentative","weight":1},{"label":"Busy","weight":0}]},
+      {"key": "in_out_maybe",            "label": "In / Out / Maybe",             "items": [{"label":"In","weight":2},{"label":"Maybe","weight":1},{"label":"Out","weight":0}]},
+      {"key": "attending_not_attending", "label": "Attending / Not Attending",    "items": [{"label":"Attending","weight":2},{"label":"Not attending","weight":0}]}
+    ],
+    "defaults": [{"label":"Yes","weight":2},{"label":"Maybe","weight":1},{"label":"No","weight":0}]
+  },
+  "dates": {
+    "max_range_days": 360,
+    "presets": [
+      {"key": "1day",   "label": "1 day",    "days": 0},
+      {"key": "2day",   "label": "2 days",   "days": 2},
+      {"key": "3day",   "label": "3 days",   "days": 3},
+      {"key": "5day",   "label": "5 days",   "days": 5},
+      {"key": "1week",  "label": "1 week",   "days": 6},
+      {"key": "2weeks", "label": "2 weeks",  "days": 13},
+      {"key": "1month", "label": "1 month",  "days": 30}
+    ]
+  }
+}

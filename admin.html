@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin - When RU Free?</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- ============================================
+       LOGIN SCREEN
+       ============================================ -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <h1><span class="material-symbols-outlined">admin_panel_settings</span> Admin Login</h1>
+      <form id="loginForm">
+        <input type="text" name="username" value="admin" autocomplete="username" style="display:none;">
+        <div class="form-group">
+          <label for="adminPassword">Password</label>
+          <div class="pin-field">
+            <input type="password" id="adminPassword" name="adminPassword" required autocomplete="current-password">
+            <button type="button" id="toggleAdminPassword" class="pin-toggle" aria-label="Show password">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            </button>
+          </div>
+        </div>
+        <div id="loginError" class="error-msg hide"></div>
+        <button type="submit" class="btn btn-primary btn-full">
+          <span class="material-symbols-outlined">login</span> Login
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================
+       ADMIN PANEL (hidden until authenticated)
+       ============================================ -->
+  <div id="adminPanel" class="admin-panel hide">
+    <div class="card">
+      <!-- Header -->
+      <div class="admin-header">
+        <h1><span class="material-symbols-outlined">admin_panel_settings</span> When RU Free Admin</h1>
+        <button id="logoutBtn" class="btn btn-ghost btn-small">
+          <span class="material-symbols-outlined">logout</span> Logout
+        </button>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="admin-tabs" role="tablist">
+        <button class="admin-tab active" data-tab="calendars" role="tab" aria-selected="true" aria-controls="tabCalendars">
+          <span class="material-symbols-outlined">calendar_month</span> Calendars
+        </button>
+        <button class="admin-tab" data-tab="hubs" role="tab" aria-selected="false" aria-controls="tabHubs">
+          <span class="material-symbols-outlined">hub</span> Hubs
+        </button>
+        <button class="admin-tab" data-tab="setup" role="tab" aria-selected="false" aria-controls="tabSetup">
+          <span class="material-symbols-outlined">tune</span> Setup Page
+        </button>
+      </div>
+
+      <!-- ============================================
+           TAB: CALENDARS
+           ============================================ -->
+      <div id="tabCalendars" class="tab-panel" role="tabpanel">
+
+        <!-- Search/Filter Bar -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="material-symbols-outlined">search</span>
+            <input type="text" id="searchInput" placeholder="Search by title or token...">
+          </div>
+          <div class="filter-group">
+            <label>
+              <input type="checkbox" id="filterPermanent"> Permanent only
+            </label>
+          </div>
+          <button id="refreshBtn" class="btn btn-ghost btn-small">
+            <span class="material-symbols-outlined">refresh</span> Refresh
+          </button>
+        </div>
+
+        <!-- Bulk Actions Bar (hidden until items selected) -->
+        <div id="bulkActionsBar" class="bulk-actions-bar hide">
+          <span id="selectedCount">0 selected</span>
+          <button id="bulkDeleteBtn" class="btn btn-danger btn-small">
+            <span class="material-symbols-outlined">delete</span> Delete Selected
+          </button>
+          <button id="clearSelectionBtn" class="btn btn-ghost btn-small">
+            <span class="material-symbols-outlined">close</span> Clear
+          </button>
+        </div>
+
+        <!-- Calendar Table -->
+        <div class="table-container">
+          <table id="calendarTable" class="admin-table">
+            <thead>
+              <tr>
+                <th class="col-checkbox">
+                  <input type="checkbox" id="selectAll" title="Select all on this page">
+                </th>
+                <th class="col-id sortable" data-sort="id">ID</th>
+                <th class="col-title sortable" data-sort="title">Title</th>
+                <th class="col-hub">Hub</th>
+                <th class="col-token">Token</th>
+                <th class="col-created sortable" data-sort="created_at">Created</th>
+                <th class="col-activity sortable" data-sort="last_activity">Last Activity</th>
+                <th class="col-users sortable" data-sort="user_count">Users</th>
+                <th class="col-permanent">Permanent</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="calendarTableBody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Loading/Empty States -->
+        <div id="loadingState" class="state-msg hide">
+          <span class="material-symbols-outlined spin">progress_activity</span> Loading calendars...
+        </div>
+        <div id="emptyState" class="state-msg hide">
+          <span class="material-symbols-outlined">event_busy</span> No calendars found
+        </div>
+        <div id="errorState" class="state-msg error hide"></div>
+
+        <!-- Pagination -->
+        <div id="pagination" class="pagination hide">
+          <button id="prevPage" class="btn btn-ghost btn-small" disabled>
+            <span class="material-symbols-outlined">chevron_left</span>
+          </button>
+          <span id="pageInfo">Page 1 of 1</span>
+          <button id="nextPage" class="btn btn-ghost btn-small" disabled>
+            <span class="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
+
+      </div><!-- /tabCalendars -->
+
+      <!-- ============================================
+           TAB: HUBS
+           ============================================ -->
+      <div id="tabHubs" class="tab-panel hide" role="tabpanel">
+
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="material-symbols-outlined">search</span>
+            <input type="text" id="hubSearchInput" placeholder="Search by title, token, or organiser...">
+          </div>
+          <div class="filter-group">
+            <label>
+              <input type="checkbox" id="hubFilterPermanent"> Permanent only
+            </label>
+          </div>
+          <button id="hubRefreshBtn" class="btn btn-ghost btn-small">
+            <span class="material-symbols-outlined">refresh</span> Refresh
+          </button>
+        </div>
+
+        <div id="hubBulkActionsBar" class="bulk-actions-bar hide">
+          <span id="hubSelectedCount">0 selected</span>
+          <button id="hubBulkDeleteBtn" class="btn btn-danger btn-small">
+            <span class="material-symbols-outlined">delete</span> Delete Selected
+          </button>
+          <button id="hubClearSelectionBtn" class="btn btn-ghost btn-small">
+            <span class="material-symbols-outlined">close</span> Clear
+          </button>
+        </div>
+
+        <div class="table-container">
+          <table id="hubTable" class="admin-table">
+            <thead>
+              <tr>
+                <th class="col-checkbox">
+                  <input type="checkbox" id="hubSelectAll" title="Select all on this page">
+                </th>
+                <th class="col-id sortable" data-sort="id">ID</th>
+                <th class="col-title sortable" data-sort="title">Title</th>
+                <th class="col-token">Token</th>
+                <th class="col-organiser sortable" data-sort="organiser_name">Organiser</th>
+                <th class="col-created sortable" data-sort="created_at">Created</th>
+                <th class="col-activity sortable" data-sort="last_activity">Last Activity</th>
+                <th class="col-cal-count sortable" data-sort="calendar_count">Calendars</th>
+                <th class="col-permanent">Permanent</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="hubTableBody">
+            </tbody>
+          </table>
+        </div>
+
+        <div id="hubLoadingState" class="state-msg hide">
+          <span class="material-symbols-outlined spin">progress_activity</span> Loading Hubs...
+        </div>
+        <div id="hubEmptyState" class="state-msg hide">
+          <span class="material-symbols-outlined">hub</span> No Hubs found
+        </div>
+        <div id="hubErrorState" class="state-msg error hide"></div>
+
+        <div id="hubPagination" class="pagination hide">
+          <button id="hubPrevPage" class="btn btn-ghost btn-small" disabled>
+            <span class="material-symbols-outlined">chevron_left</span>
+          </button>
+          <span id="hubPageInfo">Page 1 of 1</span>
+          <button id="hubNextPage" class="btn btn-ghost btn-small" disabled>
+            <span class="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
+
+      </div><!-- /tabHubs -->
+
+      <!-- ============================================
+           TAB: SETUP PAGE CUSTOMISER
+           ============================================ -->
+      <div id="tabSetup" class="tab-panel hide" role="tabpanel">
+
+        <div class="setup-header">
+          <p class="setup-intro">Customise the defaults and options shown on the calendar creation page (<strong>index.html</strong>). Changes are saved to the database (<code>site_config</code> table) and take effect immediately for new visitors.</p>
+          <div id="setupSaveBar" class="setup-save-bar">
+            <span id="setupStatus" class="setup-status"></span>
+            <button id="saveConfigBtn" class="btn btn-primary">
+              <span class="material-symbols-outlined">save</span> Save Changes
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION: Slots -->
+        <div class="setup-section">
+          <div class="setup-section-head">
+            <h2><span class="material-symbols-outlined">view_agenda</span> Slots</h2>
+            <button id="addSlotExampleBtn" class="btn btn-ghost btn-small">
+              <span class="material-symbols-outlined">add</span> Add Example
+            </button>
+          </div>
+          <p class="setup-hint">Controls the maximum number of slots allowed per calendar, the example chip buttons, and the default slots pre-filled when the page loads.</p>
+
+          <div class="setup-field-row">
+            <label for="slotsMaxInput">Max slots per calendar</label>
+            <input type="number" id="slotsMaxInput" min="1" value="6" class="setup-num-input">
+            <span class="setup-field-hint">Min 1, no upper limit</span>
+          </div>
+
+          <h3 class="setup-subhead">Example chips <span class="setup-subhint">(shown as quick-add buttons)</span></h3>
+          <div id="slotExamplesWrap" class="setup-list setup-chip-list"></div>
+
+          <h3 class="setup-subhead">Default slots <span class="setup-subhint">(pre-filled on page load)</span></h3>
+          <div id="slotDefaultsWrap" class="setup-list setup-chip-list"></div>
+          <button id="addSlotDefaultBtn" class="btn btn-ghost btn-small" style="margin-top:6px;">
+            <span class="material-symbols-outlined">add</span> Add Default
+          </button>
+          <div class="setup-section-save">
+            <button class="btn btn-primary btn-small js-save-config">
+              <span class="material-symbols-outlined">save</span> Save
+            </button>
+            <span class="js-setup-status setup-status"></span>
+          </div>
+        </div>
+
+        <!-- SECTION: Options -->
+        <div class="setup-section">
+          <div class="setup-section-head">
+            <h2><span class="material-symbols-outlined">checklist</span> Options</h2>
+            <button id="addPresetBtn" class="btn btn-ghost btn-small">
+              <span class="material-symbols-outlined">add</span> Add Preset
+            </button>
+          </div>
+          <p class="setup-hint">Controls the maximum number of status options per calendar, the preset chip buttons, and the default options pre-filled on page load.</p>
+
+          <div class="setup-field-row">
+            <label for="optionsMaxInput">Max options per calendar</label>
+            <input type="number" id="optionsMaxInput" min="1" value="5" class="setup-num-input">
+            <span class="setup-field-hint">Min 1, no upper limit</span>
+          </div>
+
+          <h3 class="setup-subhead">Preset groups <span class="setup-subhint">(each chip loads a set of options)</span></h3>
+          <div id="presetsWrap" class="setup-list"></div>
+
+          <h3 class="setup-subhead">Default options <span class="setup-subhint">(pre-filled on page load)</span></h3>
+          <p class="setup-hint-sm">Each row: label and weight (0-5, higher = better).</p>
+          <div id="optDefaultsWrap" class="setup-list setup-chip-list"></div>
+          <button id="addOptDefaultBtn" class="btn btn-ghost btn-small" style="margin-top:6px;">
+            <span class="material-symbols-outlined">add</span> Add Default
+          </button>
+          <div class="setup-section-save">
+            <button class="btn btn-primary btn-small js-save-config">
+              <span class="material-symbols-outlined">save</span> Save
+            </button>
+            <span class="js-setup-status setup-status"></span>
+          </div>
+        </div>
+
+        <!-- SECTION: Dates -->
+        <div class="setup-section">
+          <div class="setup-section-head">
+            <h2><span class="material-symbols-outlined">date_range</span> Dates</h2>
+            <button id="addDatePresetBtn" class="btn btn-ghost btn-small">
+              <span class="material-symbols-outlined">add</span> Add Preset
+            </button>
+          </div>
+          <p class="setup-hint">Controls the maximum calendar date range and the quick preset chip buttons.</p>
+
+          <div class="setup-field-row">
+            <label for="maxRangeDaysInput">Max date range (days)</label>
+            <input type="number" id="maxRangeDaysInput" min="1" max="365" value="360" class="setup-num-input">
+            <span class="setup-field-hint">1 - 365</span>
+          </div>
+
+          <h3 class="setup-subhead">Quick preset chips <span class="setup-subhint">(label + day offset from today)</span></h3>
+          <div class="setup-col-heads setup-date-heads">
+            <span>Label</span><span>Days offset</span><span></span>
+          </div>
+          <div id="datePresetsWrap" class="setup-list"></div>
+          <div class="setup-section-save">
+            <button class="btn btn-primary btn-small js-save-config">
+              <span class="material-symbols-outlined">save</span> Save
+            </button>
+            <span class="js-setup-status setup-status"></span>
+          </div>
+        </div>
+
+        <!-- SECTION: Retention / Auto-delete -->
+        <div class="setup-section">
+          <div class="setup-section-head">
+            <h2><span class="material-symbols-outlined">delete_history</span> Auto-delete</h2>
+          </div>
+          <p class="setup-hint">
+            Calendars with no Submit/Save activity (i.e. no <code>last_activity</code> update) for this many days will be automatically deleted by the daily cleanup job.
+            <strong>Permanent calendars are always protected</strong> regardless of this setting &mdash; toggle the <em>Permanent</em> switch on the <strong>Calendars</strong> tab to keep a specific calendar forever.
+          </p>
+
+          <div class="setup-field-row">
+            <label for="retentionDaysInput">Calendars: inactive days before auto-delete</label>
+            <input type="number" id="retentionDaysInput" min="1" max="3650" value="30" class="setup-num-input">
+            <span class="setup-field-hint">1 - 3650 (default 30)</span>
+          </div>
+
+          <p class="setup-hint" style="margin-top:16px;">
+            Hubs with no activity for this many days are automatically deleted by the same cleanup job.
+            Activity includes Submit/Save on linked calendars, Hub management actions,
+            and opening a calendar from the Hub list.
+            Child calendars are <strong>detached</strong>, not deleted.
+            <strong>Permanent Hubs</strong> are protected &mdash; toggle <em>Permanent</em> on the <strong>Hubs</strong> tab.
+          </p>
+
+          <div class="setup-field-row">
+            <label for="hubRetentionDaysInput">Hubs: inactive days before auto-delete</label>
+            <input type="number" id="hubRetentionDaysInput" min="1" max="3650" value="30" class="setup-num-input">
+            <span class="setup-field-hint">1 - 3650 (default 30)</span>
+          </div>
+
+          <p class="setup-hint-sm" style="margin-top:8px;">
+            Note: deletion runs from the server's nightly <code>cleanup.php</code> cron job. Changes here take effect on the next scheduled run.
+          </p>
+
+          <div class="setup-section-save">
+            <button class="btn btn-primary btn-small js-save-config">
+              <span class="material-symbols-outlined">save</span> Save
+            </button>
+            <span class="js-setup-status setup-status"></span>
+          </div>
+        </div>
+
+        <!-- Bottom save bar -->
+        <div class="setup-save-bar setup-save-bar-bottom">
+          <button id="saveConfigBtn2" class="btn btn-primary">
+            <span class="material-symbols-outlined">save</span> Save Changes
+          </button>
+          <button id="reloadConfigBtn" class="btn btn-ghost btn-small">
+            <span class="material-symbols-outlined">refresh</span> Reload from server
+          </button>
+          <span id="setupStatus2" class="setup-status"></span>
+        </div>
+
+      </div><!-- /tabSetup -->
+
+    </div>
+  </div>
+
+  <!-- ============================================
+       DELETE CONFIRMATION MODAL (single)
+       ============================================ -->
+  <div id="deleteModal" class="modal hide">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2><span class="material-symbols-outlined">warning</span> Delete Calendar</h2>
+      <p>Are you sure you want to delete this calendar?</p>
+      <p class="modal-detail" id="deleteCalendarInfo"></p>
+      <p class="warn">This action cannot be undone. All users and availability data will be permanently deleted.</p>
+      <div class="modal-actions">
+        <button id="cancelDelete" class="btn btn-ghost">Cancel</button>
+        <button id="confirmDelete" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       BULK DELETE CONFIRMATION MODAL
+       ============================================ -->
+  <div id="bulkDeleteModal" class="modal hide">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2><span class="material-symbols-outlined">warning</span> Delete Multiple Calendars</h2>
+      <p>Are you sure you want to delete <strong id="bulkDeleteCount">0</strong> calendars?</p>
+      <div class="modal-detail" id="bulkDeleteList" style="max-height: 200px; overflow-y: auto;"></div>
+      <p class="warn">This action cannot be undone. All users and availability data will be permanently deleted.</p>
+      <div class="form-group" style="margin-top: 16px;">
+        <label for="bulkConfirmInput">Type <strong>DELETE</strong> to confirm:</label>
+        <input type="text" id="bulkConfirmInput" placeholder="DELETE" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button id="cancelBulkDelete" class="btn btn-ghost">Cancel</button>
+        <button id="confirmBulkDelete" class="btn btn-danger" disabled>Delete All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       DELETE HUB CONFIRMATION MODAL (single)
+       ============================================ -->
+  <div id="deleteHubModal" class="modal hide">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2><span class="material-symbols-outlined">warning</span> Delete Hub</h2>
+      <p>Are you sure you want to delete this Hub?</p>
+      <p class="modal-detail" id="deleteHubInfo"></p>
+      <p class="warn">Child calendars will <strong>not</strong> be deleted — they will be detached and remain standalone. Hub sessions will be removed. This action cannot be undone.</p>
+      <div class="modal-actions">
+        <button id="cancelDeleteHub" class="btn btn-ghost">Cancel</button>
+        <button id="confirmDeleteHub" class="btn btn-danger">Delete Hub</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       BULK DELETE HUB CONFIRMATION MODAL
+       ============================================ -->
+  <div id="bulkDeleteHubModal" class="modal hide">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2><span class="material-symbols-outlined">warning</span> Delete Multiple Hubs</h2>
+      <p>Are you sure you want to delete <strong id="bulkDeleteHubCount">0</strong> Hubs?</p>
+      <div class="modal-detail" id="bulkDeleteHubList" style="max-height: 200px; overflow-y: auto;"></div>
+      <p class="warn">Child calendars will <strong>not</strong> be deleted — they will be detached and remain standalone. This action cannot be undone.</p>
+      <div class="form-group" style="margin-top: 16px;">
+        <label for="bulkDeleteHubConfirmInput">Type <strong>DELETE</strong> to confirm:</label>
+        <input type="text" id="bulkDeleteHubConfirmInput" placeholder="DELETE" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button id="cancelBulkDeleteHub" class="btn btn-ghost">Cancel</button>
+        <button id="confirmBulkDeleteHub" class="btn btn-danger" disabled>Delete All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       DELETE USER CONFIRMATION MODAL
+       ============================================ -->
+  <div id="deleteUserModal" class="modal hide">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2><span class="material-symbols-outlined">person_remove</span> Delete User</h2>
+      <p>Are you sure you want to delete this user?</p>
+      <p class="modal-detail" id="deleteUserInfo"></p>
+      <p class="warn">This will permanently remove the user and all their availability data.</p>
+      <div class="modal-actions">
+        <button id="cancelDeleteUser" class="btn btn-ghost">Cancel</button>
+        <button id="confirmDeleteUser" class="btn btn-danger">Delete User</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Material Symbols Font -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0">
+
+  <script src="admin.js"></script>
+</body>
+</html>

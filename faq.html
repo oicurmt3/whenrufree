@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- Prevents leaking the calendar token in the Referer header -->
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Arrange a time when everyone in your group is available. Create free shared calendars, schedule availability, and plan events -- no sign-up required.">
+  <title>FAQ & Help - When RU Free?</title>
+
+  <!-- Common page styles -->
+  <link rel="stylesheet" href="page.css">
+</head>
+<body>
+  <div class="card help-page" style="max-width: 800px;">
+    <div class="top-actions">
+      <h1 style="margin:0;"><span class="material-symbols-outlined">contact_support</span> FAQ & Help</h1>
+      <a class="btn btn-ghost btn-small" onclick="history.back()" style="text-decoration:none;">&lt;- Back</a>
+    </div>
+
+    <p class="sub" style="margin-top:8px;">
+      Everything you need to know about using <b>When RU Free?</b> to coordinate group availability.
+    </p>
+
+    <!-- GETTING STARTED -->
+    <h2><span class="material-symbols-outlined">rocket_launch</span> Getting Started</h2>
+    
+    <h3>How it works</h3>
+    <p>
+      <b>When RU Free?</b> is a simple group availability tool. An organiser creates a calendar, 
+      shares the link with participants, and everyone marks their availability. The app automatically 
+      ranks the best dates based on responses.
+    </p>
+    
+    <ol>
+      <li><b>Create a calendar</b> - Set a title, date range, time slots, and status options</li>
+      <li><b>Share the link</b> - Send the unique URL to your group</li>
+      <li><b>Add availability</b> - Each person adds their name, sets a PIN, and marks their slots</li>
+      <li><b>See results</b> - The "Best Catch-Up Dates" section ranks optimal times</li>
+    </ol>
+
+    <h3>Opening a link by code</h3>
+    <p>
+      If someone gave you a calendar or Hub code (or a full URL), use the <a href="go/">Go page</a>.
+      Choose <b>Calendar</b> or <b>Hub</b>, paste the code or link, and tap <b>Go</b>.
+    </p>
+
+    <!-- CALENDAR HUBS -->
+    <h2><span class="material-symbols-outlined">hub</span> Calendar Hubs</h2>
+
+    <p>
+      A <b>Hub</b> gives your group one link to find all related calendars — useful for clubs, teams, or committees running multiple polls.
+    </p>
+
+    <ol>
+      <li><b>Create a Hub</b> — set a name and organiser PIN (<a href="hub.html?create=1">Create a Hub</a>)</li>
+      <li><b>Save the Hub link</b> when prompted — it cannot be recovered if lost</li>
+      <li><b>Add calendars</b> — anyone with the Hub link can create a new calendar in the Hub; calendar organisers can attach existing calendars via <b>Add to Hub</b> on the calendar page</li>
+      <li><b>Share once</b> — participants pick which calendar to open from the Hub list</li>
+    </ol>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Do I need the Hub organiser PIN to create a calendar in a Hub?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>No. Anyone with the Hub link can create a new calendar in that Hub. The Hub organiser PIN is only for managing the Hub (remove calendars, Share/Email/Download, Logout on shared computers).</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I add an existing calendar to a Hub?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Log in as that calendar's organiser. On the calendar page, use the Hub bar and tap <b>Add to Hub</b>. Enter the Hub code or full Hub link.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        I lost my Hub link — can you recover it?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>No. Hub links cannot be recovered. Save your link when you create the Hub (copy, download, email, or poster).</p>
+      </div>
+    </div>
+
+    <!-- FOR PARTICIPANTS -->
+    <h2><span class="material-symbols-outlined">person</span> For Participants</h2>
+    
+    <h3>Adding your availability</h3>
+    <ol>
+      <li>Click the <span class="material-symbols-outlined icon-inline">person</span> person icon to open the user list</li>
+      <li>Click "Add Your Name" and enter your name + a 4-digit PIN</li>
+      <li>Click on time slots to cycle through status options (e.g., Yes -&gt; Maybe -&gt; No -&gt; blank)</li>
+      <li>Your changes auto-save after a few seconds, or click <span class="material-symbols-outlined icon-inline">check</span> to save immediately</li>
+    </ol>
+    
+    <h3>Understanding the slots</h3>
+    <p>
+      Each slot may show a <b>coloured left border</b>. This indicates the 
+      <b>organiser's choice</b> for that slot, helping you see which times they prefer.
+    </p>
+    
+    <h3>Changing your responses</h3>
+    <p>
+      Simply click any slot to cycle through the options again. To clear a slot entirely, 
+      keep clicking until it returns to the default grey (no selection).
+    </p>
+    
+    <h3>Resetting your availability</h3>
+    <p>
+      Click the <span class="material-symbols-outlined icon-inline">delete</span> trash icon to reset ALL your availability. 
+      This requires double confirmation (you must type "RESET") to prevent accidents.
+    </p>
+
+    <!-- FOR ORGANISERS -->
+    <h2><span class="material-symbols-outlined">person_shield</span> For Organisers (Admin)</h2>
+    
+    <p>As the calendar creator, you have additional features:</p>
+    
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h4><span class="material-symbols-outlined">share</span> Share</h4>
+        <p>Share the calendar link via your device's share menu or copy to clipboard.</p>
+      </div>
+      <div class="feature-card">
+        <h4><span class="material-symbols-outlined">person_edit</span> Edit Name</h4>
+        <p>Change your display name (doesn't affect saved availability).</p>
+      </div>
+      <div class="feature-card">
+        <h4><span class="material-symbols-outlined">delete</span> Reset Mine</h4>
+        <p>Clear all YOUR availability data. Requires typing "RESET" to confirm.</p>
+      </div>
+      <div class="feature-card">
+        <h4><span class="material-symbols-outlined">warning</span> Reset All</h4>
+        <p>Clear ALL availability for ALL users. Requires typing "RESET" to confirm.</p>
+      </div>
+      <div class="feature-card">
+        <h4><span class="material-symbols-outlined">hub</span> Add to Hub</h4>
+        <p>Attach this calendar to a Hub using the Hub code or link. Remove from Hub from the same bar.</p>
+      </div>
+      <div class="feature-card">
+        <h4><span class="material-symbols-outlined">check_circle</span> Choose / Finalise</h4>
+        <p>Lock in a chosen date and slot from the rankings panel. Freezes the calendar. Tap "Reopen" to undo.</p>
+      </div>
+    </div>
+    
+    <h3>Organiser status indicator</h3>
+    <p>
+      When you (the organiser) set your availability, other participants will see a coloured left border 
+      on their slots indicating your preferences. This helps guide participants to times that work for you.
+    </p>
+
+    <!-- BEST DATES RANKING -->
+    <h2><span class="material-symbols-outlined">trophy</span> Best Dates Ranking</h2>
+    
+    <p>
+      The ranking automatically calculates the best meeting times based on everyone's responses. 
+      Each status option has a "weight":
+    </p>
+    <ul>
+      <li><b>Yes</b> (or first option) = highest weight</li>
+      <li><b>Maybe</b> (or second option) = medium weight</li>
+      <li><b>No</b> (or third+ options) = lowest weight</li>
+    </ul>
+    <p>
+      Slots with the highest combined weights appear at the top. Click "View" on any ranking to see 
+      who responded and their individual statuses.
+    </p>
+    
+    <h3>Adding to your calendar</h3>
+    <p>
+      Once you've decided on a date, expand the ranking card and use:
+    </p>
+    <ul>
+      <li><b>Add to Google</b> - Opens Google Calendar with the event pre-filled</li>
+      <li><b>.ics Download</b> - Downloads a calendar file for Outlook, Apple Calendar, etc.</li>
+      <li><b>Choose</b> (organiser only) - Locks in this date+slot as the final decision and freezes the calendar</li>
+    </ul>
+
+    <!-- FAQ SECTION -->
+    <h2><span class="material-symbols-outlined">contact_support</span> Frequently Asked Questions</h2>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What happens if I forget my PIN?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Unfortunately, PINs cannot be recovered. You'll need to create a new name entry. 
+        Contact the organiser if you need your old entry removed.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Can I change my PIN?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Currently, PINs cannot be changed after creation. Choose a memorable 4-digit code when you first sign up.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Why am I locked out after entering wrong PINs?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>For security, accounts are temporarily locked after several incorrect PIN attempts. 
+        Wait a few minutes and try again with the correct PIN.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How long do calendars last?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Calendars with no activity (saves) are automatically deleted after a period of time 
+        to reduce data storage. Make sure someone saves their availability periodically to keep 
+        the calendar active, or export your results before the calendar expires.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Can I edit the calendar settings after creation?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Currently, calendar settings (title, dates, slots, status options) cannot be changed 
+        after creation. Create a new calendar if you need different settings.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Is my data secure?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>The calendar link acts like a password - anyone with the link can view and participate. 
+        Only share links with trusted participants. PINs protect individual entries from being 
+        modified by others. <b>Do not enter sensitive or private information.</b></p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What do the privacy modes mean?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>When creating a calendar, you can choose from three privacy modes:</p>
+        <ul>
+          <li><b><span class="material-symbols-outlined icon-inline">visibility</span> Open</b> - All users can see each other's choices. This is the default and works best when everyone should see who's available when.</li>
+          <li><b><span class="material-symbols-outlined icon-inline">visibility_off</span> Hidden</b> - Users cannot see each other's choices, but the organiser can still see all individual responses. Useful for voting or when you don't want participants to influence each other.</li>
+          <li><b><span class="material-symbols-outlined icon-inline">lock</span> Blind</b> - All choices are completely private. Even the organiser cannot see individual responses - only aggregate counts (e.g., "3 Yes, 2 Maybe"). Perfect for anonymous voting or sensitive surveys.</li>
+        </ul>
+        <p>In all modes, aggregate counts are always visible so everyone can see the overall results.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What does "Date display" do?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>When creating a calendar, the organiser can choose how dates are shown to participants:</p>
+        <ul>
+          <li><b><span class="material-symbols-outlined icon-inline">date_range</span> All dates</b> - Every date in the range is shown. This is the default.</li>
+          <li><b><span class="material-symbols-outlined icon-inline">event_available</span> Only chosen</b> - Participants see only the dates the organiser selects. After creating the calendar, the organiser clicks date headers to pick which dates are visible.</li>
+          <li><b><span class="material-symbols-outlined icon-inline">event_busy</span> All except</b> - Participants see all dates except the ones the organiser selects. Useful for blocking out dates that are already taken.</li>
+        </ul>
+        <p>The organiser always sees all dates (with selected ones highlighted in blue) so they can manage their selections. Date filter selections auto-save to the server.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How does the organiser select dates for filtering?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>After creating a calendar with "Only chosen" or "All except" mode, the organiser logs in and clicks the <b>date headers</b> (the day number/name at the top of each column) to toggle dates on and off. Selected dates appear with a blue highlight that is only visible to the organiser. A banner at the top shows the current filter mode and how many dates are selected.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What does the green "Decided" banner mean?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>The organiser has locked in a final date and time slot. The calendar is now frozen -- 
+        no one can change their availability. The chosen slot is highlighted in the calendar grid 
+        with a green outline, and all other slots are dimmed. If the organiser changes their mind, 
+        they can tap "Reopen" to allow editing again.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How does the organiser finalise a date?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>The organiser expands a rank card by tapping "View", then taps the green <b>Choose</b> button. 
+        After confirming, the calendar is frozen and a green "Decided" banner appears. To undo, 
+        tap the "Reopen" button in the banner.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Why don't I see the organiser dots?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Organiser indicators (coloured left borders on slots) only appear when the organiser has set their availability for a slot. 
+        If you ARE the organiser, you won't see your own indicators (you already know your preferences!). 
+        They are only visible to other participants. In Blind mode, no individual indicators are shown.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Does my availability save automatically?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Yes! Changes auto-save after about 4-5 seconds of inactivity. You'll see the save button 
+        spin briefly when saving. You can also click the <span class="material-symbols-outlined icon-inline">check</span> 
+        button to save immediately.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What do the different status colours mean?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>The legend at the top of the calendar shows what each colour means. By default:</p>
+        <ul>
+          <li><b>Green</b> = Yes / Available</li>
+          <li><b>Yellow/Orange</b> = Maybe / Tentative</li>
+          <li><b>Red/Blue</b> = No / Unavailable</li>
+          <li><b>Grey</b> = No response yet</li>
+        </ul>
+        <p>Organisers can customise these options when creating the calendar.</p>
+      </div>
+    </div>
+
+    <!-- TIPS -->
+    <h2><span class="material-symbols-outlined">tooltip_2</span> Tips</h2>
+    <ul>
+      <li><b>Bookmark the calendar link</b> - You'll need it to return and update your availability</li>
+      <li><b>Use the Go page</b> - Open <a href="go/">Go to code</a> if you have a calendar or Hub code or URL</li>
+      <li><b>Use a memorable PIN</b> - You can't recover it if forgotten</li>
+      <li><b>Check the organiser indicator</b> - The coloured left border on slots shows which times the organiser prefers</li>
+      <li><b>View "Top 10"</b> - Click the "Top 10" button to see more ranked date options</li>
+      <li><b>Use date filtering</b> - Organisers can narrow the visible dates using "Only chosen" or "All except" modes</li>
+      <li><b>Export early</b> - Calendars may be deleted after inactivity, so save important outcomes</li>
+    </ul>
+
+    <!-- CONTACT -->
+    <h2><span class="material-symbols-outlined">live_help</span> Need More Help?</h2>
+    <p>
+      For questions or issues, contact: <b>admin@whenrufree.net</b>
+    </p>
+    <p class="muted" style="margin-top: 10px;">
+      See also:     <a href="index.html" style="color:inherit; text-decoration:underline;">Home</a>
+    <span aria-hidden="true"> | </span>
+    <a href="go/" style="color:inherit; text-decoration:underline;">Go to code</a>
+    <span aria-hidden="true"> | </span>
+    <a href="terms.html" style="color:inherit; text-decoration:underline;">Terms</a>
+    <span aria-hidden="true"> | </span>
+    <a href="privacy.html" style="color:inherit; text-decoration:underline;">Privacy</a>
+    <span aria-hidden="true"> | </span>
+    <a href="faq.html" style="color:inherit; text-decoration:underline;">FAQs</a>
+    <span aria-hidden="true"> | </span>
+    <a href="ideas.html" style="color:inherit; text-decoration:underline;">Templates</a>
+    <span aria-hidden="true"> | </span>
+    <a href="guide.html" style="color:inherit; text-decoration:underline;">Guide</a>
+    </p>
+
+    <div class="top-actions" style="margin-top: 24px;">
+      <a class="btn btn-ghost btn-small" onclick="history.back()" style="text-decoration:none;">&lt;- Back</a>
+    </div>
+  </div>
+</body>
+</html>

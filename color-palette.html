@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="When RU Free color palette reference for developers and designers.">
+  <title>Color Palette - When RU Free</title>
+  <link rel="stylesheet" href="page.css">
+  <style>
+    .palette-page { max-width: 1024px; }
+    .palette-intro { margin: 8px 0 20px; line-height: 1.5; color: var(--text-muted); }
+    .palette-nav {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;
+    }
+    .palette-nav a {
+      font-size: 0.85rem; padding: 6px 12px; border-radius: 6px;
+      background: var(--grey-bg); border: 1px solid var(--grey-border);
+      color: var(--text-main); text-decoration: none; font-weight: 600;
+    }
+    .palette-nav a:hover { background: var(--blue-bg); border-color: var(--blue-border); }
+    .palette-section { margin-bottom: 32px; }
+    .palette-section > p { margin: 0 0 12px; font-size: 0.92rem; color: var(--text-muted); }
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .swatch {
+      border: 1px solid var(--grey-border); border-radius: var(--radius-sm);
+      overflow: hidden; background: #fff;
+    }
+    .swatch-color {
+      height: 72px; display: flex; align-items: flex-end; padding: 8px 10px;
+      font-size: 0.78rem; font-weight: 700; font-family: Consolas, monospace;
+    }
+    .swatch-color.light-text { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+    .swatch-color.dark-text { color: #222; }
+    .swatch-body { padding: 10px 12px 12px; }
+    .swatch-name { font-weight: 700; font-size: 0.95rem; margin: 0 0 4px; }
+    .swatch-hex {
+      font-family: Consolas, 'Courier New', monospace; font-size: 0.88rem;
+      color: var(--primary); margin: 0 0 6px;
+    }
+    .swatch-var {
+      font-family: Consolas, monospace; font-size: 0.8rem;
+      color: var(--text-muted); margin: 0 0 8px;
+    }
+    .swatch-use { font-size: 0.85rem; line-height: 1.45; margin: 0; color: #444; }
+    .swatch-use code {
+      font-size: 0.8rem; background: #f5f5f5; padding: 1px 4px; border-radius: 3px;
+    }
+    .swatch-file {
+      display: inline-block; margin-top: 8px; font-size: 0.75rem;
+      color: var(--text-muted); background: #f0f0f0; padding: 2px 6px; border-radius: 4px;
+    }
+    .btn-demo-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; }
+    .demo-btn {
+      border: none; border-radius: 6px; padding: 10px 16px;
+      font-weight: 600; font-size: 0.9rem; cursor: default; min-height: 44px;
+    }
+    table.palette-table {
+      width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 8px;
+    }
+    table.palette-table th, table.palette-table td {
+      border: 1px solid var(--grey-border); padding: 8px 10px; text-align: left;
+    }
+    table.palette-table th { background: var(--grey-bg); font-weight: 700; }
+    .mini-swatch {
+      display: inline-block; width: 18px; height: 18px; border-radius: 3px;
+      vertical-align: middle; margin-right: 6px; border: 1px solid rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <div class="card palette-page">
+    <div class="top-actions">
+      <h1 style="margin:0;"><span class="material-symbols-outlined">palette</span> Color Palette</h1>
+      <a class="btn btn-ghost btn-small" onclick="history.back()" style="text-decoration:none;">&lt;- Back</a>
+    </div>
+
+    <main id="main-content">
+      <p class="palette-intro">
+        Reference for colours used across <b>When RU Free</b>. Status slot colours are configurable per calendar;
+        CSS defaults are from <code>calendar.css</code>; runtime defaults also appear in <code>calendar.js</code> and
+        <code>index.js</code>. Sources: stylesheets
+        (<code>page.css</code>, <code>index.css</code>, <code>calendar.css</code>, <code>hub.css</code>, <code>admin.css</code>),
+        inline HTML (<code>go/index.html</code>, <code>index.html</code>, <code>calendar.html</code>),
+        and JS string templates (<code>index.js</code>, <code>hub.js</code>, <code>calendar.js</code>, <code>admin.js</code>).
+      </p>
+
+      <nav class="palette-nav" aria-label="Palette sections">
+        <a href="#brand">Brand</a>
+        <a href="#semantic">Semantic</a>
+        <a href="#surfaces">Surfaces</a>
+        <a href="#buttons">Buttons</a>
+        <a href="#status">Status slots</a>
+        <a href="#calendar">Calendar UI</a>
+        <a href="#hub">Hub</a>
+        <a href="#index">Create page</a>
+        <a href="#admin">Admin</a>
+        <a href="#docs">Docs pages</a>
+        <a href="#html-inline">HTML inline</a>
+        <a href="#js-runtime">JS runtime</a>
+      </nav>
+
+      <!-- BRAND -->
+      <section id="brand" class="palette-section">
+        <h2><span class="material-symbols-outlined">brush</span> Brand and primary</h2>
+        <p>Core identity colours shared across most pages.</p>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#3f51b5;">#3f51b5</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Primary (Indigo)</p>
+              <p class="swatch-hex">#3f51b5</p>
+              <p class="swatch-var">--primary</p>
+              <p class="swatch-use">Page <code>h1</code> backgrounds, active toggles, hub link bar border, save panel headings, calendar header accents, category nav active state.</p>
+              <span class="swatch-file">page.css, index.css, hub.css, calendar.css, admin.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#303f9f;">#303f9f</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Primary dark</p>
+              <p class="swatch-hex">#303f9f</p>
+              <p class="swatch-var">--primary-dark</p>
+              <p class="swatch-use">Hover states on primary buttons (calendar page).</p>
+              <span class="swatch-file">calendar.css, page.css, admin.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#880000;">#880000</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Accent (Maroon)</p>
+              <p class="swatch-hex">#880000</p>
+              <p class="swatch-var">--accent</p>
+              <p class="swatch-use">Primary action buttons on create/hub pages, ranking toggle active, today column highlight, validation focus borders, poster promo strip.</p>
+              <span class="swatch-file">index.css, hub.css, page.css, admin.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#283593;">#283593</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Primary text (deep indigo)</p>
+              <p class="swatch-hex">#283593</p>
+              <p class="swatch-use">Hub organiser badge, hub context banner, hub link URL text, calendar hub bar links.</p>
+              <span class="swatch-file">hub.css, index.css, calendar.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e8eaf6;">#e8eaf6</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Primary tint background</p>
+              <p class="swatch-hex">#e8eaf6</p>
+              <p class="swatch-use">Hub link bar, organiser badge bg, active type toggle (go page), calendar hub bar, admin selected rows.</p>
+              <span class="swatch-file">hub.css, go/index.html, calendar.css, admin.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#c5cae9;">#c5cae9</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Primary tint border</p>
+              <p class="swatch-hex">#c5cae9</p>
+              <p class="swatch-use">Hub link bar border, hub context banner border, calendar date-filter highlights.</p>
+              <span class="swatch-file">hub.css, index.css, calendar.css</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEMANTIC -->
+      <section id="semantic" class="palette-section">
+        <h2><span class="material-symbols-outlined">flag</span> Semantic colours</h2>
+        <p>Success, danger, warning, and info messaging.</p>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#2e7d32;">#2e7d32</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Success green</p>
+              <p class="swatch-hex">#2e7d32</p>
+              <p class="swatch-var">--green-text, --success (admin)</p>
+              <p class="swatch-use">Hub Open button, frozen/decided badges, chosen banner text, choose button, admin success state.</p>
+              <span class="swatch-file">hub.css, calendar.css, page.css, admin.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e8f5e9;">#e8f5e9</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Success background</p>
+              <p class="swatch-hex">#e8f5e9</p>
+              <p class="swatch-var">--green-bg, --success-light</p>
+              <p class="swatch-use">Frozen hub cards, decided banner, chosen slot highlight, guide tip boxes (green).</p>
+              <span class="swatch-file">hub.css, calendar.css, page.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#357A38;">#357A38</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Success border (strong)</p>
+              <p class="swatch-hex">#357A38</p>
+              <p class="swatch-use">Frozen cal-card border, chosen slot outline, reopen button hover.</p>
+              <span class="swatch-file">hub.css, calendar.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#b00020;">#b00020</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Danger</p>
+              <p class="swatch-hex">#b00020</p>
+              <p class="swatch-var">--danger</p>
+              <p class="swatch-use">Error text, PIN errors, modal warnings border, delete buttons, validation errors, go page input error.</p>
+              <span class="swatch-file">All main CSS files</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#fdecea; border-bottom:3px solid #b00020;">#fdecea</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Danger background (strong warn)</p>
+              <p class="swatch-hex">#fdecea on #b00020 border</p>
+              <p class="swatch-use">Save panel "Important" box (hub + create), save modal acknowledgement areas.</p>
+              <span class="swatch-file">hub.css, index.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#fff3cd;">#fff3cd</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Warning background</p>
+              <p class="swatch-hex">#fff3cd / border #ffeeba</p>
+              <p class="swatch-use">Warning boxes on create page, guide/faq warn boxes, clipboard-fail hint, admin bulk bar.</p>
+              <span class="swatch-file">index.css, hub.css, page.css, admin.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#fff3cd; color:#6b5200;">#6b5200</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Warning text</p>
+              <p class="swatch-hex">#6b5200</p>
+              <p class="swatch-var">--border-s, --border-section (index)</p>
+              <p class="swatch-use">Warning box text, section borders on create page.</p>
+              <span class="swatch-file">index.css, page.css, hub.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#d1ecf1;">#d1ecf1</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Info background</p>
+              <p class="swatch-hex">#d1ecf1 / border #bee5eb</p>
+              <p class="swatch-use">Info boxes on create page (Hub context banner uses indigo tint instead).</p>
+              <span class="swatch-file">index.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#d1ecf1; color:#0c5460;">#0c5460</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Info text</p>
+              <p class="swatch-hex">#0c5460</p>
+              <p class="swatch-use">Info box text and links on create page.</p>
+              <span class="swatch-file">index.css</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SURFACES -->
+      <section id="surfaces" class="palette-section">
+        <h2><span class="material-symbols-outlined">layers</span> Surfaces and text</h2>
+        <p>Page backgrounds, cards, borders, and typography colours.</p>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#f5f5f5;">#f5f5f5</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Body grey</p>
+              <p class="swatch-hex">#f5f5f5</p>
+              <p class="swatch-var">--bg-body (hub, admin, go)</p>
+              <p class="swatch-use">Hub page body, admin panel body, go page background, URL display boxes, save panel link field.</p>
+              <span class="swatch-file">hub.css, admin.css, go/, index.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#eee;">#eee</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Calendar body</p>
+              <p class="swatch-hex">#eee</p>
+              <p class="swatch-var">--bg-body, --bg-card (calendar)</p>
+              <p class="swatch-use">Calendar page background and card areas.</p>
+              <span class="swatch-file">calendar.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#fff;">#ffffff</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Card white</p>
+              <p class="swatch-hex">#ffffff</p>
+              <p class="swatch-var">--bg-card</p>
+              <p class="swatch-use">All card containers, modals, secondary buttons, input backgrounds.</p>
+              <span class="swatch-file">All CSS files</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#fafafa;">#fafafa</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Subtle fill</p>
+              <p class="swatch-hex">#fafafa</p>
+              <p class="swatch-use">Hub calendar cards, admin table zebra, setup sections.</p>
+              <span class="swatch-file">hub.css, admin.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#333; color:#fff;">#333333</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Text main</p>
+              <p class="swatch-hex">#333333</p>
+              <p class="swatch-var">--text-main</p>
+              <p class="swatch-use">Body copy, labels, table text, modal content.</p>
+              <span class="swatch-file">All CSS files</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#666; color:#fff;">#666666</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Text muted</p>
+              <p class="swatch-hex">#666666</p>
+              <p class="swatch-var">--text-muted</p>
+              <p class="swatch-use">Hints, subtitles, footer links, rank line 2, empty states.</p>
+              <span class="swatch-file">All CSS files</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#aaa;">#aaaaaa</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Border default</p>
+              <p class="swatch-hex">#aaaaaa</p>
+              <p class="swatch-var">--border</p>
+              <p class="swatch-use">Inputs, buttons, field borders, grid lines.</p>
+              <span class="swatch-file">index.css, hub.css, page.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#ddd;">#dddddd</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Border light</p>
+              <p class="swatch-hex">#dddddd</p>
+              <p class="swatch-use">Hub cal-cards, admin borders, dashed empty states.</p>
+              <span class="swatch-file">hub.css, admin.css</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#333;">#333333</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Toast background</p>
+              <p class="swatch-hex">#333333</p>
+              <p class="swatch-use">Toast notifications (hub, index, calendar).</p>
+              <span class="swatch-file">hub.css, index.css, calendar.css</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BUTTONS -->
+      <section id="buttons" class="palette-section">
+        <h2><span class="material-symbols-outlined">smart_button</span> Button colours by role</h2>
+        <p>Functional button colours follow role, not page.</p>
+        <div class="btn-demo-row">
+          <button type="button" class="demo-btn" style="background:#880000;color:#fff;">Primary / Create (#880000)</button>
+          <button type="button" class="demo-btn" style="background:#3f51b5;color:#fff;">Indigo action (#3f51b5)</button>
+          <button type="button" class="demo-btn" style="background:#2e7d32;color:#fff;">Open / Go (#2e7d32)</button>
+          <button type="button" class="demo-btn" style="background:#fff;color:#222;border:1px solid #aaa;">Secondary (#fff)</button>
+          <button type="button" class="demo-btn" style="background:#b00020;color:#fff;">Danger / Delete (#b00020)</button>
+          <button type="button" class="demo-btn" style="background:#4caf50;color:#fff;">Save submit (#4caf50)</button>
+          <button type="button" class="demo-btn" style="background:#f44336;color:#fff;">Saved state (#f44336)</button>
+        </div>
+        <table class="palette-table">
+          <thead>
+            <tr><th>Role</th><th>Background</th><th>Used on</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Primary (maroon)</td><td><span class="mini-swatch" style="background:#880000;"></span>#880000</td><td>Create Hub, Create Calendar, copy link (hub bar), ranking toggle active</td></tr>
+            <tr><td>Primary (indigo)</td><td><span class="mini-swatch" style="background:#3f51b5;"></span>#3f51b5</td><td>Calendar header actions, go page Go button, save panel Continue</td></tr>
+            <tr><td>Open / success action</td><td><span class="mini-swatch" style="background:#2e7d32;"></span>#2e7d32</td><td>Hub cal-card Open button, Choose/finalise actions</td></tr>
+            <tr><td>Secondary</td><td><span class="mini-swatch" style="background:#fff;border:1px solid #aaa;"></span>#fff + #aaa border</td><td>Remove, Share, Download, ghost actions</td></tr>
+            <tr><td>Danger</td><td><span class="mini-swatch" style="background:#b00020;"></span>#b00020</td><td>Admin delete, reset confirmations</td></tr>
+            <tr><td>Submit (unsaved)</td><td><span class="mini-swatch" style="background:#4caf50;"></span>#4caf50</td><td>Calendar save button (ready to save)</td></tr>
+            <tr><td>Submit (saved)</td><td><span class="mini-swatch" style="background:#f44336;"></span>#f44336</td><td>Calendar save button (all saved)</td></tr>
+            <tr><td>Google Calendar link</td><td><span class="mini-swatch" style="background:#fff;border:1px solid #1a73e8;"></span>#1a73e8 border</td><td>Rank card "Add to Google"</td></tr>
+            <tr><td>Share export</td><td><span class="mini-swatch" style="background:#fff;border:1px solid #34a853;"></span>#34a853 border</td><td>Rank card Share button</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- STATUS SLOTS -->
+      <section id="status" class="palette-section">
+        <h2><span class="material-symbols-outlined">grid_view</span> Default status slot colours</h2>
+        <p>Overridden per calendar via organiser status options. Defaults from <code>calendar.css :root</code>.</p>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#6fae00;">#6fae00</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Status 1 (Yes / positive)</p>
+              <p class="swatch-hex">#6fae00</p>
+              <p class="swatch-var">--status-1, --status-yes</p>
+              <p class="swatch-use">Default first option — typically "Yes" or highest weight.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e1b000;">#e1b000</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Status 2 (Maybe)</p>
+              <p class="swatch-hex">#e1b000</p>
+              <p class="swatch-var">--status-2, --status-maybe</p>
+              <p class="swatch-use">Default second option — tentative / maybe.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#0000FF;">#0000FF</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Status 3 (No)</p>
+              <p class="swatch-hex">#0000FF</p>
+              <p class="swatch-var">--status-3, --status-no</p>
+              <p class="swatch-use">Default third option — negative / unavailable.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#808080;">#808080</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Status 4</p>
+              <p class="swatch-hex">#808080</p>
+              <p class="swatch-var">--status-4</p>
+              <p class="swatch-use">Optional fourth status colour.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#FF0000;">#FF0000</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Status 5</p>
+              <p class="swatch-hex">#FF0000</p>
+              <p class="swatch-var">--status-5</p>
+              <p class="swatch-use">Optional fifth status colour.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e0e0e0;">#e0e0e0</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Empty slot (null)</p>
+              <p class="swatch-hex">#e0e0e0</p>
+              <p class="swatch-var">--status-null</p>
+              <p class="swatch-use">Unselected calendar grid cells.</p>
+            </div>
+          </div>
+        </div>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin-top:12px;">
+          Contrast text on slots uses <code>--status-N-text</code> (#fff or #000), computed at runtime via <code>getContrastTextColor()</code> in calendar.js / index.js.
+        </p>
+      </section>
+
+      <!-- CALENDAR UI -->
+      <section id="calendar" class="palette-section">
+        <h2><span class="material-symbols-outlined">calendar_month</span> Calendar page highlights</h2>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e3f2fd; color:#1565c0;">Open badge</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Privacy: Open indicator</p>
+              <p class="swatch-hex">bg #e3f2fd, text #1565c0</p>
+              <p class="swatch-use">Privacy mode badge when calendar is open.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#cce5ff; color:#004085;">Hidden badge</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Privacy: Hidden indicator</p>
+              <p class="swatch-hex">bg #cce5ff, text #004085</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#d4edda; color:#155724;">Blind badge</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Privacy: Blind indicator</p>
+              <p class="swatch-hex">bg #d4edda, text #155724</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#fff3e0; color:#e65100;">Filter banner</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Date filter banner</p>
+              <p class="swatch-hex">bg #fff3e0, text #e65100</p>
+              <p class="swatch-var">--orange-bg / --orange-text (page.css)</p>
+              <p class="swatch-use">Organiser date-filter instruction banner.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#880000; color:#fff;">Today</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Today column</p>
+              <p class="swatch-hex">#880000</p>
+              <p class="swatch-use">Today's date number and day name in grid header.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#69f0ae; color:#222;">Connected</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Server status: connected</p>
+              <p class="swatch-hex">#69f0ae</p>
+              <p class="swatch-use">Footer server connection indicator.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HUB -->
+      <section id="hub" class="palette-section">
+        <h2><span class="material-symbols-outlined">hub</span> Hub page</h2>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e3f2fd; color:#1565c0;">Open</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Cal-card badge: Open</p>
+              <p class="swatch-hex">bg #e3f2fd, text #1565c0</p>
+              <p class="swatch-use"><code>.badge-open</code> on active calendars in hub list.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e8f5e9; color:#2e7d32;">Decided</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Cal-card badge: Decided</p>
+              <p class="swatch-hex">bg #e8f5e9, text #2e7d32</p>
+              <p class="swatch-use"><code>.badge-frozen</code> when calendar has chosen slot.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#f1f8f1; border:2px solid #357A38;">Frozen card</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Frozen cal-card</p>
+              <p class="swatch-hex">bg #f1f8f1, border #357A38</p>
+              <p class="swatch-use"><code>.cal-card.frozen</code> list item styling.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INDEX -->
+      <section id="index" class="palette-section">
+        <h2><span class="material-symbols-outlined">edit_calendar</span> Create page (index)</h2>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#3f51b5; color:#e5e5e5;">#e5e5e5 on #3f51b5</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Page title</p>
+              <p class="swatch-hex">bg #3f51b5, text #e5e5e5</p>
+              <p class="swatch-use"><code>h1</code> "When RU Free?" header bar.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e8eaf6; color:#283593;">Hub banner</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Hub context banner</p>
+              <p class="swatch-hex">bg #e8eaf6, text #283593, border #c5cae9</p>
+              <p class="swatch-use"><code>#hubContextBanner</code> when creating in a Hub.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#f5f5f5; border:2px solid #3f51b5;">Save URL</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Save panel URL display</p>
+              <p class="swatch-hex">bg #f5f5f5, border #3f51b5</p>
+              <p class="swatch-use">Post-create save modal link field.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#1E4620; color:#fff;">Green warn box</div>
+            <div class="swatch-body">
+              <p class="swatch-name">warn-red (legacy)</p>
+              <p class="swatch-hex">#1E4620</p>
+              <p class="swatch-use"><code>.warn-red</code> — dark green warning box (rare use).</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADMIN -->
+      <section id="admin" class="palette-section">
+        <h2><span class="material-symbols-outlined">admin_panel_settings</span> Admin panel</h2>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#8b0000;">#8b0000</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Danger button hover</p>
+              <p class="swatch-hex">#8b0000</p>
+              <p class="swatch-use">Admin delete button hover state.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e3f2fd;">Selected row</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Table row selected</p>
+              <p class="swatch-hex">#e3f2fd / hover #bbdefb</p>
+              <p class="swatch-use">Admin calendar table selection highlight.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#ffebee;">User delete pill hover</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Danger light</p>
+              <p class="swatch-hex">#ffebee</p>
+              <p class="swatch-var">--danger-light</p>
+              <p class="swatch-use">User pill hover before delete in admin expand row.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DOCS -->
+      <section id="docs" class="palette-section">
+        <h2><span class="material-symbols-outlined">menu_book</span> Docs pages (page.css)</h2>
+        <p>Shared by guide, faq, privacy, terms, ideas, and this palette page.</p>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:var(--blue-bg); color:var(--blue-text);">Blue box</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Blue feature box</p>
+              <p class="swatch-hex">bg #e3f2fd, border #90caf9, text #1565c0</p>
+              <p class="swatch-use">Method boxes, info callouts in guide/ideas.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:var(--green-bg); color:var(--green-text);">Green box</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Green tip box</p>
+              <p class="swatch-hex">bg #e8f5e9, border #4caf50, text #2e7d32</p>
+              <p class="swatch-use">Tip boxes, pro tips in templates page.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:var(--orange-bg); color:var(--orange-text);">Orange box</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Orange highlight</p>
+              <p class="swatch-hex">bg #fff3e0, border #ff9800, text #e65100</p>
+              <p class="swatch-use">Optional emphasis boxes.</p>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:var(--grey-bg);">Grey box</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Grey neutral box</p>
+              <p class="swatch-hex">bg #f5f7fa, border #ddd</p>
+              <p class="swatch-use">Config previews, code blocks background.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HTML INLINE -->
+      <section id="html-inline" class="palette-section">
+        <h2><span class="material-symbols-outlined">code</span> HTML inline styles</h2>
+        <p>Colours set directly in HTML <code>style</code> attributes or embedded <code>&lt;style&gt;</code> blocks (not in external CSS).</p>
+        <table class="palette-table">
+          <thead>
+            <tr><th>File</th><th>Colour(s)</th><th>Usage</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>go/index.html</code></td>
+              <td>
+                <span class="mini-swatch" style="background:#f5f5f5;"></span>#f5f5f5 body,
+                <span class="mini-swatch" style="background:#3f51b5;"></span>#3f51b5 title / Go btn,
+                <span class="mini-swatch" style="background:#303f9f;"></span>#303f9f btn hover,
+                <span class="mini-swatch" style="background:#e8eaf6;"></span>#e8eaf6 active type toggle,
+                <span class="mini-swatch" style="background:#283593;"></span>#283593 active text,
+                <span class="mini-swatch" style="background:#b00020;"></span>#b00020 errors
+              </td>
+              <td>Self-contained Go page layout and form styling.</td>
+            </tr>
+            <tr>
+              <td><code>index.html</code></td>
+              <td>
+                <span class="mini-swatch" style="background:#e8eaf6;"></span>#e8eaf6 /
+                <span class="mini-swatch" style="background:#c5cae9;"></span>#c5cae9 /
+                <span class="mini-swatch" style="background:#283593;"></span>#283593 hub banner;
+                <span class="mini-swatch" style="background:#333;"></span>#333 chip “e.g.” labels
+              </td>
+              <td><code>#hubContextBanner</code>, quick-add / status / date preset bars.</td>
+            </tr>
+            <tr>
+              <td><code>calendar.html</code></td>
+              <td>
+                <span class="mini-swatch" style="background:#555;"></span>#555 filter text,
+                <span class="mini-swatch" style="background:#777;"></span>#777 rank empty,
+                <span class="mini-swatch" style="background:#ccc;"></span>#ccc hub token input border
+              </td>
+              <td>Date-filter copy, empty rank panel, hub token modal input.</td>
+            </tr>
+            <tr>
+              <td><code>guide.html</code></td>
+              <td><span class="mini-swatch" style="background:#f5f5f5;"></span>#f5f5f5</td>
+              <td>Cron example <code>&lt;pre&gt;</code> background.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- JS RUNTIME -->
+      <section id="js-runtime" class="palette-section">
+        <h2><span class="material-symbols-outlined">javascript</span> JavaScript-defined colours</h2>
+        <p>Colours assigned at runtime via constants, inline styles, or popup HTML strings.</p>
+
+        <h3 style="font-size:1rem;margin:20px 0 8px;">Strength palette — create page (<code>index.js</code>)</h3>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 10px;">
+          Used when organiser adds status options on the create page. Material Design–style gradient from positive to negative.
+        </p>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#4caf50;">#4caf50</div>
+            <div class="swatch-body">
+              <p class="swatch-name">green</p>
+              <p class="swatch-hex">STRENGTH_COLORS.green</p>
+              <span class="swatch-file">index.js</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#8bc34a;">#8bc34a</div>
+            <div class="swatch-body">
+              <p class="swatch-name">yellowGreen</p>
+              <p class="swatch-hex">STRENGTH_COLORS.yellowGreen</p>
+              <span class="swatch-file">index.js</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#ffc107;">#ffc107</div>
+            <div class="swatch-body">
+              <p class="swatch-name">amber</p>
+              <p class="swatch-hex">STRENGTH_COLORS.amber</p>
+              <span class="swatch-file">index.js</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#ff9800;">#ff9800</div>
+            <div class="swatch-body">
+              <p class="swatch-name">orange</p>
+              <p class="swatch-hex">STRENGTH_COLORS.orange</p>
+              <span class="swatch-file">index.js</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#f44336;">#f44336</div>
+            <div class="swatch-body">
+              <p class="swatch-name">red</p>
+              <p class="swatch-hex">STRENGTH_COLORS.red</p>
+              <span class="swatch-file">index.js</span>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="font-size:1rem;margin:20px 0 8px;">Default status options — calendar (<code>calendar.js</code>)</h3>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 10px;">
+          Fallback when a calendar has no custom status colours. Applied to CSS variables at load time.
+        </p>
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#357A38;">#357A38</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Yes (default)</p>
+              <p class="swatch-hex">STATUS_OPTIONS[0]</p>
+              <p class="swatch-use">Also used for choose/finalise icon tint in rank cards.</p>
+              <span class="swatch-file">calendar.js</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color dark-text" style="background:#e58800;">#e58800</div>
+            <div class="swatch-body">
+              <p class="swatch-name">Maybe (default)</p>
+              <p class="swatch-hex">STATUS_OPTIONS[1]</p>
+              <span class="swatch-file">calendar.js</span>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color light-text" style="background:#880000;">#880000</div>
+            <div class="swatch-body">
+              <p class="swatch-name">No (default)</p>
+              <p class="swatch-hex">STATUS_OPTIONS[2]</p>
+              <span class="swatch-file">calendar.js</span>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="font-size:1rem;margin:20px 0 8px;">Strength palette — calendar (<code>calendar.js</code>)</h3>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 10px;">
+          Matches <code>calendar.css</code> status slot defaults; used when auto-assigning colours by weight rank.
+        </p>
+        <table class="palette-table">
+          <thead>
+            <tr><th>Key</th><th>Hex</th><th>Maps to CSS var</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>green</td><td><span class="mini-swatch" style="background:#6fae00;"></span>#6fae00</td><td>--status-1</td></tr>
+            <tr><td>yellowGreen</td><td><span class="mini-swatch" style="background:#e1b000;"></span>#e1b000</td><td>--status-2</td></tr>
+            <tr><td>amber</td><td><span class="mini-swatch" style="background:#0000FF;"></span>#0000FF</td><td>--status-3</td></tr>
+            <tr><td>orange</td><td><span class="mini-swatch" style="background:#808080;"></span>#808080</td><td>--status-4</td></tr>
+            <tr><td>red</td><td><span class="mini-swatch" style="background:#FF0000;"></span>#FF0000</td><td>--status-5</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="font-size:1rem;margin:20px 0 8px;">Poster popup (<code>index.js</code>, <code>hub.js</code>)</h3>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 10px;">
+          Save/share poster window injects a full CSS block. Brand colours match the main palette; extra tints below.
+        </p>
+        <table class="palette-table">
+          <thead>
+            <tr><th>Hex / gradient</th><th>Element</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>linear-gradient(145deg, #e8eaf6, #f5f5f5, #eceff1)</td><td>Popup body background</td></tr>
+            <tr><td><span class="mini-swatch" style="background:linear-gradient(135deg,#3f51b5,#283593);"></span>#3f51b5 → #283593</td><td>Brand header</td></tr>
+            <tr><td><span class="mini-swatch" style="background:linear-gradient(90deg,#880000,#c62828,#880000);"></span>#880000 / #c62828 stripe</td><td>Header bottom accent</td></tr>
+            <tr><td><span class="mini-swatch" style="background:linear-gradient(135deg,#880000,#6d0000);"></span>#880000 → #6d0000</td><td>Promo footer strip</td></tr>
+            <tr><td><span class="mini-swatch" style="background:#6d0000;"></span>#6d0000</td><td>Primary toolbar button hover</td></tr>
+            <tr><td><span class="mini-swatch" style="background:#ccc;"></span>#ccc</td><td>Toolbar button border</td></tr>
+            <tr><td><span class="mini-swatch" style="background:#888;"></span>#888</td><td>Label / created date text</td></tr>
+            <tr><td><span class="mini-swatch" style="background:#222;"></span>#222 / <span class="mini-swatch" style="background:#111;"></span>#111</td><td>Calendar name / code text</td></tr>
+            <tr><td><span class="mini-swatch" style="background:#444;"></span>#444 / <span class="mini-swatch" style="background:#555;"></span>#555</td><td>Instruction / link section text</td></tr>
+            <tr><td>linear-gradient(180deg, #fafafa, #f0f0f0)</td><td>Code block background</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="font-size:1rem;margin:20px 0 8px;">Dynamic inline styles</h3>
+        <table class="palette-table">
+          <thead>
+            <tr><th>File</th><th>Colour(s)</th><th>Usage</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>index.js</code></td>
+              <td><span class="mini-swatch" style="background:#e3f2fd;"></span>#e3f2fd / #90caf9 / #1565c0</td>
+              <td><code>showTemplateBanner()</code> — template loaded notice (overrides default warn styling).</td>
+            </tr>
+            <tr>
+              <td><code>index.js</code>, <code>calendar.js</code></td>
+              <td><span class="mini-swatch" style="background:#fff;border:1px solid #000;"></span>#FFFFFF / #000000</td>
+              <td><code>getContrastTextColor()</code> — slot label text on custom status backgrounds.</td>
+            </tr>
+            <tr>
+              <td><code>index.js</code></td>
+              <td><span class="mini-swatch" style="background:#333;"></span>#333</td>
+              <td>Chip bar “e.g.” prefix (also in <code>index.html</code>).</td>
+            </tr>
+            <tr>
+              <td><code>index.js</code></td>
+              <td><span class="mini-swatch" style="background:#6fae00;"></span>#6fae00 / #CCCCCC</td>
+              <td>Status colour picker default and fallback when unset.</td>
+            </tr>
+            <tr>
+              <td><code>calendar.js</code></td>
+              <td><span class="mini-swatch" style="background:#777;"></span>#777</td>
+              <td>“No responses yet” in rank expand panel.</td>
+            </tr>
+            <tr>
+              <td><code>admin.js</code></td>
+              <td><span class="mini-swatch" style="background:#999;"></span>#999 / <span class="mini-swatch" style="background:#c00;"></span>#c00</td>
+              <td>Loading spinner, empty users, and expand-row error messages.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <p class="muted" style="margin-top:24px;font-size:0.85rem;">
+        Last synced with CSS, HTML inline styles, and JS colour constants in the codebase.
+      </p>
+    </main>
+
+    <p class="muted" style="margin-top: 10px;">
+      <a href="index.html" style="color:inherit; text-decoration:underline;">Home</a>
+      <span aria-hidden="true"> | </span>
+      <a href="guide.html" style="color:inherit; text-decoration:underline;">Guide</a>
+    </p>
+
+    <div class="top-actions" style="margin-top: 24px;">
+      <a class="btn btn-ghost btn-small" onclick="history.back()" style="text-decoration:none;">&lt;- Back</a>
+    </div>
+  </div>
+</body>
+</html>

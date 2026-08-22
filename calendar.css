@@ -1,0 +1,1565 @@
+:root{
+  --primary:#3f51b5;
+  --primary-dark:#303f9f;
+  --accent:#ff4081;
+  --bg-body:#eee;
+  --bg-card:#eee;
+  --text-main:#333333;
+  --text-muted:#666666;
+  /* Status palette (overridden dynamically per-calendar) */
+  --status-1:#6fae00; /* primary/positive */
+  --status-2:#e1b000; /* tentative */
+  --status-3:#0000FF; /* negative */
+  --status-4:#808080; /* extra */
+  --status-5:#FF0000; /* extra */
+  /* Status text colours (calculated dynamically for WCAG contrast) */
+  --status-1-text:#fff;
+  --status-2-text:#000;
+  --status-3-text:#fff;
+  --status-4-text:#fff;
+  --status-5-text:#fff;
+
+  /* Back-compat aliases */
+  --status-yes:var(--status-1);
+  --status-maybe:var(--status-2);
+  --status-no:var(--status-3);
+  --status-null:#e0e0e0;
+  --spacing-sm:8px;
+  --spacing-md:16px;
+  --spacing-lg:24px;
+  --radius:8px;
+  --slot-h:44px;
+  --slot-gap:4px;
+}
+
+*{box-sizing:border-box;font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif;}
+
+body{
+  background-color:var(--bg-body);
+  color:var(--text-main);
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+header{
+  background-color:var(--primary);
+  color:white;
+  padding:var(--spacing-md) var(--spacing-lg);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 2px 4px rgba(0,0,0,0.1);
+  flex-wrap:wrap;
+  gap:var(--spacing-sm);
+}
+
+.hub-bar{
+  background:#e8eaf6;
+  color:#283593;
+  padding:10px var(--spacing-lg);
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:10px;
+  font-size:0.9rem;
+  border-bottom:1px solid #c5cae9;
+}
+.hub-bar .material-symbols-outlined{font-size:20px;}
+.hub-bar-link{
+  color:#283593;
+  font-weight:600;
+  text-decoration:underline;
+}
+.hub-bar .btn-sm{
+  padding:6px 12px;
+  font-size:0.85rem;
+  min-height:36px;
+}
+
+/* Logo area - contains title and current user */
+.logo{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  min-width:0;
+}
+
+h1{
+  margin:0;
+  font-size:1.15rem;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* Current user display - shown after title */
+.current-user-display{
+  font-size:1rem;
+  font-weight:600;
+  color:rgba(255,255,255,.95);
+  display:none; /* Hidden when no user selected */
+  align-items:center;
+  gap:6px;
+  background:rgba(0,0,0,.2);
+  padding:4px 8px;
+  border-radius:6px;
+  white-space:nowrap;
+}
+
+.current-user-display.visible{
+  display:inline-flex;
+}
+
+
+
+.current-user-display.is-admin{
+  background:rgba(0,0,0,.35);
+}
+
+.controls{
+  display:flex;
+  align-items:center;
+  gap:var(--spacing-sm);
+  flex-wrap:wrap;
+}
+
+.user-tag{
+  font-size:.9rem;
+  color:rgba(255,255,255,.9);
+  background:rgba(0,0,0,.2);
+  padding:8px 12px;
+  border-radius:6px;
+  margin-left:1px;
+  display:inline-block;
+  vertical-align:middle;
+  font-weight:400;
+}
+
+/* ============================================
+   SELECT DROPDOWNS (kept for compatibility)
+   ============================================ */
+select{
+  padding:1px 6px;
+  border-radius:var(--radius);
+  border:none;
+  font-size:.9rem;
+  background:rgba(255,255,255,.9);
+  cursor:pointer;
+  outline:none;
+  min-width:180px;
+}
+
+#userSelect,#monthSelect{
+  height:34px;
+  padding:0 6px;
+  font-size:.9rem;
+  font-weight:600;
+  border-radius:10px;
+  line-height:34px;
+}
+
+#userSelect{min-width:140px;}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+.btn{
+  padding:8px 14px;
+  border-radius:var(--radius);
+  border:none;
+  font-size:.9rem;
+  cursor:pointer;
+  font-weight:600;
+  transition:all .2s;
+  white-space:nowrap;
+}
+
+.icon-btn{
+  width:40px;
+  height:40px;
+  padding:0!important;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1;
+  transition:background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Authenticated state for user select button - dark green with white icon */
+.icon-btn.authenticated{
+  background-color:#2e7d32 !important;
+  color:#fff !important;
+}
+.icon-btn.authenticated:hover{
+  background-color:#1b5e20 !important;
+}
+
+.material-symbols-outlined{
+  font-variation-settings:'FILL' 0,'wght' 500,'GRAD' 0,'opsz' 24;
+  font-size:22px;
+  user-select:none;
+}
+
+.btn-submit{color:white;box-shadow:0 2px 5px rgba(0,0,0,.2);}
+.btn-submit.is-submit{background-color:#4caf50;}
+.btn-submit.is-submit:hover{background-color:#43a047;transform:translateY(-1px);}
+.btn-submit.is-saved{background-color:#f44336;opacity:1;cursor:default;}
+
+/* Hide submit button initially until JS determines state - prevents flash */
+.btn-submit.init-hidden{visibility:hidden;}
+
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(76,175,80,.65);}
+  70%{box-shadow:0 0 0 10px rgba(76,175,80,0);}
+  100%{box-shadow:0 0 0 0 rgba(76,175,80,0);}
+}
+.btn-submit.unsaved{animation:pulse 2s infinite;}
+
+/* Loading spinner animation (used while saving) */
+@keyframes spin{
+  from{transform:rotate(0deg);}
+  to{transform:rotate(360deg);}
+}
+.btn-submit.loading .material-symbols-outlined{animation:spin 1s linear infinite;}
+
+
+
+/* ============================================
+   MAIN LAYOUT
+   ============================================ */
+main{
+  display:flex;
+  flex:1;
+  overflow:hidden;
+}
+
+.calendar-section{
+  flex:2;
+  padding:var(--spacing-md);
+  overflow-y:auto;
+  border-right:1px solid #ddd;
+  overflow-x:hidden;
+  /* Position relative for sticky legend positioning */
+  position:relative;
+}
+
+.calendar-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:var(--spacing-md);
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+/* Month label wrapper - not sticky */
+.month-label-wrap{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:var(--spacing-sm);
+}
+
+.month-label{
+  font-size:1.2rem;
+  font-weight:normal;
+}
+
+.toggle-past-btn{
+  font-size:0.78rem;
+  font-weight:600;
+  padding:3px 12px;
+  border-radius:20px;
+  border:1px solid #aaa;
+  background:#fff;
+  color:#333;
+  cursor:pointer;
+  white-space:nowrap;
+  flex-shrink:0;
+  transition:background 0.15s, color 0.15s, border-color 0.15s;
+}
+.toggle-past-btn.active{
+  background:var(--primary);
+  color:#fff;
+  border-color:var(--primary);
+}
+.toggle-past-btn:hover:not(.active){
+  background:#f5f5f5;
+}
+
+/* Legend wrapper - sticky positioning */
+.legend-wrap{
+  position:sticky;
+  top:0;
+  background:var(--bg-body);
+  z-index:10;
+  padding:8px 0;
+  margin-bottom:var(--spacing-sm);
+}
+
+/* ============================================
+   CALENDAR GRID
+   ============================================ */
+/* Default: 7 days */
+.calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:var(--spacing-sm);
+  grid-auto-rows:min-content;
+}
+
+/* When weekends are excluded: 5 days */
+.calendar-grid.weekdays-only{
+  grid-template-columns:repeat(5,1fr);
+}
+
+.day-column{
+  background:var(--bg-card);
+  border-radius:var(--radius);
+  padding:var(--spacing-sm);
+  display:flex;
+  flex-direction:column;
+  gap:var(--slot-gap);
+  box-shadow:0 1px 3px rgba(0,0,0,.05);
+  border:2px solid #ccc;
+  min-width:0;
+}
+
+.day-header{
+  text-align:center;
+  font-weight:bold;
+  padding-bottom:0;
+  border-bottom:2px solid var(--bg-body);
+  margin-bottom:0;
+  font-size:.9rem;
+  height:40px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+.day-header .date-num{font-size:1.1rem;font-weight:600;}
+.day-header .date-dow{font-size:.8rem;opacity:.8;font-weight:500;}
+.day-header.today .date-num,.day-header.today .date-dow{color:#880000;font-weight:800;}
+
+/* ============================================
+   TIME SLOTS
+   ============================================ */
+.time-slot{
+  height:var(--slot-h);
+  flex:0 0 var(--slot-h);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:4px;
+  font-size:.85rem;
+  cursor:pointer;
+  user-select:none;
+  background-color:var(--status-null);
+  color:#555;
+  transition:all .15s ease, border-left-color .2s ease;
+  font-weight:600;
+  position:relative;
+  /* Transparent left border by default -- reserves space so layout
+     doesn't shift when the organiser indicator appears */
+  border-left:8px solid transparent;
+}
+
+.time-slot:hover{filter:brightness(.95);}
+.time-slot.status-1{background-color:var(--status-1);color:var(--status-1-text, #fff);}
+.time-slot.status-2{background-color:var(--status-2);color:var(--status-2-text, #fff);}
+.time-slot.status-3{background-color:var(--status-3);color:var(--status-3-text, #fff);}
+.time-slot.status-4{background-color:var(--status-4);color:var(--status-4-text, #fff);}
+.time-slot.status-5{background-color:var(--status-5);color:var(--status-5-text, #fff);}
+
+/* ============================================
+   ORGANISER BORDER - Shows organiser's status on each slot
+   Coloured 5px left border -- replaces the old dot indicator
+   ============================================ */
+.time-slot.org-border-1{border-left-color:var(--status-1);}
+.time-slot.org-border-2{border-left-color:var(--status-2);}
+.time-slot.org-border-3{border-left-color:var(--status-3);}
+.time-slot.org-border-4{border-left-color:var(--status-4);}
+.time-slot.org-border-5{border-left-color:var(--status-5);}
+
+/* ============================================
+   DATE FILTER INDICATORS
+   Shows organiser which dates are marked for
+   filtering (only/except mode). Clickable headers
+   toggle date selection.
+   ============================================ */
+
+/* Clickable date header (organiser only, when filter mode is not 'all') */
+.day-header.date-header-clickable{
+  cursor:pointer;
+  transition:background 0.15s ease, border-color 0.15s ease;
+  border-radius:4px;
+  position:relative;
+}
+.day-header.date-header-clickable:hover{
+  background:rgba(63,81,181,0.10);
+}
+
+/* Visual indicator for marked/filtered dates (organiser view) -
+   Strong background highlight + bottom bar so it is unmistakable */
+.day-header.date-filtered{
+  background:#3f51b5 !important;
+  border-radius:4px;
+  border-bottom:none;
+}
+.day-header.date-filtered .date-num,
+.day-header.date-filtered .date-dow{
+  color:#fff !important;
+  font-weight:500;
+  opacity:1 !important;
+}
+/* Override today styling when date is also filtered */
+.day-header.today.date-filtered .date-num,
+.day-header.today.date-filtered .date-dow{
+  color:#fff !important;
+}
+
+/* Unselected clickable headers get a dashed bottom hint */
+.day-header.date-header-clickable:not(.date-filtered){
+  border-bottom:2px dashed #aaa;
+}
+
+/* Entire column border highlight when date is filtered */
+.day-column.date-col-filtered{
+  border-color:#3f51b5;
+}
+
+/* Message shown when 'only' mode has no dates selected (non-organiser view) */
+.date-filter-empty-msg{
+  grid-column:1 / -1;
+  text-align:center;
+  padding:24px 16px;
+  color:#777;
+  font-size:0.95rem;
+  font-style:italic;
+  background:#f8f8f8;
+  border-radius:var(--radius);
+  border:1px dashed #ccc;
+}
+
+/* Date filter instruction banner (organiser only) */
+.date-filter-banner{
+  background:#e8eaf6;
+  border:1px solid #9fa8da;
+  border-radius:var(--radius);
+  padding:8px 12px;
+  margin-bottom:8px;
+  font-size:0.85rem;
+  color:#283593;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  line-height:1.4;
+}
+
+/* Date filter save indicator (matches submit button pattern) */
+.date-filter-save-status{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  font-size:0.8rem;
+  font-weight:600;
+  margin-left:auto;
+  padding:3px 10px;
+  border-radius:4px;
+  transition:background 0.3s, color 0.3s;
+  white-space:nowrap;
+}
+.date-filter-save-status.unsaved{
+  background:#fff3cd;
+  color:#856404;
+}
+.date-filter-save-status.saving{
+  background:#cce5ff;
+  color:#004085;
+}
+.date-filter-save-status.saved{
+  background:#d4edda;
+  color:#155724;
+}
+
+/* ============================================
+   ANALYSIS SECTION
+   ============================================ */
+.analysis-section{
+  flex:1;
+  padding:var(--spacing-sm);
+  background-color:#ccc;
+  overflow-y:auto;
+  min-width:320px;
+}
+
+.analysis-card{
+  background:var(--bg-card);
+  border-radius:var(--radius);
+  padding:var(--spacing-sm);
+  margin-bottom:var(--spacing-sm);
+  box-shadow:0 2px 5px rgba(0,0,0,.05);
+}
+
+.analysis-title{
+  margin-top:0;
+  margin-bottom:10px;
+  font-size:1.1rem;
+  color:var(--primary);
+  border-bottom:1px solid #eee;
+  padding-bottom:8px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  /* Prevent wrapping - keep toggles on same row */
+  flex-wrap:nowrap;
+}
+
+/* Title text shown for non-organisers */
+.analysis-title-text{
+  font-weight:600;
+  display:none; /* Hidden by default, shown via JS for non-organisers */
+  align-items:center;
+  gap:6px;
+  flex:1;
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.analysis-title-text .material-symbols-outlined{
+  font-size:20px;
+  vertical-align:middle;
+}
+
+/* ============================================
+   SORT TOGGLE (50:50 - Score vs Date)
+   Matches dateFilterToggle/privacyToggle pattern
+   ============================================ */
+.sort-toggle{
+  display:flex;
+  border:1px solid #aaa;
+  border-radius:6px;
+  overflow:hidden;
+  flex:1;
+  min-width:0; /* Allow shrinking */
+  max-width:50%;
+}
+
+.sort-toggle .sort-btn{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  border:none;
+  background:#fff;
+  padding:6px 8px;
+  font-weight:600;
+  font-size:0.8rem;
+  cursor:pointer;
+  transition:background 0.15s, color 0.15s;
+  min-width:0; /* Allow shrinking */
+}
+
+.sort-toggle .sort-btn .material-symbols-outlined{
+  font-size:18px;
+  flex-shrink:0;
+}
+
+.sort-toggle .sort-btn:not(:last-child){
+  border-right:1px solid #aaa;
+}
+
+.sort-toggle .sort-btn.active{
+  background:var(--primary);
+  color:#fff;
+}
+
+.sort-toggle .sort-btn:hover:not(.active){
+  background:#f5f5f5;
+}
+
+/* ============================================
+   LIMIT TOGGLE (33:33:33 - 2/10/All)
+   Matches dateFilterToggle/privacyToggle pattern
+   ============================================ */
+.limit-toggle{
+  display:flex;
+  border:1px solid #aaa;
+  border-radius:6px;
+  overflow:hidden;
+  flex-shrink:0;
+}
+
+.limit-toggle .limit-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:none;
+  background:#fff;
+  padding:6px 10px;
+  font-weight:600;
+  font-size:0.8rem;
+  cursor:pointer;
+  transition:background 0.15s, color 0.15s;
+  min-width:46px;
+}
+
+.limit-toggle .limit-btn:not(:last-child){
+  border-right:1px solid #aaa;
+}
+
+.limit-toggle .limit-btn.active{
+  background:var(--primary);
+  color:#fff;
+}
+
+.limit-toggle .limit-btn:hover:not(.active){
+  background:#f5f5f5;
+}
+
+/* Legacy bestdates and show-pill (kept for backwards compatibility) */
+.bestdates{font-weight:600;}
+.bestdates.clickable{cursor:pointer;user-select:none;}
+.bestdates.clickable:hover{opacity:.75;}
+
+/* Pulsing hint dot: one-time nudge for organiser to discover the sort toggle */
+.bestdates .hint-dot{
+  display:inline-block;
+  width:8px;
+  height:8px;
+  background:#ff5252;
+  border-radius:50%;
+  margin-left:4px;
+  vertical-align:middle;
+  animation:hintPulse 1.5s ease-in-out infinite;
+}
+@keyframes hintPulse{
+  0%,100%{opacity:1;transform:scale(1);}
+  50%{opacity:.4;transform:scale(1.4);}
+}
+/* ============================================
+   ORGANISER MESSAGE
+   ============================================ */
+.organiser-message-wrap{
+  margin-bottom:10px;
+  padding:8px 10px;
+  background:#f7f9fb;
+  border-radius:6px;
+  border-left:3px solid var(--primary);
+}
+.organiser-message-text{
+  margin:0;
+  font-size:0.88rem;
+  color:#444;
+  line-height:1.4;
+  cursor:default;
+  word-break:break-word;
+}
+/* Organiser sees pointer cursor to indicate editable */
+.organiser-message-text.editable{
+  cursor:pointer;
+}
+.organiser-message-text.editable:hover{
+  color:var(--primary);
+}
+/* Placeholder shown when organiser has no message yet */
+.organiser-message-text.placeholder{
+  color:#999;
+  font-style:italic;
+}
+.organiser-message-input{
+  width:100%;
+  padding:6px 8px;
+  font-size:0.88rem;
+  font-family:inherit;
+  border:1px solid #ccc;
+  border-radius:4px;
+  resize:none;
+  line-height:1.4;
+  box-sizing:border-box;
+  min-height: 80px;
+}
+.organiser-message-input:focus{
+  outline:none;
+  border-color:var(--primary);
+  box-shadow:0 0 0 2px rgba(56,142,60,.15);
+}
+.organiser-message-meta{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:4px;
+}
+.organiser-message-count{
+  font-size:0.75rem;
+  color:#999;
+}
+.organiser-message-actions{
+  display:flex;
+  gap:6px;
+}
+.btn-sm{
+  padding:3px 10px;
+  font-size:0.78rem;
+  min-height:28px;
+}
+.rank-wrap{display:flex;flex-direction:column;gap:10px;}
+
+/* ============================================
+   RANK CARDS
+   ============================================ */
+   
+.show-pill{
+  background:var(--primary);
+  color:#fff;
+  font-weight:600;
+  font-size:.8rem;
+  padding:6px 10px;
+  border-radius:6px;
+  flex-shrink:0;
+}   
+   
+   
+   
+   
+.rank-card{
+  border:1px solid #d7dbe0;
+  border-radius:8px;
+  background:#fff;
+  overflow:hidden;
+}
+
+.rank-btn{
+  width:100%;
+  background:#fff;
+  border:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  text-align:left;
+  cursor:pointer;
+}
+.rank-btn:hover{filter:brightness(.98);}
+
+.rank-main{display:flex;flex-direction:column;gap:3px;}
+.rank-line1{font-size:.95rem;color:#222;font-weight:600;}
+.rank-line2{font-size:.82rem;color:#666;font-weight:500;}
+
+.rank-pill{
+  background:var(--primary);
+  color:#fff;
+  font-weight:600;
+  font-size:.8rem;
+  padding:6px 10px;
+  border-radius:6px;
+  flex-shrink:0;
+}
+
+.rank-details{
+  display:none;
+  border-top:1px solid #eef1f5;
+  padding:10px 12px;
+  background:#fff;
+}
+.rank-card.open .rank-details{display:block;}
+
+.rank-actions{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px 0;}
+
+.btn-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border-radius:999px;
+  padding:6px 12px;
+  font-size:.85rem;
+  border:1px solid #d7dbe0;
+  background:#fff;
+  color:#333;
+  cursor:pointer;
+  text-decoration:none;
+}
+.btn-pill .material-symbols-outlined{font-size:18px;}
+
+.btn-cal{border-color:#1a73e8;color:#1a73e8;}
+.btn-cal:hover{background:#e8f0fe;}
+
+.btn-ics{border-color:#6c757d;color:#495057;}
+.btn-ics:hover{background:#f1f3f5;}
+
+.btn-share{border-color:#34a853;color:#34a853;}
+.btn-share:hover{background:#e6f4ea;}
+
+/* Inline roster display (name + status tag pairs that wrap) */
+.roster-inline{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 12px;
+  padding:6px 0;
+  font-size:.9rem;
+}
+
+.roster-item{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  white-space:nowrap;
+}
+
+.roster-name{
+  font-weight:500;
+  color:#333;
+}
+
+/* Legacy detail-row (kept for backwards compatibility) */
+.detail-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:6px 0;
+  border-bottom:1px solid #f0f0f0;
+  font-size:.9rem;
+}
+.detail-row:last-child{border-bottom:none;}
+
+.status-tag{
+  font-weight:600;
+  padding:3px 8px;
+  border-radius:6px;
+  font-size:.78rem;
+  flex-shrink:0;
+}
+
+.status-1{background:var(--status-1);color:var(--status-1-text, #fff);}
+.status-2{background:var(--status-2);color:var(--status-2-text, #fff);}
+.status-3{background:var(--status-3);color:var(--status-3-text, #fff);}
+.status-4{background:var(--status-4);color:var(--status-4-text, #fff);}
+.status-5{background:var(--status-5);color:var(--status-5-text, #fff);}
+
+/* Add name link in user select modal */
+.add-name-link{
+  color:#1a73e8;
+  font-weight:600;
+  text-decoration:none;
+}
+.add-name-link:hover{
+  text-decoration:underline;
+}
+
+/* ============================================
+   LEGEND
+   ============================================ */
+.legend{
+  display:flex;
+  gap:12px;
+  font-size:.8rem;
+  margin-bottom:0;
+  flex-wrap:wrap;
+}
+
+.legend-item{display:flex;align-items:center;gap:4px;padding:2px 6px;border-radius:4px;border:2px solid transparent;transition:border-color 0.2s;}
+.legend-item.recently-used{border-color:#333;background:rgba(0,0,0,0.05);}
+.dot{width:12px;height:12px;border-radius:50%;}
+
+/* ============================================
+   SERVER STATUS
+   ============================================ */
+.server-status{
+  font-size:.75rem;
+  color:rgba(255,255,255,.75);
+  margin-left:10px;
+}
+.server-status.connected{color:#69f0ae;}
+.server-status.offline{color:#ffd180;}
+.hide{display:none;}
+
+/* ============================================
+   MODAL OVERLAY
+   ============================================ */
+.modal-overlay{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.5);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:2000;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .25s;
+}
+.modal-overlay.active{opacity:1;pointer-events:all;}
+
+.modal{
+  background:white;
+  padding:20px;
+  border-radius:var(--radius);
+  width:92%;
+  max-width:420px;
+  box-shadow:0 10px 25px rgba(0,0,0,.2);
+  transform:translateY(16px);
+  transition:transform .25s;
+}
+.modal-overlay.active .modal{transform:translateY(0);}
+
+.modal h2{margin:0 0 10px;color:var(--primary);}
+.modal p{margin:0 0 10px;color:#333;line-height:1.4;}
+
+.modal input{
+  width:100%;
+  padding:10px 12px;
+  border:1px solid #d7dbe0;
+  border-radius:10px;
+  font-size:1rem;
+  margin-top:6px;
+}
+
+.modal .error{
+  color:#b00020;
+  font-size:.9rem;
+  margin-top:8px;
+  display:none;
+}
+
+.modal .fieldish{margin-top:8px;}
+
+.modal-actions{
+  margin-top:16px;
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
+
+.btn-cancel{background:#e0e0e0;color:#333;}
+.btn-confirm{background:var(--primary);color:white;}
+
+/* ============================================
+   USER SELECT LIST (in modal)
+   ============================================ */
+.user-select-list{
+  max-height:300px;
+  overflow-y:auto;
+  margin:12px 0;
+  border:1px solid #e0e0e0;
+  border-radius:8px;
+}
+
+.user-select-item{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 14px;
+  cursor:pointer;
+  border-bottom:1px solid #f0f0f0;
+  transition:background .1s ease;
+}
+
+.user-select-item:last-child{
+  border-bottom:none;
+}
+
+.user-select-item:hover{
+  background:#f5f5f5;
+}
+
+.user-select-item.selected{
+  background:#e3f2fd;
+}
+
+.user-select-item.selected:hover{
+  background:#bbdefb;
+}
+
+.user-select-avatar{
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  background:var(--primary);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  font-size:1rem;
+  flex-shrink:0;
+}
+
+.user-select-avatar.admin{
+  background:#000;
+}
+
+.user-select-info{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.user-select-name{
+  font-weight:600;
+  font-size:.95rem;
+  color:#222;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.user-select-role{
+  font-size:.8rem;
+  color:#666;
+  font-weight:500;
+}
+
+.user-select-check{
+  color:var(--status-yes);
+  font-size:24px;
+  flex-shrink:0;
+}
+
+/* Delete button in user select list (organiser only) */
+.user-select-delete{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:32px;
+  height:32px;
+  border:none;
+  background:transparent;
+  color:#999;
+  border-radius:50%;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:background .15s, color .15s;
+  padding:0;
+}
+.user-select-delete:hover{
+  background:#ffebee;
+  color:#b00020;
+}
+.user-select-delete .material-symbols-outlined{
+  font-size:20px;
+}
+
+/* Logout button in user select list (for authenticated user) */
+.user-select-logout{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:32px;
+  height:32px;
+  border:none;
+  background:transparent;
+  color:#999;
+  border-radius:50%;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:background .15s, color .15s;
+  padding:0;
+  margin-left:4px;
+}
+.user-select-logout:hover{
+  background:#fff3e0;
+  color:#e65100;
+}
+.user-select-logout .material-symbols-outlined{
+  font-size:20px;
+}
+
+.user-select-empty{
+  padding:24px;
+  text-align:center;
+  color:#777;
+}
+
+/* ============================================
+   PIN FIELD - Toggle INSIDE the input
+   ============================================ */
+.pin-field{
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.pin-field input{
+  width: 100%;
+  padding-right: 44px !important; /* Space for the toggle button */
+}
+
+.pin-toggle{
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  height: 36px;
+  width: 36px;
+}
+
+.pin-toggle:hover{
+  background: #f2f2f2;
+  color: #333;
+}
+
+.pin-toggle:focus{
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* ============================================
+   TOAST NOTIFICATIONS
+   ============================================ */
+/* Toast: default bottom; .center = middle of screen */
+.toast{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#323232;
+  color:white;
+  padding:12px 20px;
+  border-radius:8px;
+  font-size:.9rem;
+  opacity:0;
+  transition:opacity .25s;
+  pointer-events:none;
+  z-index:3000;
+}
+.toast.show{opacity:1;}
+.toast.center{top:50%;bottom:auto;transform:translate(-50%, -50%);}
+
+/* ============================================
+   RESPONSIVE - DESKTOP
+   ============================================ */
+@media (max-width:1280px){
+  :root{--slot-h:38px;}
+
+  main{
+    flex-direction:column;
+    overflow-y:auto;
+  }
+
+  .analysis-section{
+    order:-1;
+    overflow:visible;
+    min-width:unset;
+  }
+
+  .calendar-section{
+    order:0;
+    border-right:none;
+    overflow:visible;
+  }
+  
+  /* Legend stays sticky on tablet */
+  .legend-wrap{
+    position:sticky;
+    top:0;
+    background:var(--bg-body);
+    z-index:10;
+  }
+
+  .calendar-grid{grid-template-columns:repeat(5,1fr);}
+  .calendar-grid.weekdays-only{grid-template-columns:repeat(5,1fr);}
+
+  #userSelect{max-width:130px;}
+  #monthSelect{display:none!important;}
+
+  .day-column{min-width:0;}
+
+  /* Adjust current user display for tablet */
+  .current-user-display{
+    font-size:.9rem;
+    padding:3px 10px;
+  }
+  
+  /* Ensure toggles stay on same row */
+  .analysis-title{
+    flex-wrap:nowrap;
+    gap:6px;
+  }
+  
+  .sort-toggle{
+    max-width:50%;
+  }
+  
+  .sort-toggle .sort-btn{
+    padding:6px 6px;
+  }
+}
+
+/* ============================================
+   RESPONSIVE - TABLET
+   ============================================ */
+@media (max-width:1400px){
+  :root{--slot-h:38px;}
+
+  main{
+    flex-direction:column;
+    overflow-y:auto;
+  }
+
+  .analysis-section{
+    order:-1;
+    overflow:visible;
+    min-width:unset;
+  }
+
+  .calendar-section{
+    order:0;
+    border-right:none;
+    overflow:visible;
+  }
+  
+  /* Legend stays sticky on tablet */
+  .legend-wrap{
+    position:sticky;
+    top:0;
+    background:var(--bg-body);
+    z-index:10;
+  }
+
+  .calendar-grid{grid-template-columns:repeat(7,1fr);}
+  .calendar-grid.weekdays-only{grid-template-columns:repeat(7,1fr);}
+
+  #userSelect{max-width:130px;}
+  #monthSelect{display:none!important;}
+
+  .day-column{min-width:0;}
+
+  /* Adjust current user display for tablet */
+  .current-user-display{
+    font-size:.9rem;
+    padding:3px 10px;
+  }
+  
+  /* Ensure toggles stay on same row */
+  .analysis-title{
+    flex-wrap:nowrap;
+    gap:6px;
+  }
+  
+  .sort-toggle{
+    max-width:50%;
+  }
+  
+  .sort-toggle .sort-btn{
+    padding:6px 6px;
+  }
+}
+
+/* ============================================
+   RESPONSIVE - TABLET 1000
+   ============================================ */
+@media (max-width:1000px){
+  :root{--slot-h:38px;}
+
+  main{
+    flex-direction:column;
+    overflow-y:auto;
+  }
+
+  .analysis-section{
+    order:-1;
+    overflow:visible;
+    min-width:unset;
+  }
+
+  .calendar-section{
+    order:0;
+    border-right:none;
+    overflow:visible;
+  }
+  
+  /* Legend stays sticky on tablet */
+  .legend-wrap{
+    position:sticky;
+    top:0;
+    background:var(--bg-body);
+    z-index:10;
+  }
+
+  .calendar-grid{grid-template-columns:repeat(5,1fr);}
+  .calendar-grid.weekdays-only{grid-template-columns:repeat(5,1fr);}
+
+  #userSelect{max-width:130px;}
+  #monthSelect{display:none!important;}
+
+  .day-column{min-width:0;}
+
+  /* Adjust current user display for tablet */
+  .current-user-display{
+    font-size:.9rem;
+    padding:3px 10px;
+  }
+  
+  /* Ensure toggles stay on same row */
+  .analysis-title{
+    flex-wrap:nowrap;
+    gap:6px;
+  }
+  
+  .sort-toggle{
+    max-width:50%;
+  }
+  
+  .sort-toggle .sort-btn{
+    padding:6px 6px;
+  }
+}
+
+
+/* ============================================
+   RESPONSIVE - MOBILE
+   ============================================ */
+@media (max-width:700px){
+  .calendar-grid{grid-template-columns:repeat(5,1fr);}
+  .calendar-grid.weekdays-only{grid-template-columns:repeat(5,1fr);}
+
+  .day-header .date-num{font-size:1rem;}
+  .day-header .date-dow{font-size:.8rem;}
+  .time-slot{font-size:.75rem;}
+
+  /* Stack title and user on mobile if needed */
+  .logo{
+    flex-direction:row;
+    gap:6px;
+  }
+
+  h1{
+    font-size:1rem;
+  }
+
+  .current-user-display{
+    font-size:.85rem;
+    padding:3px 8px;
+  }
+  
+  /* Keep toggles on same row with smaller sizing */
+  .analysis-title{
+    flex-wrap:nowrap;
+    gap:4px;
+  }
+  
+  .sort-toggle{
+    max-width:50%;
+    flex:1;
+  }
+  
+  .sort-toggle .sort-btn{
+    padding:5px 4px;
+    font-size:0.75rem;
+    gap:3px;
+  }
+  
+  .sort-toggle .sort-btn .material-symbols-outlined{
+    font-size:16px;
+  }
+  
+  .limit-toggle .limit-btn{
+    padding:5px 8px;
+    font-size:0.75rem;
+    min-width:40px;
+  }
+}
+
+@media (max-width:600px){
+  .calendar-grid{grid-template-columns:repeat(4,1fr);}
+  .calendar-grid.weekdays-only{grid-template-columns:repeat(4,1fr);}
+}
+
+@media (max-width:500px){
+  .calendar-grid{grid-template-columns:repeat(3,1fr);}
+  .calendar-grid.weekdays-only{grid-template-columns:repeat(3,1fr);}
+
+  h1{
+    font-size:.95rem;
+  }
+
+  .current-user-display{
+    font-size:.8rem;
+  }
+  
+  /* Hide text labels on small screens, show only icons */
+  .sort-toggle .sort-btn span:not(.material-symbols-outlined){
+    display:none;
+  }
+  
+  .sort-toggle .sort-btn{
+    padding:6px 10px;
+  }
+}
+
+@media (max-width:400px){
+  .calendar-grid{grid-template-columns:repeat(3,1fr);}
+  .calendar-grid.weekdays-only{grid-template-columns:repeat(3,1fr);}
+  
+  /* Even smaller on very narrow screens */
+  .sort-toggle .sort-btn{
+    padding:6px 8px;
+  }
+  
+  .limit-toggle .limit-btn{
+    padding:5px 6px;
+    min-width:36px;
+  }
+}
+
+/* ============================================
+   EMPTY DAY PLACEHOLDER
+   ============================================ */
+.empty-day{
+  background:transparent;
+  border:2px dashed #ddd;
+  opacity:.5;
+}
+
+/* ============================================
+   FOOTER LINKS (inside calendar-section)
+   ============================================ */
+.footer-links{
+  border-top:1px solid #ddd;
+  padding-top:12px;
+  margin-top:20px;
+}
+
+.footer-links .muted{
+  color:#666;
+}
+
+.footer-links a:hover{
+  color:#3f51b5;
+}
+
+/* ============================================
+   PRIVACY INDICATOR
+   ============================================ */
+.privacy-indicator{
+  font-family:'Material Symbols Outlined';
+  font-size:20px;
+  opacity:0.7;
+  vertical-align:middle;
+  margin-left:8px;
+  cursor:help;
+}
+
+/* Privacy message in rankings (Blind mode) */
+.privacy-message{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#666;
+  font-size:0.9rem;
+  font-style:italic;
+  padding:12px 0;
+}
+.privacy-message .material-symbols-outlined{
+  font-size:18px;
+  opacity:0.7;
+}
+
+/* ============================================
+   CHOSEN/FROZEN STATE
+   When organiser locks in a date+slot
+   ============================================ */
+
+/* Decided banner at top of analysis section */
+.chosen-banner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  background:#e8f5e9;
+  border:1px solid #a5d6a7;
+  border-radius:8px;
+  padding:10px 14px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+}
+.chosen-banner-text{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:#2e7d32;
+  font-size:0.95rem;
+  line-height:1.4;
+}
+.chosen-reopen-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  background:#fff;
+  border:1px solid #bbb;
+  border-radius:6px;
+  padding:5px 10px;
+  font-size:0.82rem;
+  cursor:pointer;
+  color:#555;
+  transition:background 200ms,border-color 200ms;
+  white-space:nowrap;
+}
+.chosen-reopen-btn:hover{background:#f5f5f5;border-color:#888;}
+
+/* Frozen grid: dim non-chosen slots */
+.calendar-frozen .frozen-slot{
+  opacity:0.35;
+  pointer-events:none;
+}
+/* Highlight the chosen slot in the grid */
+.chosen-slot{
+  outline:3px solid #357A38;
+  outline-offset:-2px;
+  border-radius:4px;
+  position:relative;
+  z-index:1;
+}
+
+/* Chosen rank card highlight */
+.rank-card-chosen{
+  border-color:#357A38;
+  background:#f1f8e9;
+}
+.rank-card-chosen .rank-btn{
+  background:#f1f8e9;
+}
+.rank-card-chosen .rank-line1{
+  color:#2e7d32;
+  font-weight:700;
+}
+
+/* Choose button in rank card actions */
+.btn-choose{
+  background:#e8f5e9;
+  color:#2e7d32;
+  border:1px solid #a5d6a7;
+}
+.btn-choose:hover{
+  background:#c8e6c9;
+  border-color:#66bb6a;
+}

@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- Prevents leaking the calendar token in the Referer header -->
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Complete guide for When RU Free - setup, usage, and troubleshooting for group availability calendars. No sign-up required.">
+  <title>Guide & Help - When RU Free</title>
+
+
+
+  <!-- Common page styles -->
+  <link rel="stylesheet" href="page.css">
+</head>
+<body>
+  <!-- Skip to main content link for accessibility -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <div class="card guide-page" style="max-width: 1024px;">
+    <div class="top-actions">
+      <h1 style="margin:0;"><span class="material-symbols-outlined">menu_book</span> Guide & Help</h1>
+      <a class="btn btn-ghost btn-small" onclick="history.back()" style="text-decoration:none;">&lt;- Back</a>
+    </div>
+
+    <main id="main-content">
+
+    <p class="sub" style="margin-top:8px;">
+      Everything you need to know about creating and using <b>When RU Free?</b> calendars.
+    </p>
+
+    <!-- QUICK NAV -->
+    <div class="category-nav" style="margin-bottom:20px;">
+      <a href="#overview" class="category-link"><span class="material-symbols-outlined">overview</span> Overview</a>
+      <a href="#hubs" class="category-link"><span class="material-symbols-outlined">hub</span> Hubs</a>
+      <a href="#setup" class="category-link"><span class="material-symbols-outlined">settings</span> Setup</a>
+      <a href="#participants" class="category-link"><span class="material-symbols-outlined">person</span> Participants</a>
+      <a href="#organisers" class="category-link"><span class="material-symbols-outlined">admin_panel_settings</span> Organisers</a>
+      <a href="#rankings" class="category-link"><span class="material-symbols-outlined">trophy</span> Rankings</a>
+      <a href="#troubleshooting" class="category-link"><span class="material-symbols-outlined">contact_support</span> Troubleshooting</a>
+    </div>
+
+    <!-- OVERVIEW -->
+    <h2 id="overview"><span class="material-symbols-outlined">overview</span> Overview</h2>
+    <p>
+      <b>When RU Free?</b> is a simple group availability tool. An organiser creates a calendar, shares the link with participants, and everyone marks their availability. The app automatically ranks the best dates based on responses. Your calendar has its own unique link with your time slots, availabiity options and date range. Everyone uses the same link and adds their name inside the calendar.
+    </p>
+    <ol>
+      <li><b>Create a calendar</b> - Set a title, date range, time slots, and status options</li>
+      <li><b>Share the link</b> - Send the unique URL to your group</li>
+      <li><b>Add availability</b> - Each person adds their name, sets a PIN, and marks their slots</li>
+      <li><b>See results</b> - The "Best Match" section ranks optimal times</li>
+    </ol>
+    <p>
+      Creating a calendar takes less than 2 minutes. Once created, you'll get a unique link to share with your group. <b>Bookmark this link</b> -- it cannot be recovered if lost.
+    </p>
+
+    <!-- HUBS -->
+    <h2 id="hubs"><span class="material-symbols-outlined">hub</span> Calendar Hubs</h2>
+    <p>
+      A <b>Hub</b> gives your group <strong>one link</strong> to find all related calendars — useful when you run multiple polls or events (e.g. training, social, AGM).
+    </p>
+    <ol>
+      <li><b>Create a Hub</b> from the home page or <a href="hub.html?create=1">Create a Hub</a> — set a name and organiser PIN</li>
+      <li><b>Save your Hub link</b> when prompted (copy, download .txt, email, share, or poster). The link cannot be recovered if lost. Your organiser PIN is not included in the download.</li>
+      <li><b>Add calendars</b> — anyone with the Hub link can tap <b>Create new calendar in this Hub</b> (no Hub PIN needed). To attach an existing calendar, log in as that calendar's organiser and use <b>Add to Hub</b> on the calendar page.</li>
+      <li><b>Share the Hub link</b> with participants — they pick which calendar to open (each calendar still uses its own name + PIN)</li>
+      <li><b>Copy link or code</b> — on the Hub page, anyone can copy the Hub link or code. Share, Email, and Download require organiser login.</li>
+      <li><b>Organiser login</b> — enter your PIN to remove calendars from the Hub or use Share/Email/Download on the Hub page</li>
+      <li><b>Logout</b> on the Hub page when you finish on a shared computer — this clears organiser access on that browser</li>
+    </ol>
+    <p>
+      Hub URL format: <code>hub.html?g=Ab12Cd34</code>. Use the <a href="go/">Go page</a> to open a calendar or Hub by pasting a code or full link.
+    </p>
+
+    <!-- SETUP SECTION -->
+    <h2 id="setup"><span class="material-symbols-outlined">settings</span> Calendar Setup</h2>
+
+    <!-- STEP 1: TITLE & CATEGORY -->
+    <div class="step">
+      <span class="step-number">Step 1</span>
+      <h3><span class="material-symbols-outlined icon-inline">edit</span> Calendar Title</h3>
+      <p>
+        Give your calendar a short name. This appears at the top of the calendar as the calendar title.
+      </p>
+      <div class="example-box">
+        <b>Examples:</b> "Saturday Catch-ups", "Team Lunch Options", "Book Club January", "Project Meeting"
+      </div>
+      <p class="muted">
+        <em>Optional</em> -- if left blank, the default title "When RU Free" will be used.
+      </p>
+      
+      <h3><span class="material-symbols-outlined icon-inline">category</span> Categories</h3>
+      <p>
+        Choose up to <b>3 categories</b> that represent your event type. These are shown as icons in your calendar header. Tap to toggle each one on or off.
+      </p>
+      <table class="options-table">
+        <tr>
+          <th>Category</th>
+          <th>Best for</th>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">groups</span> Catchup</td>
+          <td>General social gatherings, meetups</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">rsvp</span> Attendance</td>
+          <td>RSVPs, headcounts, attendance tracking</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">meeting_room</span> Meeting</td>
+          <td>Work meetings, formal gatherings</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">event</span> Event</td>
+          <td>General events, calendar items</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">cake</span> Party</td>
+          <td>Birthday parties, celebrations</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">directions_walk</span> Activity</td>
+          <td>Walks, hikes, outdoor activities</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">nightlife</span> Night life</td>
+          <td>Clubs, live music, nights out</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">how_to_vote</span> Vote</td>
+          <td>Polls, decisions, choosing between options</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">liquor</span> Drinks</td>
+          <td>Happy hour, pub nights</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">local_cafe</span> Coffee</td>
+          <td>Coffee catch-ups, casual chats</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">breakfast_dining</span> Breakfast</td>
+          <td>Brunch, breakfast meetups</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">restaurant</span> Dinner</td>
+          <td>Dinner parties, restaurant outings</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">movie</span> Movie</td>
+          <td>Movie nights, cinema outings</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">event_available</span> Booking</td>
+          <td>Parent/Teacher meeting, Job interviews</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">sports_soccer</span> Sport</td>
+          <td>Training sessions, games, fitness</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">flight</span> Travel</td>
+          <td>Trip planning, group travel</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">celebration</span> Reunion</td>
+          <td>Reunions, anniversaries, celebrations</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- STEP 2: TIME SLOTS -->
+    <div class="step">
+      <span class="step-number">Step 2</span>
+      <h3><span class="material-symbols-outlined icon-inline">schedule</span> Slots</h3>
+      <p>
+        Define the time options that appear for each day. These are the slots participants will mark their availability for.
+      </p>
+      
+      <h4>Quick Add</h4>
+      <p>Click preset buttons to quickly add common slots:</p>
+      <ul>
+        <li><span class="chip-preview">Morning</span> <span class="chip-preview">Afternoon</span> <span class="chip-preview">Evening</span> - General time periods</li>
+        <li><span class="chip-preview">Lunch</span> <span class="chip-preview">Dinner</span> - Meal times</li>
+        <li><span class="chip-preview">All Day</span> - Single full-day slot</li>
+      </ul>
+      
+      <h4>Custom Slots</h4>
+      <p>
+        Add custom slots with specific times or descriptions (e.g., "9am-10am", "After work", "Session 1").
+        You can have <b>1 to 6 slots</b> per day.
+      </p>
+      
+      <div class="tip-box">
+        <b>Tip:</b> Keep slot names short (under 15 characters) for best display on mobile devices.
+      </div>
+    </div>
+
+    <!-- STEP 3: STATUS OPTIONS -->
+    <div class="step">
+      <span class="step-number">Step 3</span>
+      <h3><span class="material-symbols-outlined icon-inline">toggle_on</span> Options</h3>
+      <p>
+        These are the choices people cycle through when they click a slot. The first option is typically "yes/available" and scores highest in rankings.
+      </p>
+      
+      <h4>Preset Status Sets</h4>
+      <p>Click a preset to quickly set up common status combinations:</p>
+      <table class="options-table">
+        <tr>
+          <th>Preset</th>
+          <th>Options</th>
+        </tr>
+        <tr>
+          <td>Yes / No / Maybe</td>
+          <td>Classic three-way choice (default)</td>
+        </tr>
+        <tr>
+          <td>Available / Unavailable</td>
+          <td>Simple two-way choice</td>
+        </tr>
+        <tr>
+          <td>Yes</td>
+          <td>Assume No unless you choose Yes</td>
+        </tr>
+        <tr>
+          <td>No</td>
+          <td>Assume Yes unless you choose No</td>
+        </tr>
+        <tr>
+          <td>Free / Busy / Tentative</td>
+          <td>Calendar-style availability</td>
+        </tr>
+        <tr>
+          <td>In / Out / Maybe</td>
+          <td>Casual attendance tracking</td>
+        </tr>
+        <tr>
+          <td>Attending / Not Attending</td>
+          <td>Formal RSVP style</td>
+        </tr>
+      </table>
+      
+      <h4>Scoring Mode</h4>
+      <p>Choose how the "Best Match" is calculated:</p>
+      <ul>
+        <li><b>Rank mode:</b> Position determines score (top option = highest score)</li>
+        <li><b>Weights mode:</b> Manually assign point values (0-5) to each status</li>
+      </ul>
+      
+      <h4>Custom Colours</h4>
+      <p>Click the colour picker next to each option to choose a custom colour. The text colour will automatically adjust for readability.</p>
+      
+      <div class="tip-box">
+        <b>Tip:</b> You can have <b>1 to 5 status options</b>. The order matters -- put your "best" response first.
+      </div>
+    </div>
+
+    <!-- STEP 4: DATE RANGE -->
+    <div class="step">
+      <span class="step-number">Step 4</span>
+      <h3><span class="material-symbols-outlined icon-inline">date_range</span> Date Range</h3>
+      <p>
+        Select the start and end dates for your calendar. Each day in this range will show your time slots.
+      </p>
+      
+      <h4>Quick Presets</h4>
+      <p>Click a preset to automatically set dates from today:</p>
+      <ul>
+        <li><span class="chip-preview">1 day</span> - Single day (e.g., for voting)</li>
+        <li><span class="chip-preview">1 week</span> <span class="chip-preview">2 weeks</span> - Short-term planning</li>
+        <li><span class="chip-preview">1 month</span> - Longer-term coordination</li>
+      </ul>
+      
+      <h4>Exclude Weekends</h4>
+      <p>
+        Tick the <b>Exclude (Sat/Sun)</b> checkbox to hide weekends from the calendar. Useful for work meetings.
+      </p>
+      
+      <h4>Date Display Mode</h4>
+      <p>Control which dates participants can see:</p>
+      <table class="options-table">
+        <tr>
+          <th>Mode</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">date_range</span> All dates</td>
+          <td>Show every date in the range (default)</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">event_available</span> Only chosen</td>
+          <td>Participants see only dates you select (click date headers after creation)</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">event_busy</span> All except</td>
+          <td>Hide specific dates from participants (e.g., dates already booked)</td>
+        </tr>
+      </table>
+      
+      <div class="tip-box">
+        <b>Note:</b> Maximum range is 1 year. Dates must be between 2026 and 2030.
+      </div>
+    </div>
+
+    <!-- STEP 5: ORGANISER -->
+    <div class="step">
+      <span class="step-number">Step 5</span>
+      <h3><span class="material-symbols-outlined icon-inline">admin_panel_settings</span> Organiser (Admin)</h3>
+      <p>
+        As the organiser, you have special privileges. Set up your identity here.
+      </p>
+      
+      <h4>Organiser Name</h4>
+      <p>
+        Your display name. This will appear with "(organiser)" in the calendar and will be listed first in the user list.
+      </p>
+      
+      <h4>4-Digit PIN</h4>
+      <p>
+        Choose a memorable 4-digit PIN. You'll need this to:
+      </p>
+      <ul>
+        <li>Unlock your name to edit availability</li>
+        <li>Access organiser-only features (Share, Reset All, Delete Users)</li>
+      </ul>
+      
+      <div class="tip-box">
+        <b>Important:</b> Your PIN cannot be recovered if forgotten! Choose something memorable but not obvious (avoid 1234, 0000, etc.).
+      </div>
+      
+      <h4>Privacy Mode</h4>
+      <p>
+        Choose how much participants can see of each other's responses:
+      </p>
+      
+      <table class="options-table">
+        <tr>
+          <th style="width:120px;">Mode</th>
+          <th>What Users See</th>
+          <th>What Organiser Sees</th>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">visibility</span> <b>Open</b></td>
+          <td>All choices from everyone (when logged in)</td>
+          <td>All choices from everyone</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">visibility_off</span> <b>Hidden</b></td>
+          <td>Only their own choices</td>
+          <td>All choices from everyone</td>
+        </tr>
+        <tr>
+          <td><span class="material-symbols-outlined icon-inline">lock</span> <b>Blind</b></td>
+          <td>Only aggregate counts</td>
+          <td>Only aggregate counts</td>
+        </tr>
+      </table>
+      
+      <p>
+        <b>Important:</b> Users must be logged in to see other participants' individual choices in the rankings section. 
+        Unauthenticated visitors can only see aggregate counts (e.g., "3 Yes, 2 Maybe").
+        Privacy mode cannot be changed after the calendar is created.
+      </p>
+    </div>
+
+    <!-- AFTER CREATION -->
+    <h2><span class="material-symbols-outlined">hourglass_bottom</span> After Creating Your Calendar</h2>
+    
+    <p>Once you click <b>"Create New Calendar"</b>, you'll be redirected to your new calendar. Here's what to do:</p>
+    
+    <ol>
+      <li>
+        <b>Bookmark the page immediately</b><br>
+        The URL contains a unique 8-character token (e.g., <code>calendar.html?c=Ab3dEf9K</code>) - if you lose it, the calendar cannot be recovered.
+        <ul>
+          <li><b>iPhone:</b> Share... "Add Bookmark" or "Add to Home Screen"</li>
+          <li><b>Android:</b> Menu... "Add to Home screen"</li>
+          <li><b>Desktop:</b> Press <kbd>Ctrl</kbd>+<kbd>D</kbd> (Windows) or <kbd>Cmd</kbd>+<kbd>D</kbd> (Mac)</li>
+        </ul>
+      </li>
+      <li>
+        <b>Add your own availability</b><br>
+        Click on slots to set your availability first - this creates the coloured left borders that guide participants (visible to logged-in users only).
+      </li>
+      <li>
+        <b>Select your date filter</b> (if applicable)<br>
+        If you chose "Only chosen" or "All except" mode, click the date headers to select which dates participants will see. Selected dates turn blue. Your selections auto-save.
+      </li>
+      <li>
+        <b>Share the link</b><br>
+        Use the <span class="material-symbols-outlined icon-inline">share</span> Share button to send the calendar to your group. The short URL is easy to share via text or messaging apps.
+      </li>
+    </ol>
+    
+    <div class="tip-box">
+      <b>IMPORTANT:</b> Immediately copy and save your calendar link. If you lose it, you can't recover it back. 
+    </div>
+
+    <!-- FOR PARTICIPANTS -->
+    <h2 id="participants"><span class="material-symbols-outlined">person</span> For Participants</h2>
+
+    <h3>Joining via a Hub</h3>
+    <p>
+      If you received a Hub link, open it and pick the calendar you need from the list. Then add your name and PIN on that calendar page as usual.
+    </p>
+    
+    <h3>Adding your availability</h3>
+    <ol>
+      <li>Click the <span class="material-symbols-outlined icon-inline">person</span> person icon to open the user list</li>
+      <li>Click "Add Your Name" and enter your name + a 4-digit PIN</li>
+      <li>Click on time slots to cycle through status options (e.g., Yes -&gt; Maybe -&gt; No -&gt; blank)</li>
+      <li>Your changes auto-save after a few seconds, or click <span class="material-symbols-outlined icon-inline">check</span> to save immediately</li>
+    </ol>
+    
+    <h3>Logging in and out</h3>
+    <p>
+      To switch users or log out, click the <span class="material-symbols-outlined icon-inline">person</span> person icon. 
+      If you're logged in, you'll see a <span class="material-symbols-outlined icon-inline">logout</span> logout button 
+      next to your name. Clicking it will log you out and refresh the page.
+    </p>
+    <p>
+      <b>Privacy note:</b> You must be logged in to see other participants' individual choices in the rankings. 
+      Visitors who are not logged in can only see aggregate counts (e.g., "3 Yes, 2 Maybe").
+    </p>
+    
+    <h3>Understanding the slots</h3>
+    <p>
+      Each slot may show a <b>coloured left border</b>. This indicates the 
+      <b>organiser's choice</b> for that slot, helping you see which times they prefer.
+      You must be logged in to see these indicators.
+    </p>
+    
+    <h3>Changing your responses</h3>
+    <p>
+      Simply click any slot to cycle through the options again. To clear a slot entirely, 
+      keep clicking until it returns to the default grey (no selection).
+    </p>
+    
+    <h3>Resetting your availability</h3>
+    <p>
+      Click the <span class="material-symbols-outlined icon-inline">delete</span> trash icon to reset ALL your availability. 
+      This requires double confirmation (you must type "RESET") to prevent accidents.
+    </p>
+
+    <!-- ORGANISER FEATURES -->
+    <h2 id="organisers"><span class="material-symbols-outlined">admin_panel_settings</span> Organiser Features</h2>
+    
+    <p>As the organiser, you have access to these exclusive features:</p>
+    
+    <table class="options-table">
+      <tr>
+        <th>Feature</th>
+        <th>Icon</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td><b>Share</b></td>
+        <td><span class="material-symbols-outlined icon-inline">share</span></td>
+        <td>Share the calendar link via your device's share menu or copy to clipboard</td>
+      </tr>
+      <tr>
+        <td><b>Edit Name</b></td>
+        <td><span class="material-symbols-outlined icon-inline">person_edit</span></td>
+        <td>Change your display name (doesn't affect your saved availability)</td>
+      </tr>
+      <tr>
+        <td><b>Delete User</b></td>
+        <td><span class="material-symbols-outlined icon-inline">delete</span></td>
+        <td>Remove a participant and all their data. Click the trash icon next to their name in the user list. You cannot delete yourself.</td>
+      </tr>
+      <tr>
+        <td><b>Reset Mine</b></td>
+        <td><span class="material-symbols-outlined icon-inline">delete</span></td>
+        <td>Delete all YOUR availability data (requires typing "RESET" to confirm)</td>
+      </tr>
+      <tr>
+        <td><b>Reset All</b></td>
+        <td><span class="material-symbols-outlined icon-inline">warning</span></td>
+        <td>Delete ALL availability for ALL users - use with extreme caution!</td>
+      </tr>
+      <tr>
+        <td><b>Date Filter</b></td>
+        <td><span class="material-symbols-outlined icon-inline">filter_alt</span></td>
+        <td>Click date headers to select/deselect dates when using "Only chosen" or "All except" mode</td>
+      </tr>
+      <tr>
+        <td><b>Sort Rankings</b></td>
+        <td><span class="material-symbols-outlined icon-inline">trophy</span></td>
+        <td>Toggle between "By Match" (best scores first) and "By Date" (chronological). Available to all logged-in users. The organiser's choice is saved as the default for everyone.</td>
+      </tr>
+      <tr>
+        <td><b>Organiser Message</b></td>
+        <td><span class="material-symbols-outlined icon-inline">edit_note</span></td>
+        <td>Leave a short note for participants shown at the top of the rankings section. Click the message area to edit. Only the organiser can set or change the message; participants see it as read-only text.</td>
+      </tr>
+      <tr>
+        <td><b>Add to Hub</b></td>
+        <td><span class="material-symbols-outlined icon-inline">hub</span></td>
+        <td>Attach this calendar to a Hub (enter Hub code or link). Only the calendar organiser can add or remove. Calendars not yet in a Hub show an Add button in the Hub bar.</td>
+      </tr>
+      <tr>
+        <td><b>Choose / Finalise</b></td>
+        <td><span class="material-symbols-outlined icon-inline">check_circle</span></td>
+        <td>Lock in a chosen date and slot from the rankings panel. This freezes the calendar so participants can no longer change their availability. A green "Decided" banner appears showing the chosen time. Use "Reopen" to undo.</td>
+      </tr>
+      <tr>
+        <td><b>Limit Results</b></td>
+        <td>2 / 10 / All</td>
+        <td>Control how many ranking results are shown at once</td>
+      </tr>
+    </table>
+
+    <!-- BEST DATES RANKING -->
+    <h2 id="rankings"><span class="material-symbols-outlined">trophy</span> Best Match Rankings</h2>
+    
+    <p>
+      The ranking automatically calculates the best meeting times based on everyone's responses. 
+      How scores are calculated depends on the scoring mode set when the calendar was created:
+    </p>
+    
+    <h3>Rank Mode (default)</h3>
+    <p>Position determines score - the first option scores highest:</p>
+    <ul>
+      <li><b>1st option</b> (e.g., Yes) = highest score</li>
+      <li><b>2nd option</b> (e.g., Maybe) = medium score</li>
+      <li><b>3rd+ options</b> (e.g., No) = lowest score</li>
+    </ul>
+    
+    <h3>Weights Mode</h3>
+    <p>The organiser manually assigns point values (0-5) to each option:</p>
+    <ul>
+      <li><b>Equal weights</b> (e.g., all set to 1) - Every choice counts the same. Best for voting where you want to count how many people selected each option, not rank preferences.</li>
+      <li><b>Custom weights</b> (e.g., 3, 2, 1, 0) - Fine-tune scoring. For example, "Confirmed = 3" counts more than "Interested = 2".</li>
+    </ul>
+    
+    <h3>How Rankings Work</h3>
+    <p>
+      Each date/slot combination gets a total score by adding up everyone's weighted responses.
+      Slots with the highest combined scores appear at the top. Click "View" on any ranking to see 
+      who responded and their individual statuses.
+    </p>
+    
+    <h3>Sorting Options</h3>
+    <p>All logged-in users can change how rankings are displayed using the toggle at the top of the rankings section:</p>
+    <ul>
+      <li><b>By Match</b> - Best scores first (default). Shows the most popular dates at the top.</li>
+      <li><b>By Date</b> - Chronological order. Shows earliest dates first, regardless of score.</li>
+    </ul>
+    <p>The organiser's sort preference is saved as the default that all users see when they first open the calendar. Individual users can change the toggle during their session. Use the <b>2 / 10 / All</b> buttons to control how many results are shown.</p>
+    
+    <h3>Adding to your calendar</h3>
+    <p>
+      Once you've decided on a date, expand the ranking card and use:
+    </p>
+    <ul>
+      <li><b>Add</b> - Opens Google Calendar with the event pre-filled</li>
+      <li><b>Download</b> - Downloads a .ics calendar file for Outlook, Apple Calendar, etc.</li>
+      <li><b>Share</b> - Share the date, time slot, and roster details via your device's share menu or copy to clipboard</li>
+    </ul>
+
+    <!-- CHOOSING / FINALISING -->
+    <h2><span class="material-symbols-outlined">check_circle</span> Choosing a Final Slot (Organiser)</h2>
+
+    <p>
+      Once enough people have responded, the organiser can lock in a final decision directly from the rankings panel.
+    </p>
+
+    <ol>
+      <li>Make sure you are logged in as the organiser</li>
+      <li>Expand a rank card by tapping <b>View</b></li>
+      <li>Tap the green <b>Choose</b> button</li>
+      <li>Confirm the choice in the dialog that appears</li>
+    </ol>
+
+    <h3>What happens when a slot is chosen</h3>
+    <ul>
+      <li>A green <b>"Decided"</b> banner appears at the top showing the chosen date and slot</li>
+      <li>The chosen slot is highlighted with a green outline in the calendar grid</li>
+      <li>All other slots are dimmed and cannot be clicked</li>
+      <li>The save button is hidden -- no one can change their availability</li>
+      <li>The chosen rank card is pinned to the top of the rankings with a green border</li>
+      <li>New participants can still add their name and PIN, but they cannot select slots</li>
+    </ul>
+
+    <h3>Reopening a calendar</h3>
+    <p>
+      If plans change, the organiser can tap the <b>Reopen</b> button in the decided banner. This removes the lock and allows everyone to edit their availability again. A confirmation dialog prevents accidental reopening.
+    </p>
+
+    <div class="tip-box">
+      <b>Tip:</b> The freeze is enforced on the server -- even if someone tries to save changes via the browser console, the server will reject them.
+    </div>
+
+    <!-- TIPS FOR SUCCESS -->
+    <h2><span class="material-symbols-outlined">lightbulb_2</span> Tips for Success</h2>
+    
+    <ul>
+      <li><b>Keep it simple</b> - 3-4 time slots and 2-3 status options work best</li>
+      <li><b>Set your availability first</b> - participants will see your preferences as coloured left borders</li>
+      <li><b>Choose a clear title</b> - helps participants know what they're responding to</li>
+      <li><b>Share widely</b> - send reminders to people who haven't responded</li>
+      <li><b>Check the rankings</b> - the "Best Match" section automatically finds optimal times</li>
+      <li><b>Export results</b> - use the Google Calendar or .ics download to save the final decision</li>
+      <li><b>Lock it in</b> - once everyone has responded, use the Choose button to finalise and freeze the calendar</li>
+      <li><b>Stay active</b> - calendars with no saves for <span class="js-retention-days" data-default="40">40</span> days are automatically deleted</li>
+    </ul>
+
+    <!-- LIMITATIONS -->
+    <h2><span class="material-symbols-outlined">warning</span> Things You Can't Change After Creation</h2>
+    
+    <p>Once a calendar is created, these settings are fixed:</p>
+    <ul>
+      <li>Calendar title</li>
+      <li>Categories</li>
+      <li>Time slots</li>
+      <li>Status options and colours</li>
+      <li>Date range</li>
+      <li>Weekend exclusion setting</li>
+      <li>Date display mode (All dates / Only chosen / All except)</li>
+      <li>Privacy mode</li>
+    </ul>
+    <p>
+      If you need different settings, you'll need to create a new calendar.
+    </p>
+
+    <!-- TROUBLESHOOTING / FAQ -->
+    <h2 id="troubleshooting"><span class="material-symbols-outlined">contact_support</span> Troubleshooting</h2>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What happens if I forget my PIN?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Unfortunately, PINs cannot be recovered. You'll need to create a new name entry. 
+        Contact the organiser if you need your old entry removed.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Can I change my PIN?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Currently, PINs cannot be changed after creation. Choose a memorable 4-digit code when you first sign up.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Why am I locked out after entering wrong PINs?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>For security, accounts are temporarily locked after several incorrect PIN attempts. 
+        Wait a few minutes and try again with the correct PIN.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How long do calendars last?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Calendars with no activity (saves) are automatically deleted after <span class="js-retention-days" data-default="40">40</span> days
+        to reduce data storage. Make sure someone saves their availability periodically to keep
+        the calendar active, or export your results before the calendar expires.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Can I edit the calendar settings after creation?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Currently, calendar settings (title, dates, slots, status options) cannot be changed 
+        after creation. Create a new calendar if you need different settings.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Is my data secure?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>The calendar link acts like a password - anyone with the link can view and participate. 
+        Only share links with trusted participants. PINs protect individual entries from being 
+        modified by others. <b>Do not enter sensitive or private information.</b></p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Why don't I see the organiser indicators?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Organiser indicators (coloured left borders on slots) only appear when:</p>
+        <ul>
+          <li>You are logged in (enter your PIN)</li>
+          <li>The organiser has set their availability for that slot</li>
+          <li>You are NOT the organiser (you don't need to see your own preferences)</li>
+          <li>The calendar is not in Blind mode</li>
+        </ul>
+        <p>If you're not logged in, you won't see any individual user indicators for privacy reasons.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Does my availability save automatically?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Yes! Changes auto-save after about 4-5 seconds of inactivity. You'll see the save button 
+        spin briefly when saving. You can also click the <span class="material-symbols-outlined icon-inline">check</span> 
+        button to save immediately.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What do the different status colours mean?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>The legend at the top of the calendar shows what each colour means. By default:</p>
+        <ul>
+          <li><b>Green</b> = Yes / Available</li>
+          <li><b>Yellow/Orange</b> = Maybe / Tentative</li>
+          <li><b>Red/Blue</b> = No / Unavailable</li>
+          <li><b>Grey</b> = No response yet</li>
+        </ul>
+        <p>Organisers can customise these colours when creating the calendar.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Why do I need to log in to see who responded?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>For privacy, individual responses are only shown to authenticated users. This prevents 
+        casual visitors from seeing who is available when. When you expand a ranking card:</p>
+        <ul>
+          <li><b>Not logged in:</b> You'll see "Log in to see who responded"</li>
+          <li><b>Logged in (Open mode):</b> You'll see the full roster with names and statuses</li>
+          <li><b>Logged in (Hidden mode):</b> Only the organiser sees the roster</li>
+          <li><b>Logged in (Blind mode):</b> No one sees individual responses</li>
+        </ul>
+        <p>Aggregate counts (e.g., "3 Yes, 2 Maybe") are always visible to everyone.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What is a Calendar Hub?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>A Hub is one private link that lists multiple calendars. Share the Hub once; participants pick which calendar to open. Each calendar still has its own organiser and participant PINs. See the <a href="#hubs">Calendar Hubs</a> section above.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I open a calendar or Hub if I only have a code?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Use the <a href="go/">Go page</a>. Choose Calendar or Hub, paste the code or full link, and tap Go.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I log out?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Click the <span class="material-symbols-outlined icon-inline">person</span> person icon to open the user list. 
+        If you're logged in, you'll see a <span class="material-symbols-outlined icon-inline">logout</span> logout button 
+        next to your name. Clicking it will log you out and refresh the page to ensure a clean state.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I delete a participant? (Organiser)
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Organisers can remove any participant (except themselves) from the calendar:</p>
+        <ol>
+          <li>Click the <span class="material-symbols-outlined icon-inline">person</span> person icon to open the user list</li>
+          <li>Find the participant you want to remove</li>
+          <li>Click the <span class="material-symbols-outlined icon-inline">delete</span> trash icon next to their name</li>
+          <li>Confirm the deletion when prompted</li>
+        </ol>
+        <p><b>Warning:</b> This permanently deletes the participant and all their availability data. This action cannot be undone.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Why can't I change my availability?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>If you see a green "Decided" banner at the top, the organiser has locked in a final date and slot. 
+        The calendar is frozen and no one can change their availability. You can still view all the responses 
+        and rankings, but the slots are read-only. If the organiser reopens the calendar, you will be able 
+        to edit again.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I choose a final date as the organiser?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Once enough people have responded:</p>
+        <ol>
+          <li>Log in as the organiser</li>
+          <li>Expand a rank card by tapping "View"</li>
+          <li>Tap the green <b>Choose</b> button</li>
+          <li>Confirm your choice</li>
+        </ol>
+        <p>This freezes the calendar. To undo, tap the <b>Reopen</b> button in the green decided banner.</p>
+      </div>
+    </div>
+    
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I change the ranking sort order?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Any logged-in user can use the toggle buttons at the top of the rankings section:</p>
+        <ul>
+          <li><b>By Match</b> - Shows dates with the highest combined scores first (default)</li>
+          <li><b>By Date</b> - Shows dates in chronological order (earliest first)</li>
+        </ul>
+        <p>You can also change how many results are shown using the 2 / 10 / All buttons. When the organiser changes the sort order, it is saved as the default for all users. Other users can change it locally during their session.</p>
+      </div>
+    </div>
+
+    <!-- CONTACT -->
+    <h2><span class="material-symbols-outlined">build</span> Maintenance</h2>
+    <p>
+      Inactive calendars are removed automatically by <code>cleanup.php</code>. Schedule it via cron on your server (daily at low-traffic hours is recommended):
+    </p>
+    <pre style="background:#f5f5f5;padding:12px;border-radius:8px;overflow-x:auto;font-size:.9rem;">0 3 * * * /usr/bin/php /path/to/cleanup.php &gt;&gt; /var/log/grape_cleanup.log 2&gt;&amp;1</pre>
+    <p class="muted">
+      Replace <code>/path/to/cleanup.php</code> with the absolute path on your host. The script should run from CLI only (not via the web). It prunes expired sessions, old rate-limit rows, and calendars past the auto-delete threshold set in Admin → Setup.
+    </p>
+
+    <h2><span class="material-symbols-outlined">live_help</span> Need More Help?</h2>
+    <p>
+      For questions or issues, contact: <b>admin@whenrufree.net</b>
+    </p>
+    </main>
+    
+    <p class="muted" style="margin-top: 10px;">
+      See also: <a href="index.html" style="color:inherit; text-decoration:underline;">Home</a>
+    <span aria-hidden="true"> | </span>
+    <a href="go/" style="color:inherit; text-decoration:underline;">Go to code</a>
+    <span aria-hidden="true"> | </span>
+    <a href="terms.html" style="color:inherit; text-decoration:underline;">Terms</a>
+    <span aria-hidden="true"> | </span>
+    <a href="privacy.html" style="color:inherit; text-decoration:underline;">Privacy</a>
+    <span aria-hidden="true"> | </span>
+    <a href="faq.html" style="color:inherit; text-decoration:underline;">FAQs</a>
+    <span aria-hidden="true"> | </span>
+    <a href="ideas.html" style="color:inherit; text-decoration:underline;">Templates</a>
+    </p>
+
+    <div class="top-actions" style="margin-top: 24px;">
+      <a class="btn btn-ghost btn-small" onclick="history.back()" style="text-decoration:none;">&lt;- Back</a>
+    </div>
+  </div>
+
+  <!--
+    Replace any `.js-retention-days` spans with the admin-configured auto-delete
+    threshold from site_config. Silent fail keeps the data-default fallback.
+  -->
+  <script>
+    (function () {
+      'use strict';
+      var nodes = document.querySelectorAll('.js-retention-days');
+      if (!nodes.length) return;
+      fetch('api.php?action=get_site_config', { method: 'GET' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || data.status !== 'success' || !data.config) return;
+          var n = parseInt(data.config.retention && data.config.retention.inactive_days, 10);
+          if (!(n >= 1 && n <= 3650)) return;
+          for (var i = 0; i < nodes.length; i++) {
+            nodes[i].textContent = String(n);
+          }
+        })
+        .catch(function () { /* keep data-default */ });
+    })();
+  </script>
+</body>
+</html>

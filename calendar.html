@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noindex, nofollow">
+  <title>When RU Free</title>
+
+
+  <!-- Self-hosted Material Symbols (place woff2 in /fonts/) -->
+  <style>
+    @font-face{
+      font-family:'Material Symbols Outlined';
+      font-style:normal;
+      font-weight:400;
+      src:url('fonts/material-symbols-outlined.woff2') format('woff2');
+    }
+    .material-symbols-outlined{
+      font-family:'Material Symbols Outlined';
+      font-weight:normal;
+      font-style:normal;
+      font-size:24px;
+      line-height:1;
+      letter-spacing:normal;
+      text-transform:none;
+      display:inline-block;
+      white-space:nowrap;
+      word-wrap:normal;
+      direction:ltr;
+      -webkit-font-feature-settings:'liga';
+      font-feature-settings:'liga';
+      -webkit-font-smoothing:antialiased;
+    }
+  </style>
+  <!-- App styles -->
+  <link rel="stylesheet" href="calendar.css">
+</head>
+<body>
+<header>
+
+  <div class="logo">
+    <h1 id="calendarTitle">When RU Free <span class="material-symbols-outlined" aria-hidden="true">groups</span></h1>
+    <!-- Selected user name displayed after title -->
+    <span id="currentUserDisplay" class="current-user-display"></span>
+    <span id="serverStatus" class="server-status hide">Checking Server...</span>
+  </div>
+  <div class="controls">
+    <!-- User select icon button (opens modal) -->
+    <button id="userSelectBtn" class="btn btn-ghost icon-btn" type="button" title="Select user" aria-label="Select user" aria-haspopup="dialog">
+      <span class="material-symbols-outlined" aria-hidden="true">person</span>
+    </button>
+    <!-- Edit name (admin only) -->
+    <button id="renameBtn" class="btn btn-ghost icon-btn" type="button" disabled title="Edit name" aria-label="Edit name" style="display:none;">
+      <span class="material-symbols-outlined" aria-hidden="true">person_edit</span>
+    </button>
+    <!-- Share (admin only) -->
+    <button id="shareBtn" class="btn btn-ghost icon-btn" type="button" title="Share" aria-label="Share" style="display:none;">
+      <span class="material-symbols-outlined" aria-hidden="true">share</span>
+    </button>
+    <!-- Submit/Save button - hidden initially to prevent flash -->
+    <button id="submitBtn" class="btn btn-submit icon-btn is-saved init-hidden" type="button" disabled title="Saved" aria-label="Saved">
+      <span id="submitBtnIcon" class="material-symbols-outlined" aria-hidden="true">lock</span>
+    </button>
+    <!-- Reset My Availability (all authenticated users) -->
+    <button id="resetMineBtn" class="btn btn-danger icon-btn" type="button" title="Reset my availability" aria-label="Reset my availability" style="display:none;">
+      <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+    </button>
+    <!-- Reset All (admin only) -->
+    <button id="resetAllBtn" class="btn btn-danger icon-btn" type="button" title="Reset ALL availability (admin)" aria-label="Reset ALL availability (admin)" style="display:none;">
+      <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+    </button>
+  </div>
+</header>
+
+<div id="hubBar" class="hub-bar" style="display:none;">
+  <span class="material-symbols-outlined" aria-hidden="true">hub</span>
+  <span id="hubBarText"></span>
+  <a id="hubBarLink" class="hub-bar-link" href="#">View Hub</a>
+  <button type="button" id="hubAddBtn" class="btn btn-ghost btn-sm" style="display:none;">Add to Hub</button>
+  <button type="button" id="hubRemoveBtn" class="btn btn-ghost btn-sm" style="display:none;">Remove from Hub</button>
+</div>
+
+<main>
+  <section class="analysis-section">
+    <div id="nameBanner" class="analysis-card" style="display:none;">
+      <h3 class="analysis-title"> Add your name to start </h3>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+        <p style="margin:0; color:#555; line-height:1.4; flex:1; min-width:220px;">
+          <b>Step 1:</b> Add your name and set a 4-digit PIN, then tap time-slots and press <b>Submit</b>.
+          You must <b>Submit/Save</b> to protect the calendar from cleanup.
+        </p>
+        <button id="bannerAddBtn" class="btn btn-submit is-submit icon-btn" type="button" title="Add your name" aria-label="Add your name">
+          <span class="material-symbols-outlined" aria-hidden="true">person_add</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="analysis-card">
+      <!-- Analysis card header with sort toggle and limit toggle -->
+      <div class="analysis-title">
+        <!-- Title shown for non-organisers (hidden for organisers who see sort toggle) -->
+        <span class="analysis-title-text" id="analysisTitleText">Best Match</span>
+        <!-- Sort order toggle (50:50 - Score vs Date) - organiser only -->
+        <div class="sort-toggle" id="sortToggle">
+          <button type="button" class="sort-btn active" data-mode="score">
+            <span class="material-symbols-outlined" aria-hidden="true">trophy</span>
+            <span>By Match</span>
+          </button>
+          <button type="button" class="sort-btn" data-mode="date">
+            <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+            <span>By Date</span>
+          </button>
+        </div>
+        <!-- Rank limit toggle (33:33:33 - 2/10/All) -->
+        <div class="limit-toggle" id="limitToggle">
+          <button type="button" class="limit-btn active" data-limit="2">2</button>
+          <button type="button" class="limit-btn" data-limit="10">10</button>
+          <button type="button" class="limit-btn" data-limit="0">All</button>
+        </div>
+      </div>
+      <!-- Organiser message: editable by organiser, read-only for participants -->
+      <div class="organiser-message-wrap" id="organiserMessageWrap" style="display:none;">
+        <p class="organiser-message-text" id="organiserMessageText"></p>
+        <div class="organiser-message-edit" id="organiserMessageEdit" style="display:none;">
+          <textarea id="organiserMessageInput" class="organiser-message-input" rows="4" placeholder="Leave a short note for participants..."></textarea>
+          <div class="organiser-message-meta">
+            <span class="organiser-message-count" id="organiserMessageCount"></span>
+            <div class="organiser-message-actions">
+              <button type="button" class="btn btn-cancel btn-sm" id="organiserMessageCancel">Cancel</button>
+              <button type="button" class="btn btn-confirm btn-sm" id="organiserMessageSave">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="rank-wrap" id="rankWrap"></div>
+      <div id="rankEmpty" style="display:none; padding:10px; text-align:center; color:#777; font-weight:500;">
+        No matches yet.
+      </div>
+    </div>
+  </section>
+
+  <section class="calendar-section">
+    <!-- Month label - scrolls away on mobile -->
+    <div class="month-label-wrap">
+      <span class="month-label" id="monthLabel">Loading date range...</span>
+      <button type="button" id="togglePastDatesBtn" class="btn btn-ghost btn-sm toggle-past-btn" style="display:none;" title="Toggle past dates">
+        Hide past dates
+      </button>
+    </div>
+    <!-- Legend - sticky on all views -->
+    <div class="legend-wrap" id="legendWrapContainer">
+      <div class="legend" id="legendWrap"></div>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+    
+    <!-- Small footer links - inside calendar-section so they scroll out of view -->
+    <div class="row footer-links" style="justify-content:center; margin-top: 16px; padding-bottom: 10px;">
+      <p class="muted" style="margin:0; font-size:0.82rem; text-align:center;">
+        <a href="terms.html" style="color:inherit; text-decoration:underline;">Terms</a>
+        <span aria-hidden="true"> - </span>
+        <a href="privacy.html" style="color:inherit; text-decoration:underline;">Privacy</a>
+        <span aria-hidden="true"> - </span>
+        <a href="guide.html" style="color:inherit; text-decoration:underline;">Help</a>
+      </p>
+    </div>
+  </section>
+</main>
+
+
+
+
+<!-- User Selection Modal -->
+<div class="modal-overlay" id="userSelectModal">
+  <div class="modal">
+    <h2>Select Name</h2>
+    <p>Choose your name from the list below, or <a href="#" id="userSelectAddLink" class="add-name-link">Add Your Name</a>.</p>
+    <div class="user-select-list" id="userSelectList">
+      <!-- Users will be populated here by JS -->
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="userSelectCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Rename user Modal -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <h2 id="userModalTitle">Add your name</h2>
+    <p id="userModalText">Enter your name and a 4-digit PIN (keep it secret).</p>
+
+    <!-- Name -->
+    <div class="fieldish">
+      <input id="userNameInput" placeholder="e.g. John" maxlength="40" />
+      <div class="error" id="userNameErr"></div>
+    </div>
+
+    <!-- PIN (add mode only) -->
+    <div class="fieldish" id="userPinWrap">
+      <div class="pin-field">
+        <input id="userPinInput" placeholder="4-digit PIN" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" />
+        <button type="button" id="toggleUserPin" class="pin-toggle" aria-label="Show PIN">
+          <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+        </button>
+      </div>
+      <div class="error" id="userPinErr"></div>
+    </div>
+
+    <!-- Confirm PIN (add mode only) -->
+    <div class="fieldish" id="userPin2Wrap">
+      <div class="pin-field">
+        <input id="userPin2Input" placeholder="Confirm" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" />
+        <button type="button" id="toggleUserPin2" class="pin-toggle" aria-label="Show PIN">
+          <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+        </button>
+      </div>
+      <div class="error" id="userPin2Err"></div>
+    </div>
+
+    <div class="error" id="userModalError"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="userModalCancel" type="button">Cancel</button>
+      <button class="btn btn-confirm" id="userModalConfirm" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN prompt (unlock selected user) -->
+<div class="modal-overlay" id="pinModal">
+  <div class="modal">
+    <h2 id="pinModalTitle">Enter PIN</h2>
+    <p id="pinModalText">Enter the 4-digit PIN for the selected user.</p>
+    <div class="pin-field">
+      <input id="pinInput" placeholder="4-digit PIN" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" />
+      <button type="button" id="toggleUnlockPin" class="pin-toggle" aria-label="Show PIN">
+        <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+      </button>
+    </div>
+    <div class="error" id="pinModalError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="pinCancel" type="button">Cancel</button>
+      <button class="btn btn-confirm" id="pinConfirm" type="button">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- Simple info modal -->
+<div class="modal-overlay" id="infoModal">
+  <div class="modal">
+    <h2>Select a Name</h2>
+    <p style="margin: 0 0 16px;">Please select a name or add your name first.</p>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="infoModalCancel" type="button">OK</button>
+      <button class="btn btn-confirm" id="infoModalAdd" type="button">Add Name</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add to Hub modal (organiser only) -->
+<div class="modal-overlay" id="hubModal">
+  <div class="modal">
+    <h2>Add to Hub</h2>
+    <p style="margin:0 0 12px;">Enter the Hub code or paste the Hub link.</p>
+    <input id="hubTokenInput" type="text" placeholder="Hub code e.g. Ab12Cd34" maxlength="64" autocomplete="off" style="width:100%;padding:12px;margin-bottom:8px;border:1px solid #ccc;border-radius:6px;" />
+    <div class="error" id="hubModalError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="hubModalCancel" type="button">Cancel</button>
+      <button class="btn btn-confirm" id="hubModalConfirm" type="button">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast">Saved</div>
+
+<!-- App script -->
+<script src="calendar.js?v=20260430"></script>
+</body>
+</html>

@@ -1,0 +1,1765 @@
+'use strict';
+
+/************** CATEGORY TOGGLE UI **************/
+const catGrid = document.getElementById('catGrid');
+const catCount = document.getElementById('catCount');
+const CAT_MAX = 3;
+
+/**
+ * Returns an array of currently selected category values.
+ * @returns {string[]}
+ */
+function getSelectedCategories(){
+  return Array.from(catGrid.querySelectorAll('.cat-tog.active')).map(b => b.dataset.value);
+}
+
+/**
+ * Updates the counter text and disabled state on unselected buttons.
+ */
+function updateCatUI(){
+  const selected = getSelectedCategories();
+  const atMax = selected.length >= CAT_MAX;
+  catCount.textContent = selected.length > 0 ? `(${selected.length}/${CAT_MAX})` : '';
+  catGrid.querySelectorAll('.cat-tog').forEach(btn => {
+    if(!btn.classList.contains('active')){
+      btn.disabled = atMax;
+    }
+  });
+}
+
+// Toggle handler for category buttons
+catGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.cat-tog');
+  if(!btn || btn.disabled) return;
+  btn.classList.toggle('active');
+  updateCatUI();
+});
+
+// CSRF token cached for this browser session (fetched from api.php?action=csrf_token)
+let csrfToken = null;
+
+/** Hub context when creating calendar inside a Hub (?g=TOKEN) */
+let hubContext = { token: null, title: null };
+
+function getHubTokenFromUrl() {
+  return new URL(window.location.href).searchParams.get('g');
+}
+
+async function initHubContext() {
+  const g = getHubTokenFromUrl();
+  if (!g || !/^[A-Za-z0-9_-]{8,64}$/.test(g)) return;
+
+  hubContext.token = g;
+  const banner = document.getElementById('hubContextBanner');
+  const titleEl = document.getElementById('hubContextTitle');
+  if (!banner) return;
+
+  try {
+    const resp = await fetch(`api.php?action=group_meta&g=${encodeURIComponent(g)}`);
+    const data = await resp.json();
+    if (data.status === 'success' && data.group) {
+      hubContext.title = data.group.title || 'Untitled Hub';
+      titleEl.textContent = hubContext.title;
+      banner.classList.remove('hideme');
+    }
+  } catch (e) {
+    console.warn('Hub meta failed', e);
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function toPlainAscii(str) {
+  return String(str ?? '')
+    .replace(/\u2014/g, '-')
+    .replace(/\u2013/g, '-')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2026/g, '...')
+    .replace(/\u00A0/g, ' ');
+}
+
+// -------------------------
+// Calendar Save Kit
+// -------------------------
+
+const calendarSaveKit = {
+  buildCalendarUrl(token) {
+    const dir = window.location.href.replace(/[^/]*$/, '');
+    return `${dir}calendar.html?c=${encodeURIComponent(token)}`;
+  },
+
+  buildGoCalendarUrl(token) {
+    const dir = window.location.href.replace(/[^/]*$/, '');
+    return `${dir}go/?c=${encodeURIComponent(token)}`;
+  },
+
+  sanitiseFilename(title) {
+    const s = (title || 'Calendar').replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\s+/g, '-');
+    return (s || 'Calendar').substring(0, 40);
+  },
+
+  formatDateForFile() {
+    return new Date().toLocaleDateString('en-AU', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+  },
+
+  buildCalendarDetailsText(meta) {
+    const url = meta.url || this.buildCalendarUrl(meta.token);
+    const goUrl = this.buildGoCalendarUrl(meta.token);
+    const title = toPlainAscii(meta.title || 'When RU Free');
+    const lines = [
+      'When RU Free - Calendar details',
+      `Created: ${this.formatDateForFile()}`,
+      '',
+      `Calendar title:  ${title}`,
+      `Calendar link:   ${url}`,
+      `Calendar code:   ${meta.token}`,
+      ''
+    ];
+    if (meta.hub_title) {
+      lines.push(`Part of Hub:       ${toPlainAscii(meta.hub_title)}`);
+      lines.push('');
+    }
+    lines.push(
+      'Go page (enter code if you lose the full link):',
+      goUrl,
+      '',
+      'INSTRUCTIONS',
+      '- Share the calendar link with participants so they can add their name and mark availability.',
+      '- Bookmark this link - it cannot be recovered if lost.',
+      '- Your organiser PIN is NOT stored here. Remember it separately.',
+      '- Anyone with the link can view and participate in this calendar.',
+      '',
+      window.location.origin
+    );
+    return lines.join('\n');
+  },
+
+  downloadCalendarDetailsTxt(meta) {
+    const content = this.buildCalendarDetailsText(meta);
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `WhenRUFree-Calendar-${this.sanitiseFilename(meta.title)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  },
+
+  async copyCalendarUrl(url) {
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('Link copied to clipboard');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  buildEmailContent(meta) {
+    const url = meta.url || this.buildCalendarUrl(meta.token);
+    const goUrl = this.buildGoCalendarUrl(meta.token);
+    const title = toPlainAscii(meta.title || 'When RU Free');
+    const subject = `When RU Free: ${title}`;
+    const body = [
+      'Save this calendar link for our group availability poll:',
+      '',
+      url,
+      '',
+      `Calendar code: ${meta.token}`,
+      '',
+      'If you lose the full link, enter the code on the Go page:',
+      goUrl,
+      '',
+      'Remember your organiser PIN separately - it is not included here.',
+      '',
+      'Share this link with participants so they can mark their availability.'
+    ];
+    return { subject, body };
+  },
+
+  emailCalendarLink(meta) {
+    const { subject, body } = this.buildEmailContent(meta);
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  },
+
+  async shareCalendarLink(meta) {
+    const url = meta.url || this.buildCalendarUrl(meta.token);
+    const title = toPlainAscii(meta.title || 'When RU Free');
+    const shareTitle = `${title} - When RU Free`;
+    const shareText = `Use this link to mark your availability for ${title}: ${url}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: shareTitle, text: shareText });
+        return;
+      }
+    } catch (e) { /* cancelled */ }
+    const ok = await this.copyCalendarUrl(shareText);
+    if (!ok) showToast('Share not available - use Copy link');
+  },
+
+  buildCalendarPosterHtml(meta, options = {}) {
+    const { showToolbar = false } = options;
+    const url = meta.url || this.buildCalendarUrl(meta.token);
+    const title = toPlainAscii(meta.title || 'When RU Free');
+    const token = meta.token || '';
+    const siteUrl = 'https://whenrufree.net';
+    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const created = this.formatDateForFile();
+
+    const toolbarHtml = showToolbar ? `
+  <div class="toolbar no-print">
+    <span class="toolbar-label">Calendar poster</span>
+    <div class="toolbar-actions">
+      <button type="button" id="posterCopyCodeBtn" class="tb-btn">Copy code</button>
+      <button type="button" id="posterCopyLinkBtn" class="tb-btn">Copy link</button>
+      <button type="button" id="posterPrintBtn" class="tb-btn tb-btn-primary">Print</button>
+    </div>
+  </div>` : '';
+
+    const onloadScript = showToolbar ? `<script>
+(function(){
+  var calUrl=${JSON.stringify(url)};
+  var calCode=${JSON.stringify(token)};
+  function copyText(t){
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){alert('Copied to clipboard');})
+        .catch(function(){prompt('Copy this text:',t);});
+    }else{prompt('Copy this text:',t);}
+  }
+  document.getElementById('posterCopyCodeBtn').onclick=function(){copyText(calCode);};
+  document.getElementById('posterCopyLinkBtn').onclick=function(){copyText(calUrl);};
+  document.getElementById('posterPrintBtn').onclick=function(){window.print();};
+  window.focus();
+})();
+<\/script>` : '';
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>When RU Free - ${esc(title)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(145deg,#e8eaf6 0%,#f5f5f5 45%,#eceff1 100%);
+    color:#333;min-height:100vh;padding:20px;
+  }
+  .page-wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px;}
+  .toolbar{
+    display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;
+    background:#fff;border:1px solid #c5cae9;border-radius:10px;
+    padding:12px 16px;box-shadow:0 4px 16px rgba(63,81,181,0.1);
+  }
+  .toolbar-label{font-weight:700;color:#283593;font-size:0.95rem;}
+  .toolbar-actions{display:flex;flex-wrap:wrap;gap:8px;}
+  .tb-btn{padding:9px 14px;border:1px solid #ccc;background:#fff;border-radius:6px;font-weight:600;font-size:0.88rem;cursor:pointer;min-height:40px;}
+  .tb-btn:hover{background:#f5f5f5;}
+  .tb-btn-primary{background:#880000;color:#fff;border-color:#880000;}
+  .tb-btn-primary:hover{background:#6d0000;}
+  .poster{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.14);border:1px solid rgba(63,81,181,0.15);}
+  .brand-header{background:linear-gradient(135deg,#3f51b5 0%,#283593 100%);color:#fff;padding:32px 28px 28px;text-align:center;position:relative;}
+  .brand-header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#880000,#c62828,#880000);}
+  .brand-badge{display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);border-radius:999px;padding:6px 14px;font-size:0.75rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:14px;}
+  .brand-header .app-name{font-size:2.2rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:8px;}
+  .brand-header .tagline{font-size:1.05rem;opacity:0.94;font-weight:500;}
+  .poster-body{padding:36px 32px 30px;text-align:center;}
+  .cal-label{font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#888;margin-bottom:8px;}
+  .cal-name{font-size:1.75rem;font-weight:800;color:#222;margin-bottom:6px;line-height:1.25;}
+  .cal-created{font-size:0.85rem;color:#888;margin-bottom:26px;}
+  .code-block{background:linear-gradient(180deg,#fafafa 0%,#f0f0f0 100%);border:3px solid #3f51b5;border-radius:14px;padding:32px 24px 28px;margin:0 auto 26px;max-width:100%;box-shadow:0 8px 24px rgba(63,81,181,0.12),inset 0 1px 0 #fff;}
+  .code-label{font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#3f51b5;margin-bottom:14px;}
+  .cal-code{font-family:Consolas,'Courier New',monospace;font-size:clamp(2.6rem,11vw,4.8rem);font-weight:800;letter-spacing:0.2em;color:#111;line-height:1.1;word-break:break-all;}
+  .go-instruction{font-size:1.08rem;font-weight:600;color:#444;line-height:1.45;margin:0 auto 26px;max-width:520px;}
+  .link-section{text-align:left;margin-top:4px;}
+  .link-section p{font-size:0.92rem;color:#555;line-height:1.55;margin-bottom:10px;}
+  .link-box{font-family:Consolas,'Courier New',monospace;font-size:0.84rem;background:#e8eaf6;border:1px solid #c5cae9;border-radius:8px;padding:14px 16px;word-break:break-all;color:#283593;}
+  .promo{background:linear-gradient(135deg,#880000 0%,#6d0000 100%);color:#fff;padding:26px 32px;text-align:center;}
+  .promo .site{font-size:1.45rem;font-weight:800;letter-spacing:0.02em;margin-bottom:8px;}
+  .promo .pitch{font-size:0.98rem;opacity:0.96;line-height:1.45;}
+  .promo .cta{font-size:0.84rem;margin-top:12px;opacity:0.88;padding-top:12px;border-top:1px solid rgba(255,255,255,0.25);}
+  @media print{
+    body{background:#fff;padding:0;}
+    .no-print{display:none !important;}
+    .page-wrap{max-width:none;gap:0;}
+    .poster{box-shadow:none;border-radius:0;border:none;}
+    .brand-header,.promo,.code-block{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    ${toolbarHtml}
+    <div class="poster">
+      <div class="brand-header">
+        <div class="brand-badge">whenrufree.net</div>
+        <div class="app-name">When RU Free?</div>
+        <div class="tagline">Group Availability Calendar</div>
+      </div>
+      <div class="poster-body">
+        <div class="cal-label">Your calendar</div>
+        <div class="cal-name">${esc(title)}</div>
+        <div class="cal-created">Created ${esc(created)}</div>
+        <div class="code-block">
+          <div class="code-label">Calendar code</div>
+          <div class="cal-code">${esc(token)}</div>
+        </div>
+        <p class="go-instruction">Go to whenrufree.net/go and enter this calendar code</p>
+        <div class="link-section">
+          <p><strong>Full link</strong> - share with your group:</p>
+          <div class="link-box">${esc(url)}</div>
+        </div>
+      </div>
+      <div class="promo">
+        <div class="site">${esc(siteUrl)}</div>
+        <div class="pitch">Find a time when everyone in your group is available.<br>Free shared calendars for clubs, teams, and events.</div>
+        <div class="cta">Created with When RU Free - whenrufree.net</div>
+      </div>
+    </div>
+  </div>
+  ${onloadScript}
+</body>
+</html>`;
+  },
+
+  openCalendarPosterPopup(meta) {
+    const html = this.buildCalendarPosterHtml(meta, { showToolbar: true });
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const w = window.open(blobUrl, '_blank', 'noopener,noreferrer,width=920,height=900');
+    if (!w) {
+      URL.revokeObjectURL(blobUrl);
+      showToast('Allow pop-ups to open poster');
+      return;
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  }
+};
+
+function showSaveCalendarPanel(meta) {
+  const overlay = document.getElementById('savePanelOverlay');
+  const url = meta.url || calendarSaveKit.buildCalendarUrl(meta.token);
+
+  document.getElementById('saveCalTitle').textContent = meta.title || 'When RU Free';
+  document.getElementById('saveCalCode').textContent = meta.token;
+  document.getElementById('saveCalUrl').textContent = url;
+
+  const ack = document.getElementById('saveAckCheckbox');
+  const continueBtn = document.getElementById('saveContinueBtn');
+  ack.checked = false;
+  continueBtn.disabled = true;
+
+  document.getElementById('clipboardFailMsg').classList.add('hideme');
+  overlay.classList.remove('hideme');
+
+  (async () => {
+    const copied = await calendarSaveKit.copyCalendarUrl(url);
+    if (!copied) document.getElementById('clipboardFailMsg').classList.remove('hideme');
+    calendarSaveKit.downloadCalendarDetailsTxt({ ...meta, url });
+  })();
+
+  const fullMeta = { ...meta, url };
+
+  document.getElementById('saveCopyBtn').onclick = () => calendarSaveKit.copyCalendarUrl(url);
+  document.getElementById('saveDownloadBtn').onclick = () => {
+    calendarSaveKit.downloadCalendarDetailsTxt(fullMeta);
+    showToast('Download started');
+  };
+  document.getElementById('saveShareBtn').onclick = () => calendarSaveKit.shareCalendarLink(fullMeta);
+  document.getElementById('saveEmailBtn').onclick = () => calendarSaveKit.emailCalendarLink(fullMeta);
+  document.getElementById('savePosterBtn').onclick = () => calendarSaveKit.openCalendarPosterPopup(fullMeta);
+
+  ack.onchange = () => {
+    continueBtn.disabled = !ack.checked;
+  };
+
+  continueBtn.onclick = () => {
+    if (!ack.checked) return;
+    overlay.classList.add('hideme');
+    try {
+      sessionStorage.setItem('creator_auth', JSON.stringify({
+        token: meta.token,
+        admin_name: meta.admin_name || '',
+        admin_pin: meta.admin_pin || ''
+      }));
+    } catch (e) { /* ignore */ }
+    window.location.href = `calendar.html?c=${encodeURIComponent(meta.token)}`;
+  };
+}
+
+/**
+ * IMPORTANT: getRelativeLuminance() and getContrastTextColor() below are
+ * duplicated in calendar.js. If you change the luminance formula or contrast
+ * threshold here, update calendar.js to match (and vice versa).
+ *
+ * Calculates relative luminance of a colour for WCAG contrast calculations.
+ * Uses sRGB linearisation as per WCAG 2.1 specification.
+ * @param {string} hexColor - Hex colour string (e.g., '#FF5500' or 'FF5500')
+ * @returns {number} Relative luminance between 0 (black) and 1 (white)
+ */
+function getRelativeLuminance(hexColor) {
+  // Remove # if present and handle shorthand hex
+  let hex = hexColor.replace(/^#/, '');
+  if (hex.length === 3) {
+    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  }
+  
+  // Parse RGB components
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+  
+  // sRGB to linear RGB conversion (WCAG formula)
+  const toLinear = (c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  
+  const rLin = toLinear(r);
+  const gLin = toLinear(g);
+  const bLin = toLinear(b);
+  
+  // Relative luminance formula (ITU-R BT.709)
+  return 0.2126 * rLin + 0.7152 * gLin + 0.0722 * bLin;
+}
+
+/**
+ * Determines if text should be black or white based on background colour.
+ * Uses a simple luminance threshold for predictable results.
+ * @param {string} bgColor - Background colour in hex format
+ * @returns {string} '#000000' for dark text or '#FFFFFF' for light text
+ */
+function getContrastTextColor(bgColor) {
+  if (!bgColor || typeof bgColor !== 'string') return '#FFFFFF';
+  
+  const luminance = getRelativeLuminance(bgColor);
+  
+  // Simple threshold: adjust this value (0.0-1.0)
+  // Higher = more backgrounds get white text
+  // 0.5 = balanced, 0.6 = prefer white, 0.7 = strongly prefer white
+  // ##################### TEXT SLOT COLOR ###############
+  const threshold = 0.4;
+  
+  return luminance < threshold ? '#FFFFFF' : '#000000';
+}
+
+/**
+ * Applies the chosen colour as background to the label input with appropriate text contrast.
+ * @param {HTMLInputElement} colorPicker - The color picker element
+ * @param {HTMLInputElement} labelInput - The label input element
+ */
+function applyColorPreview(colorPicker, labelInput) {
+  const bgColor = colorPicker.value;
+  const textColor = getContrastTextColor(bgColor);
+  labelInput.style.backgroundColor = bgColor;
+  labelInput.style.color = textColor;
+  labelInput.style.borderColor = bgColor;
+}
+
+/**
+ * Fetches and caches a CSRF token for state-changing requests.
+ * @returns {Promise<string|null>} CSRF token or null if unavailable
+ */
+async function ensureCsrfToken(){
+  if(csrfToken) return csrfToken;
+  try{
+    const resp = await fetch('api.php?action=csrf_token', {method:'GET'});
+    const data = await resp.json();
+    if(data && data.status==='success' && typeof data.csrf_token==='string' && data.csrf_token.length>10){
+      csrfToken = data.csrf_token;
+    }
+  }catch(e){
+    console.error('Failed to fetch CSRF token:', e);
+  }
+  return csrfToken;
+}
+
+/************** HELPERS: Normalisation etc **************/
+function normaliseTitle(t){
+  t = (t ?? '').trim().replace(/\s+/g,' ');
+  t = t.replace(/[<>]/g,'');
+  if (!t) return '';
+  if (t.length>80) t = t.slice(0,80);
+  return t;
+}
+function normaliseSlotLabel(s){
+  s = (s ?? '').replace(/\u00A0/g,' ').trim().replace(/\s+/g,' ');
+  if (s.length===0) return '';
+  if (s.length>20) s = s.slice(0,20);
+  return s;
+}
+// Must match validateSlotsArray() in api.php (includes apostrophe)
+const SLOT_REGEX = /^[A-Za-z0-9][A-Za-z0-9'\- ]{0,19}$/;
+const MIN_DATE='2026-01-01';
+const MAX_DATE='2030-12-31';
+
+/* These are mutable so admin site config can override them at runtime.
+   No upper limit on slots or statuses - admin sets the ceiling.
+   Defaults match the original hardcoded values. */
+let MAX_SLOTS = 6;
+let MAX_STATUSES = 5;
+let MAX_RANGE_DAYS = 360;
+
+/* ============================================
+   SITE CONFIG - fetched from api.php?action=get_site_config
+   Controls: category list, slot chips, option presets, date chips, max limits.
+   Falls back gracefully to hardcoded defaults if fetch fails or config absent.
+   ============================================ */
+let siteConfig = null;
+
+/**
+ * Fetch site config from the server.
+ * Silent fail - returns null if unavailable (page uses hardcoded defaults).
+ * @returns {Promise<object|null>}
+ */
+async function fetchSiteConfig() {
+  try {
+    const resp = await fetch('api.php?action=get_site_config', { method: 'GET' });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (data && data.status === 'success' && data.config && typeof data.config === 'object') {
+      return data.config;
+    }
+  } catch (e) {
+    console.warn('site config fetch failed:', e);
+  }
+  return null;
+}
+
+/**
+ * Rebuild the category grid from config.
+ * @param {Array} cats - array of {value, icon, label}
+ */
+function applyCategoryConfig(cats) {
+  if (!Array.isArray(cats) || cats.length === 0) return;
+  catGrid.innerHTML = '';
+  cats.forEach(cat => {
+    if (!cat.value || !cat.icon || !cat.label) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cat-tog';
+    btn.dataset.value = cat.value;
+    btn.dataset.icon  = cat.icon;
+    btn.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${cat.icon}</span><span>${cat.label}</span>`;
+    catGrid.appendChild(btn);
+  });
+}
+
+/**
+ * Rebuild the slot example chips bar from config.
+ * @param {Array} examples - array of strings
+ */
+function applySlotChipsConfig(examples) {
+  const bar = document.getElementById('quickAddBar');
+  if (!bar || !Array.isArray(examples) || examples.length === 0) return;
+  bar.innerHTML = '<span style="font-size:0.8em;color:#333;vertical-align:middle;margin-top:0.2em;">e.g. </span>';
+  examples.forEach(ex => {
+    if (!ex) return;
+    const btn = document.createElement('button');
+    btn.className = 'btn-chip';
+    btn.type = 'button';
+    btn.dataset.slot = ex;
+    btn.textContent = ex;
+    bar.appendChild(btn);
+  });
+}
+
+/**
+ * Rebuild the option preset chips bar from config.
+ * @param {Array} presets - array of {key, label, items}
+ */
+function applyOptionPresetsConfig(presets) {
+  const bar = document.getElementById('statusPresetBar');
+  if (!bar || !Array.isArray(presets) || presets.length === 0) return;
+  bar.innerHTML = '<span style="font-size:0.8em;color:#333;vertical-align:middle;margin-top:0.2em;">e.g. </span>';
+  presets.forEach(p => {
+    if (!p.key || !p.label) return;
+    const btn = document.createElement('button');
+    btn.className = 'btn-chip';
+    btn.type = 'button';
+    btn.dataset.preset = p.key;
+    btn.textContent = p.label;
+    bar.appendChild(btn);
+  });
+}
+
+/**
+ * Rebuild the date range quick preset chips from config.
+ * Also updates the hidden MAX_RANGE_DAYS used in validation.
+ * @param {Array} presets - array of {key, label, days}
+ * @param {number} maxRangeDays
+ */
+function applyDatePresetsConfig(presets, maxRangeDays) {
+  if (typeof maxRangeDays === 'number' && maxRangeDays >= 1) {
+    MAX_RANGE_DAYS = maxRangeDays;
+  }
+  const rangeDaysHint = document.getElementById('maxRangeDaysHint');
+  if (rangeDaysHint) rangeDaysHint.textContent = MAX_RANGE_DAYS;
+
+  if (!Array.isArray(presets) || presets.length === 0) return;
+
+  // Find the chips container inside the Dates section
+  const chipsWrap = document.querySelector('#datePresetsBar');
+  if (!chipsWrap) return;
+
+  chipsWrap.innerHTML = '<span style="font-size:0.8em;color:#333;vertical-align:middle;margin-top:0.2em;">e.g. </span>';
+  presets.forEach(p => {
+    if (!p.key || !p.label) return;
+    const btn = document.createElement('button');
+    btn.className = 'btn-chip';
+    btn.type = 'button';
+    btn.dataset.range = p.key;
+    btn.dataset.rangeDays = p.days;
+    btn.textContent = p.label;
+    chipsWrap.appendChild(btn);
+  });
+
+  // Re-wire the click handler for the new buttons (event delegation handles it already)
+}
+
+/**
+ * Apply max slot/status limits from config to validation and UI hints.
+ * @param {number} maxSlots
+ * @param {number} maxStatuses
+ */
+function applyMaxLimits(maxSlots, maxStatuses) {
+  if (typeof maxSlots === 'number' && maxSlots >= 1) {
+    MAX_SLOTS = maxSlots;
+  }
+  if (typeof maxStatuses === 'number' && maxStatuses >= 1) {
+    MAX_STATUSES = maxStatuses;
+  }
+  // Always update hint text to reflect current maximums
+  const slotHint = document.getElementById('slotsMaxHint');
+  if (slotHint) slotHint.textContent = MAX_SLOTS;
+  const statusHint = document.getElementById('statusMaxHint');
+  if (statusHint) statusHint.textContent = MAX_STATUSES;
+}
+
+/**
+ * Apply full site config to the index page.
+ * Called once after fetchSiteConfig() resolves.
+ * @param {object} cfg
+ */
+function applySiteConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object') return;
+  siteConfig = cfg;
+
+  if (cfg.slots) {
+    applySlotChipsConfig(cfg.slots.examples);
+    applyMaxLimits(cfg.slots.max, null);
+  }
+  if (cfg.options) {
+    applyOptionPresetsConfig(cfg.options.presets);
+    // Update STATUS_PRESETS from config so preset chips work correctly
+    if (Array.isArray(cfg.options.presets)) {
+      cfg.options.presets.forEach(p => {
+        if (p.key && Array.isArray(p.items)) {
+          STATUS_PRESETS[p.key] = p.items;
+        }
+      });
+    }
+    applyMaxLimits(null, cfg.options.max);
+  }
+  if (cfg.dates) {
+    applyDatePresetsConfig(cfg.dates.presets, cfg.dates.max_range_days);
+  }
+  if (cfg.retention) {
+    applyRetentionConfig(cfg.retention.inactive_days);
+  }
+}
+
+/**
+ * Update any `.js-retention-days` spans in the page with the admin-configured
+ * auto-delete threshold (in days). Falls back to each span's data-default when
+ * the value is missing or out of range.
+ * @param {number|string} days
+ */
+function applyRetentionConfig(days) {
+  const n = parseInt(days, 10);
+  document.querySelectorAll('.js-retention-days').forEach(el => {
+    const fallback = parseInt(el.dataset.default, 10) || 30;
+    el.textContent = (n >= 1 && n <= 3650) ? String(n) : String(fallback);
+  });
+}
+
+/**
+ * Returns the default slots/statuses from site config, or falls back to hardcoded defaults.
+ * @returns {{slots: string[], statuses: Array}}
+ */
+function getConfigDefaults() {
+  if (siteConfig) {
+    const slots = Array.isArray(siteConfig.slots?.defaults) && siteConfig.slots.defaults.length > 0
+      ? siteConfig.slots.defaults
+      : ['Morning', 'Afternoon', 'Evening'];
+    const statuses = Array.isArray(siteConfig.options?.defaults) && siteConfig.options.defaults.length > 0
+      ? siteConfig.options.defaults
+      : [{label:'Yes', weight:2}, {label:'Maybe', weight:1}, {label:'No', weight:0}];
+    return { slots, statuses };
+  }
+  return {
+    slots: ['Morning', 'Afternoon', 'Evening'],
+    statuses: [{label:'Yes', weight:2}, {label:'Maybe', weight:1}, {label:'No', weight:0}]
+  };
+}
+
+function formatDateDisplay(dateStr){
+  const date = new Date(dateStr + 'T00:00:00');
+  const options = { month: 'short', day: 'numeric', year: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+}
+function daysBetween(start, end){
+  const startMs = new Date(start + 'T00:00:00').getTime();
+  const endMs   = new Date(end   + 'T00:00:00').getTime();
+  return Math.round((endMs - startMs) / (1000 * 60 * 60 * 24));
+}
+function getTodayClamped(){
+  const today = new Date();
+  const y=today.getFullYear(), m=String(today.getMonth()+1).padStart(2,'0'), d=String(today.getDate()).padStart(2,'0');
+  const s=`${y}-${m}-${d}`;
+  if (s<MIN_DATE) return MIN_DATE;
+  if (s>MAX_DATE) return MAX_DATE;
+  return s;
+}
+function addDays(dateStr, days){
+  const d=new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
+  const res=`${y}-${m}-${da}`;
+  if (res<MIN_DATE) return MIN_DATE;
+  if (res>MAX_DATE) return MAX_DATE;
+  return res;
+}
+
+/************** SLOTS REPEATER UI **************/
+const slotsWrap   = document.getElementById('slotsWrap');
+const addSlotBtn  = document.getElementById('addSlotBtn');
+const slotsError  = document.getElementById('slotsError');
+
+function makeSlotRow(initial=''){
+  const row = document.createElement('div');
+  row.className = 'slot-row';
+
+  // Reorder control: move this row above the previous one. Mirrors the
+  // .status-row move-up behaviour - the slot order in the DOM is the order
+  // saved by getValidSlots(), so swapping siblings is enough.
+  const up = document.createElement('button');
+  up.type = 'button';
+  up.className = 'btn-small move-up';
+  up.setAttribute('aria-label', 'Move up');
+  up.setAttribute('title', 'Move up');
+  up.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">arrow_shape_up_stack_2</span>`;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = "e.g., Morning";
+  input.maxLength = 20;
+  input.value = initial;
+
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'btn-small remove';
+  del.setAttribute('aria-label', 'Delete');
+  del.setAttribute('title', 'Delete');
+  del.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">delete</span>`;
+
+  const err = document.createElement('span');
+  err.className = 'inline-error';
+
+  input.addEventListener('input', validateSlotsUI);
+  del.addEventListener('click', () => {
+    row.remove();
+    refreshSlotReorderUI();
+    validateSlotsUI();
+  });
+
+  up.addEventListener('click', () => {
+    const prev = row.previousElementSibling;
+    if (!prev) return;
+    slotsWrap.insertBefore(row, prev);
+    refreshSlotReorderUI();
+    validateSlotsUI();
+  });
+
+  row.appendChild(up);
+  row.appendChild(input);
+  row.appendChild(del);
+  row.appendChild(err);
+  return row;
+}
+
+/** Disable the Move-up button on the first slot row so it can't go above itself. */
+function refreshSlotReorderUI(){
+  const rows = Array.from(slotsWrap.querySelectorAll('.slot-row'));
+  rows.forEach((row, idx) => {
+    const btn = row.querySelector('.move-up');
+    if (!btn) return;
+    btn.disabled = (idx === 0);
+  });
+}
+
+function readSlotsFromUI(){
+  const inputs = Array.from(slotsWrap.querySelectorAll('input'));
+  return inputs.map(i => normaliseSlotLabel(i.value));
+}
+function setSlots(slots){
+  slotsWrap.innerHTML = '';
+  for (const s of slots) slotsWrap.appendChild(makeSlotRow(s));
+  refreshSlotReorderUI();
+  validateSlotsUI();
+}
+function addSlot(label=''){
+  const current = slotsWrap.querySelectorAll('.slot-row').length;
+  if (current >= MAX_SLOTS) return;
+  slotsWrap.appendChild(makeSlotRow(label));
+  refreshSlotReorderUI();
+  validateSlotsUI();
+}
+addSlotBtn.addEventListener('click', () => addSlot(''));
+document.getElementById('quickAddBar').addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-slot]');
+  if (!btn) return;
+  const label = normaliseSlotLabel(btn.dataset.slot);
+  const slots = readSlotsFromUI();
+  const lower = slots.map(s => s.toLowerCase());
+  if (label && lower.indexOf(label.toLowerCase()) === -1){
+    if (slots.length < MAX_SLOTS) addSlot(label);
+  }
+});
+function validateSlotsUI(){
+  const rows = Array.from(slotsWrap.querySelectorAll('.slot-row'));
+  const labels = [];
+  let ok = true;
+  slotsError.style.display = 'none';
+
+  for (const row of rows){
+    const input = row.querySelector('input');
+    const err   = row.querySelector('.inline-error');
+    const v = normaliseSlotLabel(input.value);
+    let msg = '';
+    if (!v){ msg = 'Required'; }
+    else if (!SLOT_REGEX.test(v)){ msg = "Use letters, numbers, spaces, apostrophes and hyphens only (max 20)."; }
+    else {
+      const lower = v.toLowerCase();
+      if (labels.map(x=>x.toLowerCase()).includes(lower)) msg = 'Duplicate';
+    }
+    if (msg){
+      ok = false; err.textContent = msg; err.style.display='inline';
+    } else {
+      err.textContent=''; err.style.display='none';
+    }
+    labels.push(v);
+  }
+  if (labels.length<1 || labels.length>MAX_SLOTS){
+    ok=false; slotsError.textContent=`Add between 1 and ${MAX_SLOTS} slots.`; slotsError.style.display='block';
+  }
+  validateAll();
+  return ok;
+}
+
+/************** STATUS OPTIONS REPEATER UI **************/
+const statusWrap  = document.getElementById('statusWrap');
+const addStatusBtn = document.getElementById('addStatusBtn');
+const statusError = document.getElementById('statusError');
+
+// Ranking mode: 'rank' (position-based) or 'weights' (custom values 0-5)
+let rankingMode = 'rank';
+
+// Toggle click handler (safe initialization)
+const rankingToggleEl = document.getElementById('rankingToggle');
+if (rankingToggleEl) {
+  rankingToggleEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tog-btn');
+    if (!btn || btn.dataset.mode === rankingMode) return;
+    
+    // Update active state
+    document.querySelectorAll('#rankingToggle .tog-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    // Update mode and hint
+    rankingMode = btn.dataset.mode;
+    const hintEl = document.getElementById('rankingHint');
+    if (hintEl) {
+      hintEl.textContent = rankingMode === 'rank' ? 'Position = score (top is best)' : 'Enter score 0-5 for each';
+    }
+    
+    // Toggle visibility of controls
+    applyRankingMode();
+  });
+}
+
+/** Show/hide move-up buttons and weight inputs based on mode */
+function applyRankingMode(){
+  const rows = statusWrap.querySelectorAll('.status-row');
+  rows.forEach(row => {
+    const moveUp = row.querySelector('.move-up');
+    const weightNum = row.querySelector('.weight-num');
+    if (rankingMode === 'rank') {
+      if (moveUp) moveUp.style.display = '';
+      if (weightNum) weightNum.style.display = 'none';
+    } else {
+      if (moveUp) moveUp.style.display = 'none';
+      if (weightNum) weightNum.style.display = '';
+    }
+  });
+  refreshStatusReorderUI();
+}
+
+// Status labels share the same constraints as slots (max 20 chars)
+function normaliseStatusLabel(s){
+  s = (s ?? '').replace(/\u00A0/g,' ').trim().replace(/\s+/g,' ');
+  if (s.length===0) return '';
+  if (s.length>20) s = s.slice(0,20);
+  return s;
+}
+const STATUS_REGEX = SLOT_REGEX;
+
+// Strength palette (2..5) used to represent weight/score.
+// Colours are intentionally tied to *rank position* (strength), not to option identity.
+// Green = best/positive, Red = worst/negative, with gradient in between.
+const STRENGTH_COLORS = {
+  green: '#4caf50',       // Strong positive (Yes, Available, etc.)
+  yellowGreen: '#8bc34a', // Moderate positive
+  amber: '#ffc107',       // Neutral/Maybe
+  orange: '#ff9800',      // Moderate negative
+  red: '#f44336'          // Strong negative (No, Unavailable, etc.)
+};
+
+/**
+ * Returns a strength-ordered palette for N statuses (1..N).
+ * For N > 5 the base 5-colour palette cycles to cover all entries.
+ * Index 0 is strongest (highest weight), last index is weakest.
+ */
+function getStrengthPalette(n){
+  const base = [
+    STRENGTH_COLORS.green,
+    STRENGTH_COLORS.yellowGreen,
+    STRENGTH_COLORS.amber,
+    STRENGTH_COLORS.orange,
+    STRENGTH_COLORS.red
+  ];
+  const N = Math.max(1, Number(n) || 1);
+  if (N === 1) return [STRENGTH_COLORS.green];
+  if (N === 2) return [STRENGTH_COLORS.green, STRENGTH_COLORS.red];
+  if (N === 3) return [STRENGTH_COLORS.green, STRENGTH_COLORS.amber, STRENGTH_COLORS.red];
+  if (N === 4) return [STRENGTH_COLORS.green, STRENGTH_COLORS.yellowGreen, STRENGTH_COLORS.amber, STRENGTH_COLORS.red];
+  if (N === 5) return [...base];
+  // N > 5: cycle through the base palette
+  const result = [];
+  for (let i = 0; i < N; i++) {
+    result.push(base[i % base.length]);
+  }
+  return result;
+}
+
+/**
+ * Applies strength colours (by DOM order) to the status option inputs.
+ * This ensures colours always match the derived ranking weights.
+ */
+/**
+ * Applies default colors to status rows based on position.
+ * Only sets color if the color picker hasn't been manually changed (still has default palette color).
+ * Also updates the label input preview styling.
+ */
+function applyDefaultColors(){
+  const rows = Array.from(statusWrap.querySelectorAll('.status-row'));
+  const palette = getStrengthPalette(rows.length || 1);
+  rows.forEach((row, idx) => {
+    const colorPicker = row.querySelector('.color-pick');
+    const labelInput = row.querySelector('.label-input');
+    if (!colorPicker) return;
+    
+    // Check if this is a "default" color (from palette) - if so, update it based on new position
+    const currentColor = colorPicker.value.toUpperCase();
+    const isDefaultColor = Object.values(STRENGTH_COLORS).some(c => c.toUpperCase() === currentColor);
+    
+    if (isDefaultColor || !colorPicker.dataset.userSet) {
+      const newColor = palette[Math.min(idx, palette.length-1)];
+      colorPicker.value = newColor;
+    }
+    
+    // Always apply preview styling to label input
+    if (labelInput) {
+      applyColorPreview(colorPicker, labelInput);
+    }
+  });
+}
+
+const STATUS_PRESETS = {
+  yes:               [{label:'Yes', weight:1}],
+  no:               [{label:'No', weight:1}],
+  yes_no:               [{label:'Yes', weight:2}, {label:'No', weight:0}],
+  yes_maybe_no:         [{label:'Yes', weight:2}, {label:'Maybe', weight:1}, {label:'No', weight:0}],
+  available_unavailable:[{label:'Available', weight:2}, {label:'Unavailable', weight:0}],
+  free_tentative_busy:  [{label:'Free', weight:2}, {label:'Tentative', weight:1}, {label:'Busy', weight:0}],
+  in_out_maybe:         [{label:'In', weight:2}, {label:'Maybe', weight:1}, {label:'Out', weight:0}],
+  attending_not_attending: [{label:'Attending', weight:2}, {label:'Not attending', weight:0}]
+};
+
+function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
+  const row = document.createElement('div');
+  row.className = 'status-row';
+
+  // Single reorder control: move up (higher priority) - shown in Rank mode
+  const up = document.createElement('button');
+  up.type = 'button';
+  up.className = 'btn-small move-up';
+  up.setAttribute('aria-label', 'Move up');
+  up.setAttribute('title', 'Move up');
+  up.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">arrow_shape_up_stack_2</span>`;
+
+  // Color picker - small square to the left of the label input
+  const colorPicker = document.createElement('input');
+  colorPicker.type = 'color';
+  colorPicker.className = 'color-pick';
+  colorPicker.title = 'Choose color';
+  // Use initial color or default based on position (will be set by applyDefaultColors)
+  colorPicker.value = initialColor || '#6fae00';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'label-input';
+  input.placeholder = 'e.g., Yes';
+  input.maxLength = 20;
+  input.value = initialLabel;
+
+  // Weight number input - shown in Weights mode
+  const weightNum = document.createElement('input');
+  weightNum.type = 'number';
+  weightNum.className = 'weight-num';
+  weightNum.min = 0;
+  weightNum.max = 5;
+  weightNum.value = initialWeight !== null ? initialWeight : 2;
+  weightNum.title = 'Weight 0-5';
+  weightNum.style.display = rankingMode === 'weights' ? '' : 'none';
+
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'btn-small remove';
+  del.setAttribute('aria-label', 'Delete');
+  del.setAttribute('title', 'Delete');
+  del.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">delete</span>`;
+
+  const err = document.createElement('span');
+  err.className = 'inline-error';
+
+  input.addEventListener('input', validateStatusesUI);
+  colorPicker.addEventListener('input', () => {
+    // Mark that user has manually set this color (prevents auto-reassignment on reorder)
+    colorPicker.dataset.userSet = 'true';
+    // Apply color preview to label input
+    applyColorPreview(colorPicker, input);
+    // Validate to check for duplicate colours
+    validateStatusesUI();
+  });
+  weightNum.addEventListener('input', () => {
+    // Clamp value to 0-5
+    let v = parseInt(weightNum.value, 10) || 0;
+    if (v < 0) v = 0;
+    if (v > 5) v = 5;
+    weightNum.value = v;
+  });
+  del.addEventListener('click', () => { row.remove(); applyDefaultColors(); validateStatusesUI(); });
+
+  up.addEventListener('click', () => {
+    const prev = row.previousElementSibling;
+    if (!prev) return;
+    statusWrap.insertBefore(row, prev);
+    refreshStatusReorderUI();
+    applyDefaultColors();
+    updatePositionWeights();
+    validateStatusesUI();
+  });
+
+  // Hide move-up in Weights mode
+  if (rankingMode === 'weights') up.style.display = 'none';
+
+  row.appendChild(up);
+  row.appendChild(colorPicker);
+  row.appendChild(input);
+  row.appendChild(weightNum);
+  row.appendChild(del);
+  row.appendChild(err);
+  return row;
+}
+
+function refreshStatusReorderUI(){
+  // Disable the Move up button on the first row only.
+  const rows = Array.from(statusWrap.querySelectorAll('.status-row'));
+  rows.forEach((row, idx) => {
+    const btn = row.querySelector('.move-up');
+    if (!btn) return;
+    btn.disabled = (idx === 0);
+  });
+}
+
+function setStatuses(items){
+  statusWrap.innerHTML = '';
+  const safe = Array.isArray(items) ? items : [];
+  const n = Math.min(safe.length, 5);
+  const palette = getStrengthPalette(n);
+  safe.slice(0, 5).forEach((item, idx) => {
+    // item can be string (label only) or {label, weight, color}
+    const label = typeof item === 'string' ? item : (item.label || '');
+    const weight = typeof item === 'object' && item.weight !== undefined 
+      ? item.weight 
+      : Math.max(0, n - 1 - idx); // Default: position-based
+    const color = typeof item === 'object' && item.color 
+      ? item.color 
+      : palette[idx]; // Default: position-based color
+    statusWrap.appendChild(makeStatusRow(label, weight, color));
+  });
+  refreshStatusReorderUI();
+  applyDefaultColors();
+  applyRankingMode();
+  validateStatusesUI();
+}
+
+function addStatus(label=''){
+  const current = statusWrap.querySelectorAll('.status-row').length;
+  if (current >= MAX_STATUSES) return;
+  // New status gets weight 0 by default
+  statusWrap.appendChild(makeStatusRow(label, 0));
+  refreshStatusReorderUI();
+  applyDefaultColors();
+  applyRankingMode();
+  updatePositionWeights();
+  validateStatusesUI();
+}
+
+/** Update weights based on position (for Rank mode) */
+function updatePositionWeights(){
+  if (rankingMode !== 'rank') return;
+  const rows = Array.from(statusWrap.querySelectorAll('.status-row'));
+  const n = rows.length;
+  rows.forEach((row, idx) => {
+    const weightNum = row.querySelector('.weight-num');
+    if (weightNum) weightNum.value = Math.max(0, n - 1 - idx);
+  });
+}
+
+addStatusBtn.addEventListener('click', () => addStatus(''));
+
+document.getElementById('statusPresetBar').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-preset]');
+  if (!btn) return;
+  const key = btn.getAttribute('data-preset');
+  const preset = STATUS_PRESETS[key];
+  if (preset) setStatuses(preset);
+});
+
+function validateStatusesUI(){
+  const rows = Array.from(statusWrap.querySelectorAll('.status-row'));
+  const labels = [];
+  const colors = [];
+  let ok = true;
+
+  statusError.style.display = 'none';
+
+  refreshStatusReorderUI();
+  applyDefaultColors();
+
+  for (const row of rows){
+    const input = row.querySelector('.label-input');
+    const colorPicker = row.querySelector('.color-pick');
+    const err   = row.querySelector('.inline-error');
+    const v = normaliseStatusLabel(input ? input.value : '');
+    const color = colorPicker ? colorPicker.value.toUpperCase() : '#CCCCCC';
+    
+    let msg = '';
+    if (!v){ msg = 'Required'; }
+    else if (!STATUS_REGEX.test(v)){ msg = "Use letters, numbers, spaces, apostrophes and hyphens only (max 20)."; }
+    else {
+      const lower = v.toLowerCase();
+      if (labels.map(x=>x.toLowerCase()).includes(lower)) msg = 'Duplicate label';
+    }
+    
+    // Check for duplicate colour (only if no other error)
+    if (!msg && colors.includes(color)) {
+      msg = 'Duplicate colour';
+    }
+    
+    if (msg){
+      ok = false; err.textContent = msg; err.style.display='inline';
+    } else {
+      err.textContent=''; err.style.display='none';
+    }
+    labels.push(v);
+    colors.push(color);
+  }
+
+  if (labels.length < 1 || labels.length > MAX_STATUSES){
+    ok = false;
+    statusError.textContent = `Add between 1 and ${MAX_STATUSES} status options.`;
+    statusError.style.display = 'block';
+  }
+
+  validateAll();
+  return ok;
+}
+
+/************** DATE RANGE + PRESETS UI **************/
+const startDate   = document.getElementById('startDate');
+const endDate     = document.getElementById('endDate');
+const rangeError  = document.getElementById('rangeError');
+const rangeSummary= document.getElementById('rangeSummary');
+const rangeDays   = document.getElementById('rangeDays');
+const rangeStart  = document.getElementById('rangeStart');
+const rangeEnd    = document.getElementById('rangeEnd');
+
+/* NEW: exclude weekends checkbox */
+const excludeWeekendsEl = document.getElementById('excludeWeekends');
+
+function updateRangeSummary(){
+  const s = startDate.value;
+  const e = endDate.value;
+  if (s && e && s<=e){
+    const days = daysBetween(s,e)+1;
+    rangeDays.textContent = days;
+    rangeStart.textContent = formatDateDisplay(s);
+    rangeEnd.textContent   = formatDateDisplay(e);
+    rangeSummary.style.display='block';
+  } else {
+    rangeSummary.style.display='none';
+  }
+}
+function setDateRange(s,e){ startDate.value=s; endDate.value=e; updateRangeSummary(); validateRangeUI(); }
+function validateRangeUI(){
+  const s=startDate.value, e=endDate.value; let ok=true, msg='';
+  rangeError.style.display='none';
+  
+  // Reset error styling
+  endDate.classList.remove('end-date-error');
+  rangeSummary.classList.remove('error');
+
+  if (!s || !e){ ok=false; msg='Both start and end dates are required.'; }
+  else if (s<MIN_DATE || s>MAX_DATE || e<MIN_DATE || e>MAX_DATE){ ok=false; msg=`Dates must be between ${MIN_DATE} and ${MAX_DATE}.`; }
+  else if (s>e){ ok=false; msg='Start date must be before or equal to end date.'; }
+  else {
+    const d=daysBetween(s,e);
+    if (d>MAX_RANGE_DAYS){ 
+      ok=false; 
+      msg=`Date range cannot exceed ${MAX_RANGE_DAYS} days.`; 
+      endDate.classList.add('end-date-error');
+      rangeSummary.classList.add('error');
+    }
+  }
+  if (!ok){ rangeError.textContent=msg; rangeError.style.display='block'; }
+  validateAll();
+  return ok;
+}
+startDate.addEventListener('change', ()=>{ updateRangeSummary(); validateRangeUI(); });
+endDate.addEventListener('change',   ()=>{ updateRangeSummary(); validateRangeUI(); });
+
+/************** ADMIN VALIDATION **************/
+const adminName   = document.getElementById('adminName');
+const adminPin    = document.getElementById('adminPin');
+const adminPin2   = document.getElementById('adminPin2');
+const adminNameErr= document.getElementById('adminNameErr');
+const adminPinErr = document.getElementById('adminPinErr');
+const adminPin2Err= document.getElementById('adminPin2Err');
+
+function validateAdmin(){
+  adminNameErr.style.display='none';
+  adminPinErr.style.display='none';
+  adminPin2Err.style.display='none';
+
+  const name = (adminName.value??'').trim().replace(/\s+/g,' ');
+  const pin  = (adminPin.value??'').trim();
+  const pin2 = (adminPin2.value??'').trim();
+
+  if (!name){
+    adminNameErr.textContent='Required.';
+    adminNameErr.style.display='block';
+    return false;
+  }
+  if (name.length>40 || !/^[A-Za-z0-9][A-Za-z0-9'\- ]*$/.test(name)){
+    adminNameErr.textContent="Use letters, numbers, spaces, apostrophes and hyphens only (max 40).";
+    adminNameErr.style.display='block';
+    return false;
+  }
+  if (!/^\d{4}$/.test(pin)){
+    adminPinErr.textContent='Must be 4 digits.';
+    adminPinErr.style.display='block';
+    return false;
+  }
+  if (!/^\d{4}$/.test(pin2)){
+    adminPin2Err.textContent='Confirm PIN.';
+    adminPin2Err.style.display='block';
+    return false;
+  }
+  if (pin !== pin2){
+    adminPin2Err.textContent='PINs do not match.';
+    adminPin2Err.style.display='block';
+    return false;
+  }
+  return true;
+}
+
+// Eye toggles for PIN fields
+function wirePinToggle(inputEl, btnEl){
+  const icon = btnEl.querySelector('.material-symbols-outlined');
+  btnEl.addEventListener('click', () => {
+    const nowText = inputEl.type === 'password';
+    inputEl.type = nowText ? 'text' : 'password';
+    icon.textContent = nowText ? 'visibility_off' : 'visibility';
+    btnEl.setAttribute('aria-label', nowText ? 'Hide PIN' : 'Show PIN');
+  });
+}
+wirePinToggle(adminPin,  document.getElementById('toggleAdminPin'));
+wirePinToggle(adminPin2, document.getElementById('toggleAdminPin2'));
+
+/************** PRIVACY MODE TOGGLE **************/
+// Privacy mode: 'open' (0), 'hidden' (1), or 'blind' (2)
+let privacyMode = 'open';
+
+const PRIVACY_HINTS = {
+  open: "Visible - All users can see each other's responses.",
+  hidden: "Private (Users) Users cannot see each other's choices, but the organiser can.",
+  blind: "Private (All) All responses are completely private - even the organiser cannot see users' responses."
+};
+
+const privacyToggleEl = document.getElementById('privacyToggle');
+const privacyHintEl = document.getElementById('privacyHint');
+
+if (privacyToggleEl) {
+  privacyToggleEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.priv-btn');
+    if (!btn || btn.dataset.mode === privacyMode) return;
+    
+    // Update active state
+    document.querySelectorAll('#privacyToggle .priv-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    // Update mode and hint
+    privacyMode = btn.dataset.mode;
+    if (privacyHintEl) {
+      privacyHintEl.textContent = PRIVACY_HINTS[privacyMode] || PRIVACY_HINTS.open;
+    }
+  });
+}
+
+/**
+ * Returns the numeric privacy value for the API (0=open, 1=hidden, 2=blind)
+ */
+function getPrivacyValue() {
+  if (privacyMode === 'hidden') return 1;
+  if (privacyMode === 'blind') return 2;
+  return 0;
+}
+
+/************** DATE FILTER MODE TOGGLE **************/
+// Date filter mode: 'all', 'only', or 'except'
+// Determines which dates participants see after organiser marks dates on the calendar
+let dateFilterMode = 'all';
+
+const DATE_FILTER_HINTS = {
+  all: "Show all dates in the range to participants.",
+  only: "Only show dates you select on the calendar. Click date headers after creating to pick them.",
+  except: "Show all dates except the ones you select. Click date headers after creating to exclude them."
+};
+
+const dateFilterToggleEl = document.getElementById('dateFilterToggle');
+const dateFilterHintEl = document.getElementById('dateFilterHint');
+
+if (dateFilterToggleEl) {
+  dateFilterToggleEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.dfilt-btn');
+    if (!btn || btn.dataset.mode === dateFilterMode) return;
+
+    // Update active state
+    document.querySelectorAll('#dateFilterToggle .dfilt-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Update mode and hint
+    dateFilterMode = btn.dataset.mode;
+    if (dateFilterHintEl) {
+      dateFilterHintEl.textContent = DATE_FILTER_HINTS[dateFilterMode] || DATE_FILTER_HINTS.all;
+    }
+  });
+}
+
+/**
+ * Returns the date filter mode string for the API ('all', 'only', 'except')
+ */
+function getDateFilterMode() {
+  return dateFilterMode;
+}
+
+/************** CREATE CALENDAR **************/
+const createBtn   = document.getElementById('createBtn');
+const titleInput  = document.getElementById('titleInput');
+
+function validateAll(){
+  const okSlots = !slotsError.style.display || slotsError.style.display==='none';
+  const okStatus = !statusError.style.display || statusError.style.display==='none';
+  const okRange = !rangeError.style.display || rangeError.style.display==='none';
+  const rows = Array.from(slotsWrap.querySelectorAll('.slot-row'));
+  const rowHasError = rows.some(r => r.querySelector('.inline-error').style.display !== 'none');
+  const sRows = Array.from(statusWrap.querySelectorAll('.status-row'));
+  const statusRowHasError = sRows.some(r => r.querySelector('.inline-error').style.display !== 'none');
+  const count = rows.length;
+  const statusCount = sRows.length;
+  const enable = okSlots && okStatus && okRange && !rowHasError && !statusRowHasError && count>=1 && count<=MAX_SLOTS && statusCount>=1 && statusCount<=MAX_STATUSES && validateAdmin();
+  createBtn.disabled = !enable;
+}
+
+function getValidSlots(){
+  const rows = Array.from(slotsWrap.querySelectorAll('.slot-row'));
+  const out = [];
+  const seen = new Set();
+  for (const r of rows){
+    const v = normaliseSlotLabel(r.querySelector('input').value);
+    if (!v || !SLOT_REGEX.test(v)) continue;
+    const k = v.toLowerCase();
+    if (!seen.has(k)){ seen.add(k); out.push(v); }
+  }
+  return out;
+}
+
+function getValidStatuses(){
+  const rows = Array.from(statusWrap.querySelectorAll('.status-row'));
+  const out = [];
+  const seen = new Set();
+  rows.forEach((row, idx) => {
+    const labelInput = row.querySelector('.label-input');
+    const v = normaliseStatusLabel(labelInput ? labelInput.value : '');
+    if (!v || !STATUS_REGEX.test(v)) return;
+    const k = v.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+
+    // Get color from the color picker
+    const colorPicker = row.querySelector('.color-pick');
+    const color = colorPicker ? colorPicker.value : '#6fae00';
+    
+    // Get weight value from the weight input
+    const weightInput = row.querySelector('.weight-num');
+    const weight = weightInput ? parseInt(weightInput.value, 10) || 0 : 0;
+    
+    out.push({ label: v, color, weight });
+  });
+  return out;
+}
+
+async function createCalendar(){
+  createBtn.disabled = true;
+  try{
+    if (!validateAdmin()) throw new Error('Invalid organiser');
+    const csrf = await ensureCsrfToken();
+    const title = normaliseTitle(titleInput.value);
+    const categories = getSelectedCategories();
+    // Default to ['groups'] if none selected
+    const category = categories.length > 0 ? JSON.stringify(categories) : JSON.stringify(['groups']);
+    const slots = getValidSlots();
+    const statuses = getValidStatuses();
+    const sDate = startDate.value, eDate=endDate.value;
+    if (slots.length<1 || slots.length>MAX_SLOTS) throw new Error('Invalid slots.');
+    if (statuses.length<1 || statuses.length>MAX_STATUSES) throw new Error('Invalid status options.');
+    if (!sDate || !eDate || sDate>eDate) throw new Error('Invalid date range.');
+    const days=daysBetween(sDate,eDate);     if (days>MAX_RANGE_DAYS) throw new Error('Range too long.');
+
+    const headers = {
+      'Content-Type':'application/json',
+      'X-CSRF-Token': csrf || ''
+    };
+
+    const body = {
+        title, category, slots,
+        statuses,
+        start_date: sDate,
+        end_date: eDate,
+        exclude_weekends: excludeWeekendsEl.checked ? 1 : 0,
+        date_filter_mode: getDateFilterMode(),
+        is_private: getPrivacyValue(),
+        admin_name: (adminName.value??'').trim().replace(/\s+/g,' '),
+        admin_pin:  (adminPin.value??'').trim()
+    };
+    if (hubContext.token) body.group_token = hubContext.token;
+
+    const resp = await fetch('api.php?action=create_calendar', {
+      method:'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (data.status!=='success') throw new Error(data.message || 'Create failed');
+
+    const adminNameVal = (adminName.value ?? '').trim().replace(/\s+/g, ' ');
+    const adminPinVal = (adminPin.value ?? '').trim();
+
+    showSaveCalendarPanel({
+      token: data.token,
+      title: title || 'When RU Free',
+      admin_name: adminNameVal,
+      admin_pin: adminPinVal,
+      hub_title: hubContext.title || null
+    });
+  }catch(e){
+    alert(e.message || 'Failed to create calendar. Please fix errors and try again.');
+  }finally{
+    createBtn.disabled = false;
+  }
+}
+
+/************** URL TEMPLATE PREFILL **************/
+/**
+ * Parses URL parameters to prefill form from Ideas page templates.
+ * URL format: index.html?template=1&title=...&category=...&slots=...&statuses=...&range=...
+ * 
+ * Parameters:
+ *   template  - Flag indicating template mode (any truthy value)
+ *   title     - Calendar title (URL encoded)
+ *   category  - Category value (catchup, how_to_vote, meeting, etc.)
+ *   slots     - Comma-separated slot labels (URL encoded)
+ *   statuses  - Comma-separated status labels (URL encoded)
+ *   weights   - Comma-separated weight values (e.g., "1,1,1" for equal weights)
+ *   mode      - Scoring mode: "rank" or "weights"
+ *   range     - Date range preset (1day, 1week, 2weeks, 1month, 2months, 3months)
+ *   weekends  - Exclude weekends flag (1 = exclude)
+ */
+function parseTemplateParams() {
+  const params = new URLSearchParams(window.location.search);
+  
+  // Only process if template flag is present
+  if (!params.has('template')) return false;
+  
+  let applied = false;
+  
+  // Title
+  if (params.has('title')) {
+    const title = decodeURIComponent(params.get('title'));
+    titleInput.value = normaliseTitle(title);
+    applied = true;
+  }
+  
+  // Category (comma-separated values, e.g. category=groups,sport,coffee)
+  if (params.has('category')) {
+    const cats = params.get('category').split(',').map(c => c.trim()).filter(Boolean);
+    // Clear any existing selections
+    catGrid.querySelectorAll('.cat-tog.active').forEach(b => b.classList.remove('active'));
+    // Activate matching buttons (up to CAT_MAX)
+    let count = 0;
+    for(const cat of cats){
+      if(count >= CAT_MAX) break;
+      const catOption = catGrid.querySelector(`.cat-tog[data-value="${cat}"]`);
+      if(catOption){
+        catOption.classList.add('active');
+        count++;
+        applied = true;
+      }
+    }
+    updateCatUI();
+  }
+  
+  // Slots (comma-separated)
+  if (params.has('slots')) {
+    const slotsStr = decodeURIComponent(params.get('slots'));
+    const slotsList = slotsStr.split(',').map(s => normaliseSlotLabel(s)).filter(s => s);
+    if (slotsList.length > 0 && slotsList.length <= 6) {
+      setSlots(slotsList);
+      applied = true;
+    }
+  }
+  
+  // Scoring mode - must be set BEFORE statuses so weights display correctly
+  if (params.has('mode')) {
+    const mode = params.get('mode');
+    if (mode === 'weights' || mode === 'rank') {
+      rankingMode = mode;
+      // Update toggle UI
+      document.querySelectorAll('#rankingToggle .tog-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === mode);
+      });
+      const hintEl = document.getElementById('rankingHint');
+      if (hintEl) {
+        hintEl.textContent = mode === 'rank' ? 'Position = score (top is best)' : 'Enter score 0-5 for each';
+      }
+      applied = true;
+    }
+  }
+  
+  // Statuses (comma-separated) with optional weights
+  if (params.has('statuses')) {
+    const statusStr = decodeURIComponent(params.get('statuses'));
+    const statusList = statusStr.split(',').map(s => normaliseStatusLabel(s)).filter(s => s);
+    
+    // Parse weights if provided
+    let weightList = [];
+    if (params.has('weights')) {
+      weightList = params.get('weights').split(',').map(w => {
+        const parsed = parseInt(w, 10);
+        return isNaN(parsed) ? 0 : Math.max(0, Math.min(5, parsed));
+      });
+    }
+    
+    if (statusList.length > 0 && statusList.length <= 5) {
+      // Create status objects with weights
+      const statusObjs = statusList.map((label, idx) => {
+        let weight;
+        if (weightList.length > 0 && idx < weightList.length) {
+          // Use provided weight
+          weight = weightList[idx];
+        } else if (rankingMode === 'rank') {
+          // Rank mode: position-based weights
+          weight = Math.max(0, statusList.length - 1 - idx);
+        } else {
+          // Weights mode without explicit weights: default to 1 (equal)
+          weight = 1;
+        }
+        return { label, weight };
+      });
+      setStatuses(statusObjs);
+      applied = true;
+    }
+  }
+  
+  // Date range preset
+  if (params.has('range')) {
+    const range = params.get('range');
+    const today = getTodayClamped();
+    const rangeMap = {
+      '1day': 0,
+      '2days': 1,
+      '3days': 2,
+      '5days': 4,
+      '1week': 6,
+      '10days': 9,
+      '2weeks': 13,
+      '1month': 29,
+      '2months': 59,
+      '3months': 89
+    };
+    if (rangeMap.hasOwnProperty(range)) {
+      setDateRange(today, addDays(today, rangeMap[range]));
+      applied = true;
+    }
+  }
+  
+  // Exclude weekends
+  if (params.has('weekends') && params.get('weekends') === '0') {
+    excludeWeekendsEl.checked = true;
+    updateRangeSummary();
+    applied = true;
+  }
+
+  // Date filter mode (all, only, except)
+  if (params.has('datefilter')) {
+    const df = params.get('datefilter');
+    if (['all', 'only', 'except'].includes(df)) {
+      dateFilterMode = df;
+      document.querySelectorAll('#dateFilterToggle .dfilt-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === df);
+      });
+      if (dateFilterHintEl) {
+        dateFilterHintEl.textContent = DATE_FILTER_HINTS[df] || DATE_FILTER_HINTS.all;
+      }
+      applied = true;
+    }
+  }
+  
+  // Apply ranking mode UI after statuses are set
+  if (applied) {
+    applyRankingMode();
+  }
+  
+  return applied;
+}
+
+/**
+ * Shows a notification banner when template is applied
+ */
+function showTemplateBanner() {
+  // Check if banner already exists
+  if (document.getElementById('templateBanner')) return;
+  
+  const banner = document.createElement('div');
+  banner.id = 'templateBanner';
+  banner.className = 'warn';
+  banner.style.cssText = 'background:#e3f2fd; border-color:#90caf9; color:#1565c0; display:flex; justify-content:space-between; align-items:center; gap:10px;';
+  banner.innerHTML = `
+    <span><strong>Template loaded!</strong> Review the settings below, and edit as needed.</span>
+    <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; padding:4px; font-size:1.2rem; line-height:1; color:#1565c0;">&times;</button>
+  `;
+  
+  // Insert after the first warning div
+  const firstWarn = document.querySelector('.card > .warn');
+  if (firstWarn) {
+    firstWarn.parentNode.insertBefore(banner, firstWarn);
+  }
+}
+
+// ============================================
+// ASYNC INIT
+// Fetch site config first, then apply it, then set defaults and wire events.
+// The page is already rendered with fallback HTML; config just upgrades it.
+// ============================================
+(async function initPage() {
+  'use strict';
+
+  // 1. Apply default limits immediately so hints show correct values before config loads
+  applyMaxLimits(MAX_SLOTS, MAX_STATUSES, MAX_RANGE_DAYS);
+
+  // 2. Fetch and apply site config (silent fail - overrides defaults if present)
+  const cfg = await fetchSiteConfig();
+  if (cfg) applySiteConfig(cfg);
+
+  // 2. Wire date range preset chips (may have been rebuilt by applySiteConfig)
+  //    Use event delegation on the parent container so dynamic chips are covered.
+  const datePresetsBar = document.getElementById('datePresetsBar');
+  if (datePresetsBar) {
+    datePresetsBar.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-range]');
+      if (!btn) return;
+      const today = getTodayClamped();
+      if (btn.hasAttribute('data-range-days')) {
+        const days = parseInt(btn.getAttribute('data-range-days'), 10) || 0;
+        setDateRange(today, addDays(today, days));
+        return;
+      }
+      // Legacy key fallback
+      const which = btn.getAttribute('data-range');
+      const legacyMap = {
+        '1day': 0, '2day': 2, '3day': 3, '5day': 5,
+        '1week': 6, '2weeks': 13, '1month': 30, '3month': 90
+      };
+      if (Object.prototype.hasOwnProperty.call(legacyMap, which)) {
+        setDateRange(today, addDays(today, legacyMap[which]));
+      }
+    });
+  }
+
+  // 3. Apply template params or use config/hardcoded defaults
+  const today = getTodayClamped();
+  const templateApplied = parseTemplateParams();
+
+  if (!templateApplied) {
+    const defs = getConfigDefaults();
+    setSlots(defs.slots);
+    setStatuses(defs.statuses);
+    setDateRange(today, addDays(today, 6));
+  } else {
+    showTemplateBanner();
+    window.scrollTo(0, 0);
+  }
+
+  // 4. Initial validation pass
+  validateAll();
+
+  // 5. Wire live validation
+  createBtn.addEventListener('click', createCalendar);
+  adminName.addEventListener('input', validateAll);
+  adminPin.addEventListener('input', validateAll);
+  adminPin2.addEventListener('input', validateAll);
+
+  // 6. Hub context when creating inside a Hub
+  await initHubContext();
+}());

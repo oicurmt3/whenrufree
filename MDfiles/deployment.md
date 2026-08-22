@@ -1,0 +1,136 @@
+# Deployment Guide
+
+## Requirements
+
+- PHP 8.x with PDO MySQL extension
+- MariaDB 10.x or MySQL 8.x
+- Apache with mod_rewrite (shared hosting via cPanel)
+- HTTPS certificate (Let's Encrypt or cPanel AutoSSL)
+
+## Initial Setup
+
+### 1. Database
+
+Create a MariaDB database and import the schema. The SQL dump is in `perthrel_grape_calendar__1_.sql` but the core CREATE TABLE statements are:
+
+```sql
+-- See dictionary.md for full schema
+-- Tables: calendars, groups, group_sessions, users, availability, user_sessions, api_rate_limit
+```
+
+After importing, run migrations in order:
+
+1. **Choose/freeze columns** (if not in base dump):
+
+```sql
+ALTER TABLE calendars
+  ADD COLUMN chosen_date VARCHAR(10) DEFAULT NULL AFTER organiser_message,
+  ADD COLUMN chosen_slot VARCHAR(50) DEFAULT NULL AFTER chosen_date;
+```
+
+2. **Calendar Hubs** — run `migrations/add_groups.sql` (creates `groups`, `group_sessions`, adds `calendars.group_id`).
+
+And fix the known column width issue:
+
+```sql
+ALTER TABLE calendars MODIFY organiser_message VARCHAR(250) DEFAULT NULL;
+```
+
+### 2. Config File
+
+Create `/home/perthrel/grape_private/config.php` (outside webroot):
+
+```php
+<?php
+return [
+    'db' => [
+        'host' => 'localhost',
+        'name' => 'your_db_name',
+        'charset' => 'utf8mb4',
+        'user' => 'your_db_user',
+        'pass' => 'your_db_password',
+    ],
+    'rate_limit' => [
+        'per_minute' => 120,
+        'retention_minutes' => 60,
+    ],
+    // Only set when behind a reverse proxy (e.g. Cloudflare). Empty = trust REMOTE_ADDR only.
+    'trusted_proxies' => [],
+    'hub_limits' => [
+        'max_calendars_per_hub' => 50,
+        'per_ip_per_hub_per_hour' => 5,
+        'per_ip_global_per_hour' => 15,
+    ],
+    'retention' => [
+        'inactive_days' => 40,
+        'hub_inactive_days' => 40,
+    ],
+    'admin' => [
+        'user' => 'your_admin_username',
+        'pass' => 'your_admin_password_hash',
+        'max_attempts' => 5,
+        'lockout_minutes' => 15,
+    ],
+];
+```
+
+### 3. File Upload
+
+Upload all project files to the web-accessible directory (e.g. `/home/perthrel/public_html/grape/` or equivalent subfolder on sandgroper.net).
+
+Rename `_htaccess` to `.htaccess`.
+
+### 4. Font File
+
+Place the Material Symbols Outlined woff2 font at `fonts/material-symbols-outlined.woff2`. This is self-hosted to avoid external CDN dependencies.
+
+### 5. Cron Job
+
+Set up the cleanup script to run daily:
+
+```
+0 3 * * * /usr/bin/php /home/perthrel/public_html/grape/cleanup.php >> /home/perthrel/grape_private/logs/cleanup.log 2>&1
+```
+
+This handles: inactive calendar deletion, expired session cleanup, rate limit table pruning, and PIN lockout resets.
+
+## Security Checklist
+
+- [ ] Config file is outside webroot (`/home/perthrel/grape_private/config.php`)
+- [ ] `.htaccess` blocks `cleanup.php`, `config.php`, `error_log`
+- [ ] HTTPS is enabled and HSTS header is active
+- [ ] Log directory (`grape_private/logs/`) exists with 0750 permissions
+- [ ] `cleanup.php` runs as CLI only (has `php_sapi_name()` guard)
+- [ ] Database user has minimal privileges (SELECT, INSERT, UPDATE, DELETE on app tables only)
+- [ ] `robots.txt` blocks `calendar.html` and `api.php` from indexing
+
+## Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `GRAPE_DIAG_ENABLED` | Enables `/api.php?action=diag` endpoint | Disabled (not set) |
+
+## Encoding Constraint
+
+All files must use plain ASCII only. No em dashes, curly quotes, or Unicode characters. cPanel File Manager corrupts non-ASCII on save. Use straight quotes, hyphens, and `...` instead of ellipsis.
+
+## Updating
+
+1. Upload changed files via cPanel File Manager or SFTP
+2. Run any new SQL migrations via phpMyAdmin
+3. Clear browser cache if CSS/JS changed (or use versioned query strings)
+4. No build step required
+
+## Monitoring
+
+- Security logs: `grape_private/logs/security_YYYY-MM.log`
+- Cleanup logs: `grape_private/logs/cleanup.log`
+- PHP error log: `error_log` in webroot (blocked by .htaccess)
+- Rate limit table size: check `api_rate_limit` row count periodically
+
+## Scaling Notes
+
+- The app is designed for shared hosting with tens of thousands of calendar entries
+- Rate limiting uses a MariaDB upsert pattern (known race condition, acceptable at current scale)
+- Session tokens are stored in DB, not files (works across load-balanced instances)
+- No external dependencies at runtime (no CDNs, no npm, no build)

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Arrange a time when everyone in your group is available. Create free shared calendars, schedule availability, and plan events - no sign-up required.">
+  <!-- Prevents leaking the calendar token in the Referer header -->
+  <meta name="referrer" content="no-referrer">
+  <title>When RU Free - no login required</title>
+
+
+
+  <!-- Google Material Symbols (Outlined) -->
+    <!-- Self-hosted Material Symbols (place woff2 in /fonts/) -->
+    <style>
+      @font-face{
+        font-family:'Material Symbols Outlined';
+        font-style:normal;
+        font-weight:400;
+        src:url('fonts/material-symbols-outlined.woff2') format('woff2');
+      }
+      .material-symbols-outlined{
+        font-family:'Material Symbols Outlined';
+        font-weight:normal;
+        font-style:normal;
+        font-size:24px;
+        line-height:1;
+        letter-spacing:normal;
+        text-transform:none;
+        display:inline-block;
+        white-space:nowrap;
+        word-wrap:normal;
+        direction:ltr;
+        -webkit-font-feature-settings:'liga';
+        font-feature-settings:'liga';
+        -webkit-font-smoothing:antialiased;
+      }
+    </style>
+
+  <!-- Page styles -->
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div class="card">
+    <h1><span class="material-symbols-outlined" style="vertical-align:middle;padding-bottom:5px;">calendar_month</span> When RU Free?</h1>
+    <p class="sub"><strong>When RU Free</strong> helps your group arrange a time when everyone is available. Create free shared calendars, schedule availability, and plan events - no login required. </p>
+    
+    <div class="info-box">
+      Use <a href="https://whenrufree.net/ideas.html">these templates</a> to get started quickly, or create your own calendar from scratch below.
+      <br><br>
+      Managing multiple calendars? <a href="hub.html?create=1">Create a Hub</a> - one link for your group to find all calendars.
+    </div>
+
+    <div id="hubContextBanner" class="info-box hideme" style="background:#e8eaf6;border-color:#c5cae9;color:#283593;">
+      <strong>Creating calendar for Hub:</strong> <span id="hubContextTitle"></span>
+    </div>
+
+
+    <!-- QUICK NAV -->
+    <!-- <div class="category-nav hideme">
+      <a href="https://whenrufree.net/ideas.html#voting" class="category-link"><span class="material-symbols-outlined">
+how_to_vote
+</span> Voting & Polls</a>
+      <a href="https://whenrufree.net/ideas.html#rosters" class="category-link"><span class="material-symbols-outlined">
+how_to_reg
+</span> Rosters & Sign-ups</a>
+      <a href="https://whenrufree.net/ideas.html#bookings" class="category-link"><span class="material-symbols-outlined">
+calendar_add_on
+</span> Bookings</a>
+      <a href="https://whenrufree.net/ideas.html#coordination" class="category-link"><span class="material-symbols-outlined">
+stacks
+</span> Coordination</a>
+      <a href="https://whenrufree.net/ideas.html#social" class="category-link"><span class="material-symbols-outlined">
+groups
+</span> Social & Gaming</a>
+      <a href="https://whenrufree.net/ideas.html#events" class="category-link"><span class="material-symbols-outlined">
+celebration
+</span> Events & RSVPs</a>
+
+    </div> -->
+
+    
+    <div class="warn">
+      <strong>What does it look like?</strong> Try a <a href="https://whenrufree.net/calendar.html?c=3PNpKJTs" target="_blank">working example</a> (use the name "Guest" with PIN "0000"). *The organiser's choices are highlighted as a coloured bar on the left of the Slot</em>.
+    </div>
+
+
+    <!-- Title -->
+    <div class="field">
+      <label for="titleInput">Your Event Title</label>
+      <p class="hint">Optional - if blank, a default title will be used.</p>
+      <input id="titleInput" type="text" maxlength="80" placeholder="e.g., Saturday Catch-ups" />
+
+    </div>
+
+    <!-- Category toggles (pick up to 3)
+         CATEGORIES: To add/edit/remove a category, update BOTH index.html (#catGrid)
+         and calendar.js (CATEGORY_META). Keys must match. Max 3 selectable per calendar. -->
+    <div class="field">
+      <label>Category <span class="cat-count" id="catCount"></span></label>
+      <p class="hint">Optional - Choose up to 3. Shown as icons on your calendar.</p>
+      <div class="cat-grid" id="catGrid" role="group" aria-label="Calendar categories - choose up to 3">
+        <button type="button" class="cat-tog" data-value="groups" data-icon="groups"><span class="material-symbols-outlined" aria-hidden="true">groups</span><span>Catchup</span></button>
+        <button type="button" class="cat-tog" data-value="rsvp" data-icon="rsvp"><span class="material-symbols-outlined" aria-hidden="true">rsvp</span><span>Attendance</span></button>
+        <button type="button" class="cat-tog" data-value="meeting_room" data-icon="meeting_room"><span class="material-symbols-outlined" aria-hidden="true">meeting_room</span><span>Meeting</span></button>
+        <button type="button" class="cat-tog" data-value="event" data-icon="event"><span class="material-symbols-outlined" aria-hidden="true">event</span><span>Event</span></button>
+        <button type="button" class="cat-tog" data-value="cake" data-icon="cake"><span class="material-symbols-outlined" aria-hidden="true">cake</span><span>Party</span></button>
+        <button type="button" class="cat-tog" data-value="directions_walk" data-icon="directions_walk"><span class="material-symbols-outlined" aria-hidden="true">directions_walk</span><span>Activity</span></button>
+        <button type="button" class="cat-tog" data-value="nightlife" data-icon="nightlife"><span class="material-symbols-outlined" aria-hidden="true">nightlife</span><span>Night life</span></button>
+        <button type="button" class="cat-tog" data-value="how_to_vote" data-icon="how_to_vote"><span class="material-symbols-outlined" aria-hidden="true">how_to_vote</span><span>Vote</span></button>
+        <button type="button" class="cat-tog" data-value="drinks" data-icon="liquor"><span class="material-symbols-outlined" aria-hidden="true">liquor</span><span>Drinks</span></button>
+        <button type="button" class="cat-tog" data-value="coffee" data-icon="local_cafe"><span class="material-symbols-outlined" aria-hidden="true">local_cafe</span><span>Coffee</span></button>
+        <button type="button" class="cat-tog" data-value="breakfast_dining" data-icon="breakfast_dining"><span class="material-symbols-outlined" aria-hidden="true">breakfast_dining</span><span>Breakfast</span></button>
+        <button type="button" class="cat-tog" data-value="dinner" data-icon="restaurant"><span class="material-symbols-outlined" aria-hidden="true">restaurant</span><span>Dinner</span></button>
+        <button type="button" class="cat-tog" data-value="movie" data-icon="movie"><span class="material-symbols-outlined" aria-hidden="true">movie</span><span>Movie</span></button>
+        <button type="button" class="cat-tog" data-value="study" data-icon="menu_book"><span class="material-symbols-outlined" aria-hidden="true">event_available</span><span>Booking</span></button>
+        
+        <button type="button" class="cat-tog" data-value="sport" data-icon="sports_soccer"><span class="material-symbols-outlined" aria-hidden="true">sports_soccer</span><span>Sport</span></button>
+        
+        <button type="button" class="cat-tog" data-value="travel" data-icon="flight"><span class="material-symbols-outlined" aria-hidden="true">flight</span><span>Travel</span></button>
+        
+        <button type="button" class="cat-tog" data-value="reunion" data-icon="celebration"><span class="material-symbols-outlined" aria-hidden="true">celebration</span><span>Reunion</span></button>
+        
+        <button type="button" class="cat-tog" data-value="appointment" data-icon="calendar_add_on"><span class="material-symbols-outlined" aria-hidden="true">calendar_add_on</span><span>Appoinment</span></button>
+      </div>
+
+    </div>
+
+    <!-- Slots -->
+    <div class="section">
+      <div class="flex-between">
+        <h2>Slots</h2>
+        <div class="chips" id="quickAddBar"> <span style="font-size: 0.8em; color: #333; vertical-align: middle; margin-top:0.2em;">e.g. </span>
+          <button class="btn-chip" type="button" data-slot="Morning">Morning</button>
+          <button class="btn-chip" type="button" data-slot="Lunch">Lunch</button>
+          <button class="btn-chip" type="button" data-slot="Afternoon">Afternoon</button>
+          <button class="btn-chip" type="button" data-slot="Evening">Evening</button>
+          <button class="btn-chip" type="button" data-slot="Dinner">Dinner</button>
+          <button class="btn-chip" type="button" data-slot="Day">Day</button>
+          <button class="btn-chip" type="button" data-slot="Night">Night</button>
+          <button class="btn-chip" type="button" data-slot="After work">After work</button>
+          <button class="btn-chip" type="button" data-slot="Red team">Vote Red  </button>
+          <button class="btn-chip" type="button" data-slot="Blue team">Vote Blue </button>
+          <button class="btn-chip" type="button" data-slot="6 am">6 am </button>
+          <button class="btn-chip" type="button" data-slot="9 am">9 am </button>
+          <button class="btn-chip" type="button" data-slot="12 noon">12 noon </button>
+          <button class="btn-chip" type="button" data-slot="3 pm">3 pm </button>
+          <button class="btn-chip" type="button" data-slot="6 pm">6 pm </button>
+          <button class="btn-chip" type="button" data-slot="9 pm">9 pm </button>
+        </div>
+      </div>
+      <p class="muted">Add/edit (rename) <b>1</b> to <b id="slotsMaxHint">6</b> Slots.</p>
+      <div id="slotsWrap"></div>
+      <div class="row">
+        <button id="addSlotBtn" class="btn btn-ghost btn-small" type="button">+ Add Slot</button>
+      </div>
+      <div id="slotsError" class="error"></div>
+    </div>
+
+    <!-- Status Options -->
+    <div class="section">
+      <div class="flex-between">
+        <h2>Options</h2>
+        <div class="chips" id="statusPresetBar"> <span style="font-size: 0.8em; color: #333; vertical-align: middle; margin-top:0.2em;">e.g. </span>
+          <button class="btn-chip" type="button" data-preset="yes">Yes</button>
+          <button class="btn-chip" type="button" data-preset="no">No</button>
+          <button class="btn-chip" type="button" data-preset="yes_no">Yes / No</button>
+          <button class="btn-chip" type="button" data-preset="yes_maybe_no">Yes / No / Maybe (default)</button>
+          <button class="btn-chip" type="button" data-preset="available_unavailable">Available / Unavailable</button>
+          <button class="btn-chip" type="button" data-preset="free_tentative_busy">Free / Busy / Tentative</button>
+          <button class="btn-chip" type="button" data-preset="in_out_maybe">In / Out / Maybe</button>
+          <button class="btn-chip" type="button" data-preset="attending_not_attending">Attending / Not Attending</button>
+        </div>
+      </div>
+      <p class="muted">Add/edit (rename) <b>1</b> to <b id="statusMaxHint">5</b> Options. These are the choices people toggle in the calendar.</p>
+      
+      <!-- Ranking Mode Toggle -->
+      <div class="ranking-mode-row">
+        <span class="ranking-mode-label">Score Method:</span>
+        <div class="ranking-toggle" id="rankingToggle">
+          <button type="button" class="tog-btn active" data-mode="rank">Rank</button>
+          <button type="button" class="tog-btn" data-mode="weights">Weights</button>
+        </div>
+        <span class="ranking-hint" id="rankingHint">Position = score (top is best)</span>
+      </div>
+      
+      <div id="statusWrap"></div>
+      <div class="row">
+        <button id="addStatusBtn" class="btn btn-ghost btn-small" type="button">+ Add status</button>
+      </div>
+      <div id="statusError" class="error"></div>
+    </div>
+
+    <!-- Date range -->
+    <div class="section">
+      <h2>Dates</h2>
+      <p class="muted">Select start & end date. Max range is <span id="maxRangeDaysHint">360</span> days. Choose 1 day if Voting</p>
+
+
+
+      <!-- MOVED: Quick range chips to top of section per request -->
+      <div class="row">
+        <div class="field" style="min-width:340px;">
+          <label>Quick presets (from today)</label>
+          <div class="chips" id="datePresetsBar"> <span style="font-size: 0.8em; color: #333; vertical-align: middle; margin-top:0.2em;">e.g. </span> 
+            <button class="btn-chip" type="button" data-range="1day">1 day</button>
+            <button class="btn-chip" type="button" data-range="2day">2 days</button>
+            <button class="btn-chip" type="button" data-range="3day">3 days</button>
+            <button class="btn-chip" type="button" data-range="5day">5 days</button>            
+            <button class="btn-chip" type="button" data-range="1week">1 week</button>
+            <button class="btn-chip" type="button" data-range="2weeks">2 weeks</button>
+            <button class="btn-chip" type="button" data-range="1month">1 month</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row date-row-mobile" style="margin-top: 16px;">
+        <div class="field" style="min-width:240px;">
+          <label for="startDate">Start date</label>
+          <input id="startDate" type="date" min="2026-01-01" max="2030-12-31"/>
+          <p class="hint hide">Earliest: Jan 1, 2026</p>
+        </div>
+        <div class="field" style="min-width:240px;">
+          <label for="endDate">End date</label>
+          <input id="endDate" type="date" min="2026-01-01" max="2030-12-31"/>
+          <p class="hint hide">Latest: Dec 31, 2030</p>
+        </div>
+
+        <!-- Exclude weekends toggle -->
+        <div class="field weekend-field" style="min-width:220px;">
+          <label class="weekend-label" for="excludeWeekends">
+            <input id="excludeWeekends" type="checkbox" />
+            Exclude (Sat/Sun)
+          </label>
+        </div>
+      </div>
+
+      <!-- Range summary display -->
+      <div id="rangeSummary" class="range-summary" style="display:none;">
+        <span class="selectedRange">Selected range:</span> <span id="rangeDays">0</span> days (<span id="rangeStart">-</span> to <span id="rangeEnd">-</span>)
+      </div>
+
+      <div id="rangeError" class="error"></div>
+
+      <!-- Date Filter Mode toggle -->
+      <div class="field" style="margin-top:14px;">
+        <label>Date display</label>
+        <div class="date-filter-toggle" id="dateFilterToggle">
+          <button type="button" class="dfilt-btn active" data-mode="all">
+            <span class="material-symbols-outlined" aria-hidden="true">date_range</span>
+            <span>All dates</span>
+          </button>
+          <button type="button" class="dfilt-btn" data-mode="only">
+            <span class="material-symbols-outlined" aria-hidden="true">event_available</span>
+            <span>Only chosen</span>
+          </button>
+          <button type="button" class="dfilt-btn" data-mode="except">
+            <span class="material-symbols-outlined" aria-hidden="true">event_busy</span>
+            <span>All except</span>
+          </button>
+        </div>
+        <p class="hint" id="dateFilterHint">Show all dates in the range to participants.</p>
+      </div>
+    </div>
+
+    <!-- Organiser (Admin) -->
+    <div class="section">
+      <h2>Organiser</h2>
+      <div class="field" style="max-width:240px;">
+        <label for="adminName">Organiser name</label>
+        <input id="adminName" type="text" maxlength="40" placeholder="e.g., Bob" required />
+        <p class="hint hideme">This user will show at the top of the calendar with "(organiser)".</p>
+        <div id="adminNameErr" class="error"></div>
+      </div>
+
+      <div class="field" style="max-width:160px;">
+        <label for="adminPin">4-digit PIN</label>
+        <div class="pin-field">
+          <input id="adminPin" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" placeholder="Numbers only" required />
+          <button type="button" id="toggleAdminPin" class="pin-toggle" aria-label="Show PIN">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+          </button>
+        </div>
+        <p class="hint hideme" >Needed to access your calendar.</p>
+        <div id="adminPinErr" class="error"></div>
+      </div>
+
+      <div class="field" style="max-width:160px;">
+        <label for="adminPin2">Confirm 4-digit PIN</label>
+        <div class="pin-field">
+          <input id="adminPin2" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" placeholder="re-enter PIN" required />
+          <button type="button" id="toggleAdminPin2" class="pin-toggle" aria-label="Show PIN">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+          </button>
+        </div>
+        <p class="hint hideme">Enter the same 4 digits again.</p>
+        <div id="adminPin2Err" class="error"></div>
+      </div>
+
+      <!-- Privacy Mode Toggle -->
+      <div class="field">
+        <label>Privacy Mode</label>
+        <div class="privacy-toggle" id="privacyToggle">
+          <button type="button" class="priv-btn active" data-mode="open">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            <span>Open</span>
+          </button>
+          <button type="button" class="priv-btn" data-mode="hidden">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility_off</span>
+            <span>Hidden</span>
+          </button>
+          <button type="button" class="priv-btn" data-mode="blind">
+            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            <span>Blind</span>
+          </button>
+        </div>
+        <p class="hint" id="privacyHint">All users can see each other's availability choices.</p>
+      </div>
+    </div>
+
+    <!-- Create -->
+    <div class="row">
+      <button id="createBtn" class="btn btn-primary">Create New Calendar</button>
+    </div>
+
+    <div class="section-t">
+      <div class="warn">
+        After you click <strong>Create New Calendar</strong>, you must save your private calendar link before continuing. It cannot be recovered if lost.
+      </div>
+      <div class="warn">
+        Calendars are auto deleted if there is no <b>Submit/Save for <span class="js-retention-days" data-default="30">30</span> days</b>.
+        (Viewing does not count as activity.)
+      </div>
+    </div>
+  
+  
+ <!-- Small footer links (kept minimal to preserve existing look-and-feel) -->
+<div class="row" style="justify-content:center; margin-top: 6px;">
+  <p class="muted" style="margin:0; font-size:0.82rem; text-align:center;">
+    <a href="terms.html" style="color:inherit; text-decoration:underline;">Terms</a>
+    <span aria-hidden="true"> | </span>
+    <a href="privacy.html" style="color:inherit; text-decoration:underline;">Privacy</a>
+    <span aria-hidden="true"> | </span>
+    <a href="ideas.html" style="color:inherit; text-decoration:underline;">Templates</a>
+    <span aria-hidden="true"> | </span>
+    <a href="guide.html" style="color:inherit; text-decoration:underline;">Guide</a>
+  </p>
+</div>
+ 
+  
+  
+  </div>
+
+  <!-- Save calendar link panel (post-create) -->
+  <div id="savePanelOverlay" class="save-panel-overlay hideme" role="dialog" aria-modal="true" aria-labelledby="savePanelTitle">
+    <div class="save-panel">
+      <h2 id="savePanelTitle">Save your calendar link now</h2>
+
+      <div class="warn-strong">
+        <strong>Important — read before continuing</strong>
+        <ul>
+          <li>This is your only chance to get this link from us automatically.</li>
+          <li>If you lose the calendar link, <strong>it cannot be recovered</strong>.</li>
+          <li>Bookmark it, download the text file, or email it to yourself now.</li>
+          <li>Your organiser PIN is <strong>not</strong> included in the download — remember it separately.</li>
+        </ul>
+      </div>
+
+      <p><strong>Calendar title:</strong> <span id="saveCalTitle"></span></p>
+      <p class="code-line"><strong>Calendar code:</strong> <span id="saveCalCode"></span></p>
+      <div id="saveCalUrl" class="save-url-display"></div>
+
+      <div id="clipboardFailMsg" class="clipboard-fail hideme">
+        Auto-copy may have failed — please use <strong>Copy calendar link</strong> below.
+      </div>
+
+      <div class="btn-row">
+        <button type="button" id="saveCopyBtn" class="btn btn-primary">Copy calendar link</button>
+        <button type="button" id="saveDownloadBtn" class="btn btn-secondary">Download details (.txt)</button>
+        <button type="button" id="saveShareBtn" class="btn btn-secondary">Share</button>
+        <button type="button" id="saveEmailBtn" class="btn btn-secondary">Email to myself</button>
+        <button type="button" id="savePosterBtn" class="btn btn-secondary">Poster</button>
+      </div>
+
+      <label class="save-ack">
+        <input type="checkbox" id="saveAckCheckbox">
+        <span>I have saved my calendar link</span>
+      </label>
+
+      <button type="button" id="saveContinueBtn" class="btn btn-primary" style="width:100%;" disabled>Continue to calendar</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Page script -->
+  <script src="index.js" defer></script>
+</body>
+</html>

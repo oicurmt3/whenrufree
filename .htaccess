@@ -1,0 +1,12 @@
+SetEnv GRAPE_CONFIG_PATH /home/perthrel/grape_private/config.php
+
+# -------------------------------------------------------------------------
+# Block direct web access to sensitive files
+# cleanup.php  - cron-only maintenance script (deletes inactive calendars)
+# config.php   - database credentials (should not exist in webroot, but just in case)
+# error_log    - PHP error log (may contain paths/stack traces)
+# -------------------------------------------------------------------------
+<FilesMatch "^(cleanup\.php|config\.php|error_log)$">
+    Require all denied
+</FilesMatch>
+
