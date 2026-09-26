@@ -85,7 +85,7 @@ You can create pre-configured calendar links from the Ideas page. These pre-fill
 index.html?template=1&title=...&category=...&slots=...&statuses=...&range=1week
 ```
 
-Add `&cap=1` (people per slot, 1-20) to make a booking calendar, and optionally `&per=2` (bookings per person in total; `0` = no limit, default 1). With `cap`, the first `statuses` label becomes the booking label.
+Add `&cap=1` (people per slot, 1-20) to make a booking calendar, and optionally `&per=2` (bookings per person in total; `0` = no limit, default 1). With `cap`, the first `statuses` label becomes the booking label. The Templates page has ready-made booking examples (interviews, workshops, gym, holiday house, shared car, meeting room) in its Bookings section.
 
 ### Calendar Hubs
 

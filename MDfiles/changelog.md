@@ -17,6 +17,7 @@ All notable changes to When RU Free, in reverse chronological order.
   - Server: each booking save locks the calendar row (`SELECT ... FOR UPDATE`), checks the day is in range and the slot exists, runs cancellations before bookings, enforces capacity and the per-person limit (organiser exempt from the per-person limit) and returns `rejected` slots ("Just taken by someone else")
   - "Book a slot" wording in the share text, email, poster and .txt file; "Booking" tag in the Hub list and admin panel
   - Template links: `cap=` (people per slot) and `per=` (bookings per person in total, 0 = no limit)
+  - Templates page (`ideas.html`): new **Interview / Appointment Slots** and **Class / Workshop Sign-up** booking templates; **Gym / Facility Booking**, **Holiday House Bookings**, **Shared Car Booking** and **Meeting Room Booking** are now real booking forms (1 per slot, single "Booked" option). Cards with "People per slot" / "Bookings per person" rows get `cap` / `per` in their Use This Template link
   - New columns `calendars.slot_capacity`, `max_per_user`, `bookings_closed`. Migration: `migrations/004_booking.sql` (option hidden until it runs)
   - API: `slot_capacity` / `max_per_user` on `create_calendar`; booking fields on `calendar_meta`; `slot_capacity` on `group_meta` calendars and `admin_calendars`; `rejected` on `save`; new `set_bookings_closed`; `features.booking` on `get_site_config`. New file `includes/booking.php`
   - Security events: `BOOKINGS_CLOSED`, `BOOKINGS_REOPENED`

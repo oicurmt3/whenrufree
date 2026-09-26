@@ -33,7 +33,7 @@
     </div>
 
     <div class="tip-box" style="margin-top: 12px;">
-      <b>Running multiple calendars?</b> Create a <a href="hub.html?create=1"><strong>Calendar Hub</strong></a> — one link for your group to find training, social, AGM, and other polls. Share the Hub once; participants pick which calendar to open. Use <a href="go/">Go to code</a> if you only have a Hub or calendar code.
+      <b>Running multiple calendars?</b> Create a <a href="hub.html?create=1"><strong>Calendar Hub</strong></a> &mdash; one link for your group to find training, social, AGM, and other polls. Share the Hub once; participants pick which calendar to open. Use <a href="go/">Go to code</a> if you only have a Hub or calendar code.
     </div>
 
 
@@ -121,7 +121,7 @@ celebration
          ============================================ -->
     <h2 id="hubs"><span class="material-symbols-outlined">hub</span> Calendar Hubs</h2>
     <p>
-      When your group runs <b>several</b> calendars (different events, teams, or seasons), a Hub gives everyone <b>one link</b> instead of many. Create separate calendars from the templates below, then add them to a Hub — or create new calendars directly from the Hub page.
+      When your group runs <b>several</b> calendars (different events, teams, or seasons), a Hub gives everyone <b>one link</b> instead of many. Create separate calendars from the templates below, then add them to a Hub &mdash; or create new calendars directly from the Hub page.
     </p>
 
     <div class="template-card">
@@ -138,7 +138,7 @@ celebration
         </div>
         <div class="config-row">
           <span class="config-label">Share:</span>
-          <span class="config-value">Hub link once — participants pick which calendar to open</span>
+          <span class="config-value">Hub link once &mdash; participants pick which calendar to open</span>
         </div>
       </div>
       <div class="tip-box" style="margin-top: 12px; margin-bottom: 0;">
@@ -581,9 +581,88 @@ calendar_add_on
     
     <p>Manage shared resources like facilities, equipment, or spaces.</p>
 
+    <div class="tip-box">
+      <b>Booking forms:</b> templates with <strong>People per slot</strong> are first come, first served. Each slot can only be taken by that many people, <strong>Bookings per person</strong> caps how many slots one person can take in total, and taps save straight away. You can remove bookings and <strong>Close bookings</strong> when you're done.
+    </div>
+
+    <div class="template-card">
+      <h3><span class="material-symbols-outlined">event_available</span> Interview / Appointment Slots</h3>
+      <p class="description">Each person books one time slot, and no two people can take the same one.</p>
+      <div class="config-box">
+        <div class="config-row">
+          <span class="config-label">Title:</span>
+          <span class="config-value">"Interview Slots"</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Date:</span>
+          <span class="config-value">1 week (exclude weekends)</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Slots:</span>
+          <span class="config-value">
+            <span class="chip-preview">9am</span>
+            <span class="chip-preview">10am</span>
+            <span class="chip-preview">11am</span>
+            <span class="chip-preview">2pm</span>
+            <span class="chip-preview">3pm</span>
+            <span class="chip-preview">4pm</span>
+          </span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">People per slot:</span>
+          <span class="config-value">1</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Bookings per person:</span>
+          <span class="config-value">1</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Options:</span>
+          <span class="config-value"><span class="chip-preview chip-status">Booked</span></span>
+        </div>
+      </div>
+      <div class="tip-box">
+        <b>Tip:</b> Choose <b>Hidden</b> privacy so candidates only see which slots are taken, not who took them.
+      </div>
+    </div>
+
+    <div class="template-card">
+      <h3><span class="material-symbols-outlined">school</span> Class / Workshop Sign-up</h3>
+      <p class="description">Limited places per session; each person signs up for one session.</p>
+      <div class="config-box">
+        <div class="config-row">
+          <span class="config-label">Title:</span>
+          <span class="config-value">"Pottery Workshop"</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Date:</span>
+          <span class="config-value">2 weeks</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Slots:</span>
+          <span class="config-value">
+            <span class="chip-preview">Morning Class</span>
+            <span class="chip-preview">Evening Class</span>
+          </span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">People per slot:</span>
+          <span class="config-value">8</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Bookings per person:</span>
+          <span class="config-value">1</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Options:</span>
+          <span class="config-value"><span class="chip-preview chip-status">Enrolled</span></span>
+        </div>
+      </div>
+    </div>
+
     <div class="template-card">
       <h3><span class="material-symbols-outlined">fitness_center</span> Gym / Facility Booking</h3>
-      <p class="description">Let people indicate when they want to use a shared gym or space.</p>
+      <p class="description">One person per session in a shared gym or space, up to 2 sessions each.</p>
       <div class="config-box">
         <div class="config-row">
           <span class="config-label">Title:</span>
@@ -603,19 +682,23 @@ calendar_add_on
           </span>
         </div>
         <div class="config-row">
-          <span class="config-label">Options:</span>
-          <span class="config-value"><span class="chip-preview chip-status">Booked</span></span>
+          <span class="config-label">People per slot:</span>
+          <span class="config-value">1</span>
         </div>
         <div class="config-row">
-          <span class="config-label">Scoring:</span>
-          <span class="config-value">Weights (1)</span>
+          <span class="config-label">Bookings per person:</span>
+          <span class="config-value">2</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Options:</span>
+          <span class="config-value"><span class="chip-preview chip-status">Booked</span></span>
         </div>
       </div>
     </div>
 
     <div class="template-card">
       <h3><span class="material-symbols-outlined">cottage</span> Holiday House Bookings</h3>
-      <p class="description">Coordinate who's using a shared holiday property.</p>
+      <p class="description">One family or group per day at a shared holiday property; book as many days as you need.</p>
       <div class="config-box">
         <div class="config-row">
           <span class="config-label">Title:</span>
@@ -630,22 +713,23 @@ calendar_add_on
           <span class="config-value"><span class="chip-preview">Full Day</span></span>
         </div>
         <div class="config-row">
-          <span class="config-label">Options:</span>
-          <span class="config-value">
-            <span class="chip-preview chip-status">Booked</span>
-            <span class="chip-preview chip-status">Interested</span>
-          </span>
+          <span class="config-label">People per slot:</span>
+          <span class="config-value">1</span>
         </div>
         <div class="config-row">
-          <span class="config-label">Scoring:</span>
-          <span class="config-value">Weights (2, 1)</span>
+          <span class="config-label">Bookings per person:</span>
+          <span class="config-value">No limit</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Options:</span>
+          <span class="config-value"><span class="chip-preview chip-status">Booked</span></span>
         </div>
       </div>
     </div>
 
     <div class="template-card">
       <h3><span class="material-symbols-outlined">directions_car</span> Shared Car Booking</h3>
-      <p class="description">Manage access to a shared vehicle among family or housemates.</p>
+      <p class="description">One driver per time block for a shared family or household car.</p>
       <div class="config-box">
         <div class="config-row">
           <span class="config-label">Title:</span>
@@ -664,22 +748,23 @@ calendar_add_on
           </span>
         </div>
         <div class="config-row">
-          <span class="config-label">Options:</span>
-          <span class="config-value">
-            <span class="chip-preview chip-status">Need it</span>
-            <span class="chip-preview chip-status">Flexible</span>
-          </span>
+          <span class="config-label">People per slot:</span>
+          <span class="config-value">1</span>
         </div>
         <div class="config-row">
-          <span class="config-label">Scoring:</span>
-          <span class="config-value">Weights (2, 1)</span>
+          <span class="config-label">Bookings per person:</span>
+          <span class="config-value">No limit</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Options:</span>
+          <span class="config-value"><span class="chip-preview chip-status">Booked</span></span>
         </div>
       </div>
     </div>
 
     <div class="template-card">
       <h3><span class="material-symbols-outlined">meeting_room</span> Meeting Room Booking</h3>
-      <p class="description">Coordinate meeting room usage in a shared office.</p>
+      <p class="description">One team per hour in a shared meeting room; book as many hours as you need.</p>
       <div class="config-box">
         <div class="config-row">
           <span class="config-label">Title:</span>
@@ -701,12 +786,16 @@ calendar_add_on
           </span>
         </div>
         <div class="config-row">
-          <span class="config-label">Options:</span>
-          <span class="config-value"><span class="chip-preview chip-status">Booked</span></span>
+          <span class="config-label">People per slot:</span>
+          <span class="config-value">1</span>
         </div>
         <div class="config-row">
-          <span class="config-label">Scoring:</span>
-          <span class="config-value">Weights (1)</span>
+          <span class="config-label">Bookings per person:</span>
+          <span class="config-value">No limit</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Options:</span>
+          <span class="config-value"><span class="chip-preview chip-status">Booked</span></span>
         </div>
       </div>
     </div>
@@ -1500,6 +1589,20 @@ help
           }
           break;
           
+        case 'people per slot':
+          // Booking form: "1".."20" (anything else = normal calendar)
+          const cap = parseInt(value.textContent, 10);
+          if (cap >= 1 && cap <= 20) config.cap = String(cap);
+          break;
+
+        case 'bookings per person':
+          // Whole-calendar total per person: "No limit" = 0, otherwise 1..20
+          const perText = value.textContent.trim().toLowerCase();
+          const per = parseInt(perText, 10);
+          if (perText === 'no limit') config.per = '0';
+          else if (per >= 1 && per <= 20) config.per = String(per);
+          break;
+
         case 'scoring':
           // Extract explicit scoring mode and optional weights
           // Format: "Rank" or "Weights (3, 2, 1)"
@@ -1552,6 +1655,8 @@ help
     if (config.range) params.set('range', config.range);
     if (config.weekends) params.set('weekends', config.weekends);
     if (config.datefilter) params.set('datefilter', config.datefilter);
+    if (config.cap) params.set('cap', config.cap);
+    if (config.cap && config.per) params.set('per', config.per);
     
     return 'index.html?' + params.toString();
   }
