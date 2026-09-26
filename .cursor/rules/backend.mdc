@@ -1,0 +1,14 @@
+---
+alwaysApply: true
+---
+
+# Backend
+
+- All endpoints live in the single `api.php` file, dispatched on an action parameter.
+- PDO prepared statements for MariaDB. Never string-concatenated SQL.
+- CSRF tokens on all POSTs; per-IP rate limiting (default 120/min); sensitive POSTs fail closed if the limiter DB is unavailable.
+- PINs: `password_hash` / `password_verify`. Session tokens: 64-char hex, 24-hour expiry. Calendar/Hub tokens: 8-char URL-safe.
+- Client IP from `REMOTE_ADDR`; honour `X-Forwarded-For` only when the direct connection is from `trusted_proxies`.
+- Escape all dynamic HTML output.
+- Security events log to `grape_private/logs/` outside the webroot; config also lives outside the webroot.
+- `cleanup.php` is the cron maintenance script for inactive calendars and Hubs.

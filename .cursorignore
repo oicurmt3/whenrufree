@@ -1,0 +1,10 @@
+﻿# Server / runtime logs
+error_log
+*.log
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

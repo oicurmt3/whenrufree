@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+
+# Project Model
+
+- Privacy-first: no accounts, no tracking, no ads. PIN-based per-calendar auth (4-digit, hashed).
+- Respect the three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices).
+- Calendar model: 1-6 time slots, 1-5 status options (with weights and colours), date ranges up to 360 days.
+- Auto-rank "Best Match" by weighted status scores, with expandable rosters.
+- Calendar Hubs: one private link lists multiple calendars; opening a calendar from a Hub counts as Hub activity.
+- Super admin panel manages calendars, Hubs, permanent retention, and site config (Setup tab).
+- Go page opens a calendar or Hub by code or pasted URL.

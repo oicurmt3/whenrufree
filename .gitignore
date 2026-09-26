@@ -1,3 +1,11 @@
+# Secrets (config lives outside the webroot, but never commit a copy)
+config*.php
+.env*
+
+# Database dumps (schema migrations are fine)
+*.sql
+!migrations/*.sql
+
 # Server / runtime logs
 error_log
 *.log

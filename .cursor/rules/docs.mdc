@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+
+# Documentation
+
+- All project docs live in `MDfiles/` (README.md, user_manual.md, API Reference.md, api.md, changelog.md, js_functions.md, deployment.md, Deployment Guide.md, dictionary.md, handover.md).
+- Keep docs in sync when behaviour, endpoints, or schema change.
