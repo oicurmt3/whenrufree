@@ -86,4 +86,4 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 - Roles: "admin" (organiser) or "member" (participant)
 - Privacy: 0=open, 1=hidden, 2=blind
 - Frozen calendar: `chosen_date` + `chosen_slot` both non-null blocks `save` endpoint
-- Booking calendar: `slot_capacity` 1-20 (people per slot), `max_per_user` 1-20 or null, `bookings_closed`; one status (1 = booked); no Blind privacy. Set only at creation (`create_calendar`)
+- Booking calendar: `slot_capacity` 1-20 (people per slot), `max_per_user` 1-20 or null, `per_user_total` (limit per day or in total), `bookings_closed`; one status (1 = booked); no Blind privacy. Set only at creation (`create_calendar`)

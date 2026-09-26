@@ -39,7 +39,7 @@
     </style>
 
   <!-- Page styles -->
-  <link rel="stylesheet" href="index.css?v=20260926c">
+  <link rel="stylesheet" href="index.css?v=20260926d">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
 </head>
 <body>
@@ -175,7 +175,7 @@ celebration
         <p class="hint" id="capacityHint">Everyone can pick every slot.</p>
       </div>
 
-      <!-- Booking: total bookings per person (shown while People per slot is limited) -->
+      <!-- Booking: bookings per person, per day or in total (shown while People per slot is limited) -->
       <div class="field hideme" id="perUserField">
         <label id="perUserLabel">Bookings per person</label>
         <div class="privacy-toggle limit-toggle" id="perUserToggle" role="group" aria-labelledby="perUserLabel">
@@ -189,7 +189,12 @@ celebration
           <output class="stepper-value" id="perUserValue" aria-live="polite">3</output>
           <button type="button" class="btn btn-secondary stepper-btn" data-step="1" aria-label="More bookings">+</button>
         </div>
-        <p class="hint" id="perUserHint">Each person can book 1 slot in total.</p>
+        <!-- Per day / In total (shown once migrations/005 has run and a limit is set) -->
+        <div class="privacy-toggle limit-toggle scope-toggle hideme" id="perUserScope" role="group" aria-label="Count bookings per day or in total">
+          <button type="button" class="priv-btn active" data-scope="day" aria-pressed="true">Per day</button>
+          <button type="button" class="priv-btn" data-scope="total" aria-pressed="false">In total</button>
+        </div>
+        <p class="hint" id="perUserHint">Each person can book 1 slot per day.</p>
 
         <!-- Booking label + colour (replaces the Options section while booking) -->
         <div id="bookingPanel">
@@ -454,6 +459,6 @@ celebration
 
   <!-- Page script -->
   <script src="emoji.js?v=20260926b" defer></script>
-  <script src="index.js?v=20260926h" defer></script>
+  <script src="index.js?v=20260926l" defer></script>
 </body>
 </html>

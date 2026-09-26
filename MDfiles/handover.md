@@ -213,14 +213,25 @@ See the "Adding a Category" Word document. Two files: `CATEGORY_META` in calenda
 
 ## Built: Booking Mode
 
-- A calendar with `calendars.slot_capacity` set (1-20) is a booking form: each slot can be taken by that many people, first come, first served. `max_per_user` (1-20 or NULL) caps bookings per person; `bookings_closed` locks it. All three are set only in `create_calendar` - there is no endpoint to change them later.
+- A calendar with `calendars.slot_capacity` set (1-20) is a booking form: each slot can be taken by that many people, first come, first served. `max_per_user` (1-20 or NULL) caps bookings per person per day (counted with `AND day = :day` in `bookingApplyChanges()`), or across the whole calendar when `per_user_total` = 1 (the day filter is dropped); `bookings_closed` locks it. All four are set only in `create_calendar` - there is no endpoint to change them later.
 - Bookings are ordinary `availability` rows with status 1. The calendar has exactly one status (the booking label, default "Booked"); Blind privacy is rejected because nobody could see which slots are free.
 - Server rules live in `includes/booking.php`: `bookingColumnsReady()` (migration check), `bookingLimitValue()`, `bookingSettingsFromRow()`, `bookingLockCalendar()` (`SELECT ... FOR UPDATE` on the calendar row - this is what makes two simultaneous taps on the last place safe) and `bookingApplyChanges()` (cancellations first, then bookings with capacity / per-person checks; returns the refused ones). `save` uses them for booking calendars only; normal calendars keep the old upsert path.
 - The organiser booking for themselves skips `max_per_user` (so they can block slots); removing someone else's booking is a `save` for that user with status 0. When closed, participants get 403 `BOOKINGS_CLOSED` from `save` and `reset_user`; the organiser can still save.
 - Hidden booking calendars send the anonymous `summary` even without a session, so visitors see Free / Full. Names follow `shouldShowRoster()`.
-- Browser: `index.js` BOOKING MODE block (`makeLimitControl()`, `applyBookingMode()`), `calendar.js` BOOKING MODE block (`bookingInfo()`, `onBookingSlotClick()`, `queueBooking()` - saves one at a time, `renderBookings()`, `setBookingsClosed()`, `refreshBookings()` every 30 s and on tab focus). `renderRankings()`, `refreshCalendarValues()`, `onSlotClick()`, `renderLegend()` and `updateChosenBanner()` branch to the booking versions when `state.booking` is set.
-- Self-disabling: until `migrations/004_booking.sql` runs, `features.booking` is false and the create page hides People per slot.
+- Browser: `index.js` BOOKING MODE block (`makeLimitControl()`, `applyBookingMode()`), `calendar.js` BOOKING MODE block (`bookingInfo()`, `onBookingSlotClick()` / `setPendingBooking()` - taps become normal pending changes saved by `savePending()`, which drops the server's `rejected` slots and handles `BOOKINGS_CLOSED`; `queueBooking()` - organiser removals of other people, `renderBookings()`, `setBookingsClosed()`, `refreshBookings()` every 30 s and on tab focus). `renderRankings()`, `refreshCalendarValues()`, `onSlotClick()`, `renderLegend()` and `updateChosenBanner()` branch to the booking versions when `state.booking` is set.
+- Self-disabling: until `migrations/004_booking.sql` runs, `features.booking` is false and the create page hides People per slot. Until `migrations/005_booking_total.sql` runs, `features.booking_total` is false, the Per day / In total toggle is hidden and every limit is per day (`bookingTotalColumnReady()`).
 - Tests: `$env:TEMP\wruf_booking_test.php` (SQLite, not in the repo) covers `includes/booking.php`; there is no browser test.
+
+## Future ideas
+
+### Booking: combined per-day and in-total limits (parked 2026-09-26)
+
+Today Bookings per person is one number counted **Per day** or **In total** (`calendars.per_user_total`, migration 005). A combined rule such as "at most 1 per day and 4 in total" is not supported.
+
+- **Use cases:** monthly volunteer rosters (1/day, 4 total), gym or court weeks (1/day, 3 total), tutoring terms (1/day, 5 total), shared-car fair share (1/day, 5 total).
+- **Not needed for:** interviews and workshops (1 in total), holiday house and meeting room (No limit), single-day calendars.
+- **Why parked:** niche; two limit controls make the create page harder to follow; organisers can already remove bunched bookings by hand.
+- **Design if built:** replace the Per day / In total toggle with two optional limits, **Per day** and **In total** (each No limit / 1 / 2 / More). New column `max_per_day` (migration 006); existing calendars map `per_user_total = 0` to `max_per_day = max_per_user`, and `per_user_total = 1` to the in-total limit only. `bookingApplyChanges()` checks both counts (organiser still exempt); `myBookingCount()` / `bookingLimitMessage()` check and name whichever limit was hit. Hint: "Each person can book 1 slot per day, up to 4 in total." Template params `per` + `day`.
 
 ## Contact and Access
 

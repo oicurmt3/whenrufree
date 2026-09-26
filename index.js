@@ -382,9 +382,10 @@ const calendarSaveKit = {
   .cal-code{font-family:Consolas,'Courier New',monospace;font-size:clamp(2.6rem,11vw,4.8rem);font-weight:800;letter-spacing:0.2em;color:#111;line-height:1.1;word-break:break-all;}
   .go-instruction{font-size:1.08rem;font-weight:600;color:#444;line-height:1.45;margin:0 auto 26px;max-width:520px;}
   .emoji-block{border:2px dashed #9fa8da;border-radius:14px;padding:18px 16px;margin:0 auto 26px;background:#f5f6fc;}
-  .emoji-glyph{font-size:4rem;line-height:1.1;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;}
-  .emoji-name{font-size:1.2rem;font-weight:700;color:#222;margin-top:4px;}
-  .emoji-note{font-size:0.95rem;color:#555;margin-top:8px;}
+  .emoji-block .code-label{font-size:1.05rem;}
+  .emoji-glyph{font-size:6.5rem;line-height:1.1;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;}
+  .emoji-name{font-size:1.8rem;font-weight:800;color:#222;margin-top:4px;}
+  .emoji-note{font-size:1.15rem;font-weight:600;color:#444;margin-top:8px;}
   .link-section{text-align:left;margin-top:4px;}
   .link-section p{font-size:0.92rem;color:#555;line-height:1.55;margin-bottom:10px;}
   .link-box{font-family:Consolas,'Courier New',monospace;font-size:0.84rem;background:#e8eaf6;border:1px solid #c5cae9;border-radius:8px;padding:14px 16px;word-break:break-all;color:#283593;}
@@ -392,12 +393,24 @@ const calendarSaveKit = {
   .promo .site{font-size:1.45rem;font-weight:800;letter-spacing:0.02em;margin-bottom:8px;}
   .promo .pitch{font-size:0.98rem;opacity:0.96;line-height:1.45;}
   .promo .cta{font-size:0.84rem;margin-top:12px;opacity:0.88;padding-top:12px;border-top:1px solid rgba(255,255,255,0.25);}
+  @page{margin:10mm;}
   @media print{
-    body{background:#fff;padding:0;}
+    body{background:#fff;padding:0;min-height:0;}
     .no-print{display:none !important;}
     .page-wrap{max-width:none;gap:0;}
-    .poster{box-shadow:none;border-radius:0;border:none;}
+    .poster{box-shadow:none;border-radius:0;border:none;break-inside:avoid;page-break-inside:avoid;}
     .brand-header,.promo,.code-block{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .brand-header{padding:20px 24px 18px;}
+    .brand-badge{margin-bottom:8px;}
+    .poster-body{padding:22px 28px 18px;}
+    .cal-created{margin-bottom:16px;}
+    .code-block{padding:20px 20px 18px;margin-bottom:16px;}
+    .cal-code{font-size:4.2rem;}
+    .go-instruction{margin-bottom:16px;}
+    .emoji-block{padding:12px 16px;margin-bottom:16px;}
+    .emoji-glyph{font-size:5.5rem;}
+    .promo{padding:16px 28px;}
+    .promo .cta{margin-top:8px;padding-top:8px;}
   }
 </style>
 </head>
@@ -1523,7 +1536,7 @@ function getDateFilterMode() {
 }
 
 /************** BOOKING MODE **************/
-// People per slot (null = normal availability poll) and Bookings per person (whole-calendar total).
+// People per slot (null = normal availability poll) and Bookings per person (per day or in total).
 // Shown once the server reports features.booking (migrations/004_booking.sql).
 const BOOKING_LIMIT_MAX = 20;
 const BOOKING_PRIVACY_HINTS = {
@@ -1597,12 +1610,42 @@ const capacityControl = makeLimitControl({
   onChange: () => applyBookingMode()
 });
 
+// Per day / In total: whether Bookings per person counts each day or the whole calendar (migrations/005).
+let perUserTotal = false;
+let bookingTotalSupported = false;
+const perUserScopeEl = document.getElementById('perUserScope');
+
 const perUserControl = makeLimitControl({
   toggleId: 'perUserToggle', stepperId: 'perUserStepper', valueId: 'perUserValue', hintId: 'perUserHint',
   initial: 1,
-  hint: (v) => v === null ? 'People can book as many slots as they like.'
-    : v === 1 ? 'Each person can book 1 slot in total.'
-    : `Each person can book up to ${v} slots in total.`
+  hint: (v) => {
+    const when = perUserTotal ? 'in total' : 'per day';
+    return v === null ? 'People can book as many slots as they like.'
+      : v === 1 ? `Each person can book 1 slot ${when}.`
+      : `Each person can book up to ${v} slots ${when}.`;
+  },
+  onChange: () => renderPerUserScope()
+});
+
+/** Per day / In total only shows when the server supports it and a limit is set. */
+function renderPerUserScope() {
+  perUserScopeEl.classList.toggle('hideme', !bookingTotalSupported || perUserControl.value === null);
+  perUserScopeEl.querySelectorAll('.priv-btn').forEach(b => {
+    const on = (b.dataset.scope === 'total') === perUserTotal;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+function setPerUserTotal(on) {
+  perUserTotal = on && bookingTotalSupported;
+  renderPerUserScope();
+  perUserControl.set(perUserControl.value, true);
+}
+
+perUserScopeEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.priv-btn');
+  if (btn) setPerUserTotal(btn.dataset.scope === 'total');
 });
 
 function isBookingMode() {
@@ -1615,7 +1658,9 @@ let bookingSupported = false;
 function initBookingField(features) {
   if (!features || features.booking !== true) return;
   bookingSupported = true;
+  bookingTotalSupported = features.booking_total === true;
   document.getElementById('capacityField').classList.remove('hideme');
+  renderPerUserScope();
 }
 
 /** Shows Bookings per person (with the booking label), hides Options and Blind privacy while booking. */
@@ -1748,6 +1793,7 @@ async function createCalendar(){
     if (booking) {
       body.slot_capacity = capacityControl.value;
       body.max_per_user = perUserControl.value;
+      if (perUserTotal && perUserControl.value !== null) body.per_user_total = 1;
     }
 
     const resp = await accessFetch('api.php?action=create_calendar', {
@@ -1795,7 +1841,8 @@ async function createCalendar(){
  *   range     - Date range preset (1day, 1week, 2weeks, 1month, 2months, 3months)
  *   weekends  - Exclude weekends flag (1 = exclude)
  *   cap       - Booking: people per slot (1-20); omit for a normal availability poll
- *   per       - Booking: bookings per person in total (0 = no limit, 1-20; default 1)
+ *   per       - Booking: bookings per person (0 = no limit, 1-20; default 1), counted per day
+ *   total     - Booking: 1 = count per across the whole calendar instead of per day
  */
 function parseTemplateParams() {
   const params = new URLSearchParams(window.location.search);
@@ -1937,12 +1984,14 @@ function parseTemplateParams() {
     }
   }
 
-  // Booking: cap = people per slot (1-20), per = bookings per person in total (0 = no limit, default 1).
+  // Booking: cap = people per slot (1-20), per = bookings per person (0 = no limit, default 1),
+  // total=1 counts "per" across the whole calendar instead of per day.
   // The first status label (if given) becomes the booking label.
   if (params.has('cap') && bookingSupported) {
     const cap = parseInt(params.get('cap'), 10);
     if (cap >= 1 && cap <= BOOKING_LIMIT_MAX) {
-      if (params.has('per')) perUserControl.set(params.get('per'), true);
+      if (params.has('per')) perUserControl.set(params.get('per'));
+      if (params.get('total') === '1') setPerUserTotal(true);
       if (params.has('statuses')) {
         const first = normaliseStatusLabel(decodeURIComponent(params.get('statuses')).split(',')[0] || '');
         if (first) bookingLabelEl.value = first;

@@ -1,6 +1,6 @@
 -- Booking mode: limit how many people can pick each slot (first come, first served).
 -- slot_capacity NULL = normal availability poll; 1..20 = people per slot.
--- max_per_user NULL = no limit; 1..20 = bookings each person can hold across the whole calendar (organiser exempt).
+-- max_per_user NULL = no limit; 1..20 = bookings each person can hold per day (organiser exempt).
 -- bookings_closed 1 = organiser has closed bookings (no more changes).
 -- Apply once in phpMyAdmin (MariaDB); safe to re-run. The option stays hidden until this runs.
 

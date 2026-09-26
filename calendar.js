@@ -508,7 +508,6 @@ function clearPersistedPending(userId){
   try{ localStorage.removeItem(pendingKey(userId)); }catch(e){}
 }
 function restorePendingForUser(userId){
-  if(isBookingMode()) return {};
   try{
     const raw = localStorage.getItem(pendingKey(userId));
     if(!raw) return {};
@@ -723,7 +722,7 @@ const state = {
   chosenDate:null, // YYYY-MM-DD if organiser has locked in a slot (null = open)
   chosenSlot:null, // Slot ID if organiser has locked in a slot (null = open)
   hubGroup:null, // { token, title } when calendar belongs to a Hub
-  booking:null, // { capacity, perUser, closed } for booking calendars (null = availability poll)
+  booking:null, // { capacity, perUser, perUserTotal, closed } for booking calendars (null = availability poll)
   bookingView:null, // 'booked' or 'free' once chosen; null = default for the role
   expandedRanks:new Set(),
   auth:new Map(), // user_id -> {token, role, exp}
@@ -894,7 +893,12 @@ async function loadCalendarMeta(){
     const cap = parseInt(meta.calendar.slot_capacity, 10);
     const per = parseInt(meta.calendar.max_per_user, 10);
     state.booking = cap >= 1
-      ? { capacity: cap, perUser: per >= 1 ? per : null, closed: meta.calendar.bookings_closed === true }
+      ? {
+          capacity: cap,
+          perUser: per >= 1 ? per : null,
+          perUserTotal: per >= 1 && meta.calendar.per_user_total === true,
+          closed: meta.calendar.bookings_closed === true
+        }
       : null;
     if(state.booking) applyBookingChrome();
 
@@ -1326,7 +1330,7 @@ function updateUserUI(){
   // Submit/Save button: only visible when authenticated and calendar is not frozen
   // Remove init-hidden class now that we know the correct state (prevents initial flash)
   els.submitBtn.classList.remove('init-hidden');
-  const showSubmit = isAuthenticated && !isCalendarFrozen() && !isBookingMode();
+  const showSubmit = isAuthenticated && !isCalendarFrozen() && !(isBookingClosed() && !isAdmin);
   els.submitBtn.style.display = showSubmit ? 'inline-flex' : 'none';
   
   // Edit name and Share are admin-only
@@ -2464,11 +2468,19 @@ async function savePending(isAutosave = false){
     // Retry with exponential backoff for transient failures
     const maxAttempts = 4;
     let lastErr = null;
+    let saveData = null;
+    let bookingsClosed = false;
     for(let attempt=1; attempt<=maxAttempts; attempt++){
       try{
         const res = await postSave(auth.token);
         if(res.data && res.data.status === 'success'){
           lastErr = null;
+          saveData = res.data;
+          break;
+        }
+        if(res.data && res.data.code === 'BOOKINGS_CLOSED'){
+          lastErr = null;
+          bookingsClosed = true;
           break;
         }
 
@@ -2496,9 +2508,26 @@ async function savePending(isAutosave = false){
     }
     if(lastErr) throw lastErr;
 
+    if(bookingsClosed){
+      handleBookingsClosedOnSave(uid);
+      return;
+    }
+
+    // Booking calendars: the server refuses bookings for full slots or over the per-person limit
+    const rejected = isBookingMode() && Array.isArray(saveData?.rejected) ? saveData.rejected : [];
+    const rejectedKeys = new Set(rejected.map(r => `${r.day}\n${r.slot}`));
+    for(const r of rejected){
+      if(toSave[r.day]) delete toSave[r.day][r.slot];
+      if(state.pending[r.day]){
+        delete state.pending[r.day][r.slot];
+        if(!Object.keys(state.pending[r.day]).length) delete state.pending[r.day];
+      }
+    }
+
     // Commit snapshot into local store
     for(const [dateStr, slots] of Object.entries(toSave)){
       for(const [slot,st] of Object.entries(slots)){
+        if(rejectedKeys.has(`${dateStr}\n${slot}`)) continue;
         const key=`${uid}\n${dateStr}\n${slot}`;
         if(Number(st)===STATUS_NULL) state.store.delete(key); else state.store.set(key, Number(st));
       }
@@ -2525,6 +2554,14 @@ async function savePending(isAutosave = false){
     // Clear legend highlights after successful save
     clearLegendHighlights();
     
+    if(isBookingMode()){
+      if(rejected.some(r => r.reason === 'full')) showToast('Just taken by someone else');
+      else if(rejected.some(r => r.reason === 'limit')) showToast(bookingLimitMessage());
+      else showToast('Saved to server!');
+      await reloadAvailability();
+      return;
+    }
+
     // Show success feedback
     showToast('Saved to server!');
   } catch(e) {
@@ -3412,7 +3449,8 @@ const debouncedRank = debounce(renderRankings, 250);
 /* ============================================
    BOOKING MODE
    Each slot can be taken by up to state.booking.capacity people.
-   Taps save straight away; the server locks the calendar row and
+   Taps toggle Booked / not booked and save like a normal calendar
+   (auto-save or Submit); the server locks the calendar row and
    returns any bookings it refused (slot full / per-person limit).
    ============================================ */
 const BOOKING_REFRESH_MS = 30000;
@@ -3478,16 +3516,22 @@ function renderBookingLegend(){
 }
 
 /**
- * Who has booked a slot. With full rows (Open, or Hidden organiser) ids lists everyone;
- * otherwise only your own row is known and count comes from the anonymous summary.
+ * Who has booked a slot, including your unsaved change. With full rows (Open, or Hidden
+ * organiser) ids lists everyone; otherwise others are counted from the anonymous summary.
  */
 function bookingInfo(dateStr, slotId){
+  const me = state.currentUserId;
   const ids = [];
+  let savedMine = false;
   for(const u of state.users){
-    if((state.store.get(`${u.id}\n${dateStr}\n${slotId}`) || 0) >= 1) ids.push(u.id);
+    const booked = (state.store.get(`${u.id}\n${dateStr}\n${slotId}`) || 0) >= 1;
+    if(u.id === me) savedMine = booked;
+    else if(booked) ids.push(u.id);
   }
-  const mine = !!state.currentUserId && ids.includes(state.currentUserId);
-  const count = Math.max(ids.length, getSummaryCount(dateStr, slotId, 1));
+  const mine = !!me && getStatus(me, dateStr, slotId).status >= 1;
+  const others = Math.max(ids.length, getSummaryCount(dateStr, slotId, 1) - (savedMine ? 1 : 0));
+  if(mine) ids.push(me);
+  const count = others + (mine ? 1 : 0);
   const cap = state.booking.capacity;
   return { ids, mine, count, left: Math.max(0, cap - count), full: count >= cap };
 }
@@ -3495,7 +3539,7 @@ function bookingInfo(dateStr, slotId){
 function bookingCellText(info){
   const roster = shouldShowRoster();
   const others = info.ids.filter(id => id !== state.currentUserId).map(bookingUserName);
-  if(info.mine) return (roster && others.length) ? `You, ${others.join(', ')}` : 'You';
+  if(info.mine) return bookingLabel();
   if(info.count === 0) return 'Free';
   if(roster && others.length){
     return info.full ? others.join(', ') : `${others.join(', ')} - ${info.left} left`;
@@ -3527,44 +3571,114 @@ function refreshBookingCells(){
   }
 }
 
-function myBookingCount(){
+/**
+ * Your bookings that count towards Bookings per person, including unsaved changes:
+ * that day's bookings, or every booking when the limit covers the whole calendar.
+ */
+function myBookingCount(dateStr){
   if(!state.currentUserId) return 0;
-  const prefix = `${state.currentUserId}\n`;
+  if(state.booking.perUserTotal) return myTotalBookingCount(true);
+  let n = 0;
+  for(const slot of TIME_SLOTS){
+    if(getStatus(state.currentUserId, dateStr, slot.id).status >= 1) n++;
+  }
+  return n;
+}
+
+/** All your bookings on this calendar; saved only (for "Cancel my bookings") unless withPending. */
+function myTotalBookingCount(withPending = false){
+  if(!state.currentUserId) return 0;
+  const uid = state.currentUserId;
+  const prefix = `${uid}\n`;
   let n = 0;
   for(const [k, v] of state.store.entries()){
     if(v >= 1 && k.startsWith(prefix)) n++;
+  }
+  if(withPending){
+    for(const [dateStr, slots] of Object.entries(state.pending)){
+      for(const [slotId, st] of Object.entries(slots)){
+        const saved = (state.store.get(`${uid}\n${dateStr}\n${slotId}`) || 0) >= 1;
+        if(st >= 1 && !saved) n++;
+        else if(st < 1 && saved) n--;
+      }
+    }
   }
   return n;
 }
 
 function bookingLimitMessage(){
   const n = state.booking.perUser;
+  const when = state.booking.perUserTotal ? 'in total' : 'per day';
   return n === 1
-    ? 'You can book 1 slot in total - cancel it to pick another.'
-    : `You can book ${n} slots in total - cancel one to pick another.`;
+    ? `You can book 1 slot ${when} - cancel it to pick another.`
+    : `You can book ${n} slots ${when} - cancel one to pick another.`;
 }
 
+/**
+ * Tap on a booking cell: toggles Booked / not booked as an unsaved change (like a normal
+ * calendar). Returns true when the change was queued.
+ */
 function onBookingSlotClick(dateStr, slotId){
-  if(isBookingClosed()){ showToast('Bookings are closed.'); return; }
-  if(!state.currentUserId){ openUserSelectModal(); return; }
+  if(isBookingClosed() && !isAuthedOrganiser()){ showToast('Bookings are closed.'); return false; }
+  if(!state.currentUserId){ openUserSelectModal(); return false; }
   if(!state.auth.get(state.currentUserId)){
     openPinModal(state.currentUserId, state.users.find(x => x.id === state.currentUserId));
-    return;
+    return false;
   }
   const info = bookingInfo(dateStr, slotId);
-  if(info.mine){
-    if(confirm('Cancel this booking?')) queueBooking(state.currentUserId, dateStr, slotId, 0);
-    return;
+  if(!info.mine){
+    if(info.full){ showToast('This slot is taken'); return false; }
+    if(!isAuthedOrganiser() && state.booking.perUser !== null && myBookingCount(dateStr) >= state.booking.perUser){
+      showToast(bookingLimitMessage());
+      return false;
+    }
   }
-  if(info.full){ showToast('This slot is taken'); return; }
-  if(!isAuthedOrganiser() && state.booking.perUser !== null && myBookingCount() >= state.booking.perUser){
-    showToast(bookingLimitMessage());
-    return;
-  }
-  queueBooking(state.currentUserId, dateStr, slotId, 1);
+  setPendingBooking(dateStr, slotId, info.mine ? STATUS_NULL : 1);
+  return true;
 }
 
-/** Booking saves run one at a time, in tap order. */
+/** Records your unsaved booking change; toggling back to the saved state leaves nothing to save. */
+function setPendingBooking(dateStr, slotId, status){
+  const saved = (state.store.get(`${state.currentUserId}\n${dateStr}\n${slotId}`) || 0) >= 1 ? 1 : STATUS_NULL;
+  if(status === saved){
+    if(state.pending[dateStr]){
+      delete state.pending[dateStr][slotId];
+      if(!Object.keys(state.pending[dateStr]).length) delete state.pending[dateStr];
+    }
+  } else {
+    if(!state.pending[dateStr]) state.pending[dateStr] = {};
+    state.pending[dateStr][slotId] = status;
+  }
+  const el = state.slotEls.get(dateStr)?.get(slotId);
+  const slot = TIME_SLOTS.find(s => s.id === slotId);
+  if(el && slot) renderBookingCell(el, dateStr, slot);
+  updateSubmitButtonState();
+  debouncedRank();
+  persistPendingDebounced();
+  scheduleAutosave();
+}
+
+/** Bookings button on the Bookings card: same toggle, saved straight away. */
+async function bookingCardAction(dateStr, slotId){
+  if(!onBookingSlotClick(dateStr, slotId)) return;
+  cancelAutosave();
+  await savePending(false);
+}
+
+/** The organiser closed bookings before your changes were saved. */
+function handleBookingsClosedOnSave(uid){
+  state.booking.closed = true;
+  state.pending = {};
+  clearPersistedPending(uid);
+  updateBookingClosedBanner();
+  updateSubmitButtonState();
+  updateUserUI();
+  refreshCalendarValues();
+  renderRankings();
+  showToast('Bookings are closed - your changes were not saved.');
+}
+
+/** Organiser removals of other people's bookings run one at a time, in tap order. */
 let bookingChain = Promise.resolve();
 let bookingInFlight = 0;
 
@@ -3621,13 +3735,17 @@ async function sendBooking(userId, dateStr, slotId, status){
 }
 
 async function cancelMyBookings(auth){
-  const n = myBookingCount();
+  const n = myTotalBookingCount();
   if(!n){ showToast('You have no bookings.'); return; }
   if(isBookingClosed() && !isAuthedOrganiser()){ showToast('Bookings are closed.'); return; }
   if(!confirm(n === 1 ? 'Cancel your booking?' : `Cancel all ${n} of your bookings?`)) return;
   try{
     const res = await apiPost('reset_user', { user_id: state.currentUserId }, auth.token);
     if(res.status !== 'success'){ showToast(res.message || 'Cancel failed'); return; }
+    cancelAutosave();
+    state.pending = {};
+    clearPersistedPending(state.currentUserId);
+    updateSubmitButtonState();
     await reloadAvailability();
     showToast(n === 1 ? 'Booking cancelled' : 'Bookings cancelled');
   }catch(e){
@@ -3653,90 +3771,134 @@ function bookingDates(){
   return out;
 }
 
-function bookingRowShell(dateStr, slot, extraClass){
+/**
+ * A booking row built like a normal Best Match card: a header button (date - slot, summary,
+ * View/Hide pill) that expands to the action pills and the roster.
+ */
+function bookingRankCard(dateStr, slot, { mine, summary, fillDetails }){
+  const key = `bk\n${dateStr}\n${slot.id}`;
+  const details = document.createElement('div'); details.className = 'rank-details';
+  const actions = document.createElement('div'); actions.className = 'rank-actions';
+  details.appendChild(actions);
+  fillDetails(details, actions);
+  if(!actions.childElementCount) actions.remove();
+  const hasDetails = details.childElementCount > 0;
+  const isOpen = hasDetails && state.expandedRanks.has(key);
+
   const card = document.createElement('div');
-  card.className = 'rank-card bk-card' + (extraClass ? ` ${extraClass}` : '');
-  const row = document.createElement('div'); row.className = 'bk-row';
+  card.className = 'rank-card bk-card' + (isOpen ? ' open' : '') + (mine ? ' bk-card-mine' : '');
+  const btn = document.createElement('button'); btn.className = 'rank-btn'; btn.type = 'button';
   const main = document.createElement('div'); main.className = 'rank-main';
   const line1 = document.createElement('div'); line1.className = 'rank-line1';
-  line1.textContent = `${formatFriendlyDate(dateStr)} - ${slot.label}`;
+  if(mine) line1.innerHTML = '<span class="material-symbols-outlined bk-mine-icon" aria-hidden="true">check_circle</span> ';
+  line1.appendChild(document.createTextNode(`${formatFriendlyDate(dateStr)} - ${slot.label}`));
   const line2 = document.createElement('div'); line2.className = 'rank-line2';
+  line2.textContent = summary;
   main.appendChild(line1); main.appendChild(line2);
-  const actions = document.createElement('div'); actions.className = 'bk-actions';
-  row.appendChild(main); row.appendChild(actions);
-  card.appendChild(row);
-  return { card, line2, actions };
+  btn.appendChild(main);
+  if(hasDetails){
+    const pill = document.createElement('div'); pill.className = 'rank-pill'; pill.textContent = isOpen ? 'Hide' : 'View';
+    btn.appendChild(pill);
+    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    btn.addEventListener('click', () => toggleRankExpand(key));
+    card.appendChild(btn);
+    card.appendChild(details);
+  } else {
+    btn.style.cursor = 'default';
+    card.appendChild(btn);
+  }
+  return card;
+}
+
+/** Names on a slot (you first), styled like the normal roster; the organiser can remove others. */
+function bookingRoster(info, dateStr, slot, isOrg){
+  const me = state.currentUserId;
+  const list = document.createElement('div'); list.className = 'roster-inline';
+  const ids = info.ids.slice().sort((a, b) =>
+    ((b === me) - (a === me)) || bookingUserName(a).localeCompare(bookingUserName(b)));
+  for(const uid of ids){
+    const name = bookingUserName(uid);
+    const item = document.createElement('span'); item.className = 'roster-item';
+    const nameEl = document.createElement('span'); nameEl.className = 'roster-name'; nameEl.textContent = name;
+    const tag = document.createElement('span'); tag.className = 'status-tag status-1'; tag.textContent = bookingLabel();
+    item.appendChild(nameEl); item.appendChild(tag);
+    if(isOrg && uid !== me){
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'bk-remove';
+      rm.title = `Remove ${name}`;
+      rm.setAttribute('aria-label', `Remove ${name}'s booking`);
+      rm.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">close</span>';
+      rm.addEventListener('click', () => {
+        if(!confirm(`Remove ${name}'s booking for ${formatFriendlyDate(dateStr)} - ${slot.label}?`)) return;
+        queueBooking(uid, dateStr, slot.id, 0);
+      });
+      item.appendChild(rm);
+    }
+    list.appendChild(item);
+  }
+  return list;
+}
+
+/** Share pill (same as Best Match) listing who booked the slot. */
+function bookingShareButton(info, dateStr, slot){
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn-pill btn-share';
+  btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">share</span> Share';
+  const details = info.ids.map(uid => ({ name: state.users.find(u => u.id === uid)?.display_name || 'Someone', status: 1 }));
+  btn.addEventListener('click', () => shareRankingDetails({ dateStr, slotLabel: slot.label, details }, STATUS_OPTIONS || []));
+  return btn;
 }
 
 function buildBookedRow({ dateStr, slot, info }, { cap, closed, isOrg, roster }){
-  const { card, line2, actions } = bookingRowShell(dateStr, slot, info.mine ? 'bk-card-mine' : '');
-  if(roster){
-    const me = state.currentUserId;
-    const ids = info.ids.slice().sort((a, b) =>
-      ((b === me) - (a === me)) || bookingUserName(a).localeCompare(bookingUserName(b)));
-    for(const uid of ids){
-      const name = bookingUserName(uid);
-      const chip = document.createElement('span'); chip.className = 'bk-person';
-      chip.appendChild(document.createTextNode(name));
-      if(isOrg && uid !== me){
-        const rm = document.createElement('button');
-        rm.type = 'button';
-        rm.className = 'bk-remove';
-        rm.title = `Remove ${name}`;
-        rm.setAttribute('aria-label', `Remove ${name}'s booking`);
-        rm.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">close</span>';
-        rm.addEventListener('click', () => {
-          if(!confirm(`Remove ${name}'s booking for ${formatFriendlyDate(dateStr)} - ${slot.label}?`)) return;
-          queueBooking(uid, dateStr, slot.id, 0);
+  const summary = cap === 1
+    ? (info.mine ? 'Booked by you' : (roster && info.ids.length ? `Booked by ${bookingUserName(info.ids[0])}` : bookingLabel()))
+    : `${info.count} of ${cap} booked${info.mine ? ' (incl. you)' : ''}`;
+  return bookingRankCard(dateStr, slot, { mine: info.mine, summary, fillDetails: (details, actions) => {
+    if(info.mine){
+      const links = buildCalendarLinks({ dateStr, slotLabel: slot.label });
+      const add = document.createElement('a');
+      add.href = links.gcalURL; add.target = '_blank'; add.rel = 'noopener';
+      add.className = 'btn-pill btn-cal';
+      add.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">event</span> Add';
+      const ics = document.createElement('a');
+      ics.href = links.icsBlobUrl; ics.download = links.icsName;
+      ics.className = 'btn-pill btn-ics';
+      ics.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">download</span> Download';
+      actions.appendChild(add); actions.appendChild(ics);
+    }
+    if(roster && info.ids.length) actions.appendChild(bookingShareButton(info, dateStr, slot));
+    if(info.mine){
+      if(!closed || isOrg){
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'btn-pill bk-cancel-btn';
+        cancel.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">event_busy</span> Cancel';
+        cancel.addEventListener('click', () => {
+          if(confirm('Cancel this booking?')) bookingCardAction(dateStr, slot.id);
         });
-        chip.appendChild(rm);
+        actions.appendChild(cancel);
       }
-      line2.appendChild(chip);
     }
-    if(cap > 1 && !info.full){
-      const left = document.createElement('span'); left.className = 'bk-left';
-      left.textContent = `${info.left} left`;
-      line2.appendChild(left);
-    }
-  } else {
-    line2.textContent = info.mine
-      ? (info.count > 1 ? `You + ${info.count - 1} more` : 'You')
-      : (cap === 1 ? bookingLabel() : `${info.count} of ${cap} booked`);
-  }
-  if(info.mine){
-    if(!closed || isOrg){
-      const cancel = document.createElement('button');
-      cancel.type = 'button';
-      cancel.className = 'btn-pill bk-cancel-btn';
-      cancel.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">event_busy</span> Cancel';
-      cancel.addEventListener('click', () => {
-        if(confirm('Cancel this booking?')) queueBooking(state.currentUserId, dateStr, slot.id, 0);
-      });
-      actions.appendChild(cancel);
-    }
-    const links = buildCalendarLinks({ dateStr, slotLabel: slot.label });
-    URL.revokeObjectURL(links.icsBlobUrl);
-    const add = document.createElement('a');
-    add.href = links.gcalURL; add.target = '_blank'; add.rel = 'noopener';
-    add.className = 'btn-pill btn-cal';
-    add.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">event</span> Add';
-    actions.appendChild(add);
-  }
-  return card;
+    if(roster && info.ids.length) details.appendChild(bookingRoster(info, dateStr, slot, isOrg));
+  }});
 }
 
-function buildFreeRow({ dateStr, slot, info }, { closed }){
-  const { card, line2, actions } = bookingRowShell(dateStr, slot, '');
-  line2.textContent = info.count === 0 ? 'Free' : `${info.left} left`;
-  if(!closed){
-    const book = document.createElement('button');
-    book.type = 'button';
-    book.className = 'btn-pill btn-choose';
-    book.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">event_available</span> Book';
-    book.addEventListener('click', () => onBookingSlotClick(dateStr, slot.id));
-    actions.appendChild(book);
-  }
-  return card;
+function buildFreeRow({ dateStr, slot, info }, { cap, closed, isOrg, roster }){
+  const summary = info.count === 0 ? 'Free' : `${info.left} of ${cap} left`;
+  return bookingRankCard(dateStr, slot, { mine: false, summary, fillDetails: (details, actions) => {
+    if(roster && info.ids.length) actions.appendChild(bookingShareButton(info, dateStr, slot));
+    if(!closed){
+      const book = document.createElement('button');
+      book.type = 'button';
+      book.className = 'btn-pill btn-choose';
+      book.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px;">check_circle</span> Book';
+      book.addEventListener('click', () => bookingCardAction(dateStr, slot.id));
+      actions.appendChild(book);
+    }
+    if(roster && info.ids.length) details.appendChild(bookingRoster(info, dateStr, slot, isOrg));
+  }});
 }
 
 /** Bookings card: "N of M booked", then the Booked or Free list in date order. */
@@ -3768,6 +3930,12 @@ function renderBookings(){
   count.className = 'bk-summary-text';
   count.textContent = cap === 1 ? `${taken} of ${places} booked` : `${taken} of ${places} places booked`;
   head.appendChild(count);
+  if(state.booking.perUserTotal && !isOrg && state.currentUserId && state.auth.get(state.currentUserId)){
+    const mine = document.createElement('span');
+    mine.className = 'bk-summary-mine';
+    mine.textContent = `You've booked ${myTotalBookingCount(true)} of ${state.booking.perUser}`;
+    head.appendChild(mine);
+  }
   if(isOrg && !closed){
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
@@ -3788,7 +3956,7 @@ function renderBookings(){
   for(const row of shown){
     els.rankWrap.appendChild(view === 'booked'
       ? buildBookedRow(row, { cap, closed, isOrg, roster })
-      : buildFreeRow(row, { closed }));
+      : buildFreeRow(row, { cap, closed, isOrg, roster }));
   }
 }
 
@@ -3850,7 +4018,7 @@ function startBookingRefresh(){
 }
 
 async function refreshBookings(){
-  if(bookingRefreshBusy || bookingInFlight > 0) return;
+  if(bookingRefreshBusy || bookingInFlight > 0 || state.isSaving) return;
   bookingRefreshBusy = true;
   try{
     const meta = await apiGet('calendar_meta');
@@ -3859,6 +4027,7 @@ async function refreshBookings(){
       if(closed !== state.booking.closed){
         state.booking.closed = closed;
         updateBookingClosedBanner();
+        updateUserUI();
       }
     }
     await reloadAvailability();
@@ -4093,8 +4262,8 @@ async function init(){
       tryRestoreCachedSession();
     }
 
-    // Restore any unsaved pending changes for the selected user (bookings save instantly)
-    if(state.currentUserId && !isBookingMode()){
+    // Restore any unsaved pending changes for the selected user
+    if(state.currentUserId){
       state.pending = restorePendingForUser(state.currentUserId);
     }
     

@@ -1065,12 +1065,17 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $slotCapacity = bookingLimitValue($_POST['slot_capacity'] ?? null, BOOKING_MAX_PER_SLOT);
     if ($slotCapacity === false) respond(400, ['status' => 'error', 'message' => 'Invalid people per slot']);
     $maxPerUser = null;
+    $perUserTotal = false;
     if ($slotCapacity !== null) {
         if (!bookingColumnsReady($pdo)) {
             respond(400, ['status' => 'error', 'message' => 'Booking is not available yet']);
         }
         $maxPerUser = bookingLimitValue($_POST['max_per_user'] ?? null, BOOKING_MAX_PER_USER);
         if ($maxPerUser === false) respond(400, ['status' => 'error', 'message' => 'Invalid bookings per person']);
+        $perUserTotal = (string)($_POST['per_user_total'] ?? '0') === '1' && $maxPerUser !== null;
+        if ($perUserTotal && !bookingTotalColumnReady($pdo)) {
+            respond(400, ['status' => 'error', 'message' => 'Bookings per person in total is not available yet']);
+        }
         if (count($statuses) !== 1) respond(400, ['status' => 'error', 'message' => 'Bookings use one choice']);
         $statuses[0]['weight'] = 1;
         if ($isPrivate === 2) {
@@ -1131,6 +1136,10 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($slotCapacity !== null) {
                 $pdo->prepare("UPDATE calendars SET slot_capacity = :cap, max_per_user = :per WHERE id = :id")
                     ->execute([':cap' => $slotCapacity, ':per' => $maxPerUser, ':id' => $calId]);
+                if ($perUserTotal) {
+                    $pdo->prepare("UPDATE calendars SET per_user_total = 1 WHERE id = :id")
+                        ->execute([':id' => $calId]);
+                }
             }
 
             if ($groupId !== null) {
@@ -1401,6 +1410,7 @@ if ($action === 'remove_calendar_from_group' && $_SERVER['REQUEST_METHOD'] === '
 if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $token = requireToken();
     $bookingCols = bookingColumnsReady($pdo) ? 'c.slot_capacity, c.max_per_user, c.bookings_closed,' : '';
+    if ($bookingCols !== '' && bookingTotalColumnReady($pdo)) $bookingCols .= ' c.per_user_total,';
     $stmt = $pdo->prepare(
         "SELECT c.id, c.token, c.group_id, c.title, c.category, c.slots_json, c.statuses_json,
                 c.start_date, c.end_date, c.exclude_weekends, c.date_filter_mode, c.date_filter_dates,
@@ -1467,6 +1477,7 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $booking = bookingSettingsFromRow($cal);
     $cal['slot_capacity'] = $booking['capacity'];
     $cal['max_per_user'] = $booking['per_user'];
+    $cal['per_user_total'] = $booking['per_user_total'];
     $cal['bookings_closed'] = $booking['closed'];
 
     // Hub breadcrumb when calendar belongs to a group
@@ -2782,7 +2793,11 @@ if ($action === 'set_bookings_closed' && $_SERVER['REQUEST_METHOD'] === 'POST') 
  */
 if ($action === 'get_site_config' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     // Optional features whose migrations have been applied
-    $features = ['access_emoji' => accessTablesReady($pdo), 'booking' => bookingColumnsReady($pdo)];
+    $features = [
+        'access_emoji' => accessTablesReady($pdo),
+        'booking' => bookingColumnsReady($pdo),
+        'booking_total' => bookingColumnsReady($pdo) && bookingTotalColumnReady($pdo),
+    ];
     try {
         $stmt = $pdo->query("SELECT config_json FROM site_config WHERE id = 1 LIMIT 1");
         $row  = $stmt->fetch();

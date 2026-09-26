@@ -1657,7 +1657,7 @@ main{
 
 /* ============================================
    BOOKING MODE
-   Cells: Free (white) / Yours (status colour + check) / some left (tint) / Full (grey hatched)
+   Cells: Free (white) / Yours (status colour + check) / booked by others: some left (light red) / Full (red)
    ============================================ */
 .time-slot.bk-cell{
   flex-direction:column;
@@ -1684,17 +1684,16 @@ main{
   text-overflow:ellipsis;
   opacity:.85;
 }
-.time-slot.bk-cell.bk-mine{box-shadow:none;}
+.time-slot.bk-cell.bk-mine{background-color:var(--status-1);color:var(--status-1-text, #fff);box-shadow:none;}
 .bk-cell.bk-mine .bk-sub{font-weight:700;opacity:1;}
 .bk-cell.bk-mine .bk-sub::before{content:'\2713  ';}
 .time-slot.bk-cell.bk-partial{
-  background-color:#eef6e6;
-  background-color:color-mix(in srgb, var(--status-1) 18%, #fff);
+  background-color:#fde4e4;
+  color:#8e1b1b;
 }
 .time-slot.bk-cell.bk-full{
-  background-color:#e6e6e6;
-  background-image:repeating-linear-gradient(45deg, transparent 0 6px, rgba(0,0,0,.07) 6px 12px);
-  color:#777;
+  background-color:#c62828;
+  color:#fff;
   box-shadow:none;
 }
 .time-slot.bk-cell.bk-busy{opacity:.55;pointer-events:none;}
@@ -1706,8 +1705,8 @@ main{
 .bk-dot{border:1px solid #bbb;}
 .bk-dot-free{background:#fff;}
 .bk-dot-mine{background:var(--status-1);border-color:transparent;}
-.bk-dot-partial{background:#eef6e6;background:color-mix(in srgb, var(--status-1) 25%, #fff);}
-.bk-dot-full{background:#e6e6e6 repeating-linear-gradient(45deg, transparent 0 2px, rgba(0,0,0,.2) 2px 4px);}
+.bk-dot-partial{background:#fde4e4;border-color:#e57373;}
+.bk-dot-full{background:#c62828;border-color:transparent;}
 
 /* Bookings card */
 .bk-summary{
@@ -1719,33 +1718,15 @@ main{
   padding:2px 2px 6px;
 }
 .bk-summary-text{font-weight:700;color:#333;font-size:.95rem;}
-.bk-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  padding:10px 12px;
-  flex-wrap:wrap;
-}
-.bk-row .rank-main{flex:1;min-width:0;}
-.bk-row .rank-line2{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
-.bk-actions{display:flex;gap:8px;flex-wrap:wrap;}
-.bk-actions .btn-pill,
+.bk-summary-mine{color:#555;font-size:.9rem;}
+/* Booking rows reuse .rank-card / .rank-btn / .rank-details / .rank-actions / .roster-inline */
 .bk-close-btn{min-height:44px;}
 .bk-card-mine{border-color:var(--status-1);}
-.bk-person{
-  display:inline-flex;
-  align-items:center;
-  gap:2px;
-  background:#f1f3f5;
-  border:1px solid #e0e3e7;
-  border-radius:999px;
-  padding:2px 10px;
-  color:#333;
-  font-weight:600;
-  min-height:32px;
-}
-.bk-person .bk-remove{margin-right:-8px;}
+.bk-card-mine,
+.bk-card-mine .rank-btn,
+.bk-card-mine .rank-details{background:#f5faf0;background:color-mix(in srgb, var(--status-1) 8%, #fff);}
+.bk-mine-icon{font-size:16px;vertical-align:middle;color:var(--status-1);}
+.bk-card .roster-item .bk-remove{margin-left:-4px;}
 .bk-remove{
   display:inline-flex;
   align-items:center;
@@ -1761,7 +1742,6 @@ main{
 }
 .bk-remove:hover{background:#fdecea;}
 .bk-remove .material-symbols-outlined{font-size:18px;}
-.bk-left{color:#666;font-weight:500;}
 .bk-cancel-btn{border-color:#b00020;color:#b00020;}
 .bk-cancel-btn:hover{background:#fdecea;}
 .bk-close-btn{border-color:#8a5300;color:#8a5300;}

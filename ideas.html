@@ -582,12 +582,12 @@ calendar_add_on
     <p>Manage shared resources like facilities, equipment, or spaces.</p>
 
     <div class="tip-box">
-      <b>Booking forms:</b> templates with <strong>People per slot</strong> are first come, first served. Each slot can only be taken by that many people, <strong>Bookings per person</strong> caps how many slots one person can take in total, and taps save straight away. You can remove bookings and <strong>Close bookings</strong> when you're done.
+      <b>Booking forms:</b> templates with <strong>People per slot</strong> are first come, first served. Each slot can only be taken by that many people, <strong>Bookings per person</strong> caps how many slots one person can take (per day or in total), and people tap a slot to book it, just like marking availability. You can remove bookings and <strong>Close bookings</strong> when you're done.
     </div>
 
     <div class="template-card">
       <h3><span class="material-symbols-outlined">event_available</span> Interview / Appointment Slots</h3>
-      <p class="description">Each person books one time slot, and no two people can take the same one.</p>
+      <p class="description">Each person books one time slot for the whole week, and no two people can take the same one.</p>
       <div class="config-box">
         <div class="config-row">
           <span class="config-label">Title:</span>
@@ -614,7 +614,7 @@ calendar_add_on
         </div>
         <div class="config-row">
           <span class="config-label">Bookings per person:</span>
-          <span class="config-value">1</span>
+          <span class="config-value">1 in total</span>
         </div>
         <div class="config-row">
           <span class="config-label">Options:</span>
@@ -628,7 +628,7 @@ calendar_add_on
 
     <div class="template-card">
       <h3><span class="material-symbols-outlined">school</span> Class / Workshop Sign-up</h3>
-      <p class="description">Limited places per session; each person signs up for one session.</p>
+      <p class="description">Limited places per session; each person signs up for one session in total.</p>
       <div class="config-box">
         <div class="config-row">
           <span class="config-label">Title:</span>
@@ -651,7 +651,7 @@ calendar_add_on
         </div>
         <div class="config-row">
           <span class="config-label">Bookings per person:</span>
-          <span class="config-value">1</span>
+          <span class="config-value">1 in total</span>
         </div>
         <div class="config-row">
           <span class="config-label">Options:</span>
@@ -662,7 +662,7 @@ calendar_add_on
 
     <div class="template-card">
       <h3><span class="material-symbols-outlined">fitness_center</span> Gym / Facility Booking</h3>
-      <p class="description">One person per session in a shared gym or space, up to 2 sessions each.</p>
+      <p class="description">One person per session in a shared gym or space, up to 2 sessions each per day.</p>
       <div class="config-box">
         <div class="config-row">
           <span class="config-label">Title:</span>
@@ -687,7 +687,7 @@ calendar_add_on
         </div>
         <div class="config-row">
           <span class="config-label">Bookings per person:</span>
-          <span class="config-value">2</span>
+          <span class="config-value">2 per day</span>
         </div>
         <div class="config-row">
           <span class="config-label">Options:</span>
@@ -1596,11 +1596,14 @@ help
           break;
 
         case 'bookings per person':
-          // Whole-calendar total per person: "No limit" = 0, otherwise 1..20
+          // "No limit" = 0, otherwise "N per day" or "N in total" (1..20)
           const perText = value.textContent.trim().toLowerCase();
           const per = parseInt(perText, 10);
           if (perText === 'no limit') config.per = '0';
-          else if (per >= 1 && per <= 20) config.per = String(per);
+          else if (per >= 1 && per <= 20) {
+            config.per = String(per);
+            if (perText.includes('in total')) config.total = '1';
+          }
           break;
 
         case 'scoring':
@@ -1657,6 +1660,7 @@ help
     if (config.datefilter) params.set('datefilter', config.datefilter);
     if (config.cap) params.set('cap', config.cap);
     if (config.cap && config.per) params.set('per', config.per);
+    if (config.cap && config.total) params.set('total', config.total);
     
     return 'index.html?' + params.toString();
   }

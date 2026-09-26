@@ -301,9 +301,10 @@ const hubSaveKit = {
     line-height:1.45;margin:0 auto 26px;max-width:520px;
   }
   .emoji-block{border:2px dashed #9fa8da;border-radius:14px;padding:18px 16px;margin:0 auto 26px;background:#f5f6fc;}
-  .emoji-glyph{font-size:4rem;line-height:1.1;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;}
-  .emoji-name{font-size:1.2rem;font-weight:700;color:#222;margin-top:4px;}
-  .emoji-note{font-size:0.95rem;color:#555;margin-top:8px;}
+  .emoji-block .code-label{font-size:1.05rem;}
+  .emoji-glyph{font-size:6.5rem;line-height:1.1;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;}
+  .emoji-name{font-size:1.8rem;font-weight:800;color:#222;margin-top:4px;}
+  .emoji-note{font-size:1.15rem;font-weight:600;color:#444;margin-top:8px;}
   .link-section{text-align:left;margin-top:4px;}
   .link-section p{
     font-size:0.92rem;color:#555;line-height:1.55;margin-bottom:10px;
@@ -326,14 +327,26 @@ const hubSaveKit = {
     font-size:0.84rem;margin-top:12px;opacity:0.88;
     padding-top:12px;border-top:1px solid rgba(255,255,255,0.25);
   }
+  @page{margin:10mm;}
   @media print{
-    body{background:#fff;padding:0;}
+    body{background:#fff;padding:0;min-height:0;}
     .no-print{display:none !important;}
     .page-wrap{max-width:none;gap:0;}
-    .poster{box-shadow:none;border-radius:0;border:none;}
+    .poster{box-shadow:none;border-radius:0;border:none;break-inside:avoid;page-break-inside:avoid;}
     .brand-header,.promo,.code-block{
       -webkit-print-color-adjust:exact;print-color-adjust:exact;
     }
+    .brand-header{padding:20px 24px 18px;}
+    .brand-badge{margin-bottom:8px;}
+    .poster-body{padding:22px 28px 18px;}
+    .hub-created{margin-bottom:16px;}
+    .code-block{padding:20px 20px 18px;margin-bottom:16px;}
+    .hub-code{font-size:4.2rem;}
+    .go-instruction{margin-bottom:16px;}
+    .emoji-block{padding:12px 16px;margin-bottom:16px;}
+    .emoji-glyph{font-size:5.5rem;}
+    .promo{padding:16px 28px;}
+    .promo .cta{margin-top:8px;padding-top:8px;}
   }
 </style>
 </head>

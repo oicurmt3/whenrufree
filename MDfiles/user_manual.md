@@ -70,11 +70,11 @@ To undo this, tap the **Reopen** button in the decided banner.
 
 Use a booking calendar when each slot can only be taken by a set number of people - interviews, appointments, rosters, parent-teacher nights.
 
-- **Setting up:** under Slots, set **People per slot** to 1, 2 or More (3-20). **Bookings per person** then appears below it: how many slots each person can book in total across the whole calendar (No limit / 1 / 2 / More; default 1). Below that, set the **Booking label** (default "Booked") and its colour. The Options section is hidden, because bookings use this one label. Blind privacy is not available - Open shows everyone who booked each slot; Hidden shows names only to you, and others just see which slots are taken.
+- **Setting up:** under Slots, set **People per slot** to 1, 2 or More (3-20). **Bookings per person** then appears below it: how many slots each person can book (No limit / 1 / 2 / More; default 1). With a limit, choose how it is counted: **Per day** (default) or **In total**. With 1 per day, someone can book one time on Monday and another on Tuesday, but not two times on Monday - good for court or room hire. With 1 in total, each person gets one slot in the whole calendar - good for interviews or workshop sign-ups; people see "You've booked 1 of 1" on the Bookings card. Below that, set the **Booking label** (default "Booked") and its colour. The Options section is hidden, because bookings use this one label. Blind privacy is not available - Open shows everyone who booked each slot; Hidden shows names only to you, and others just see which slots are taken.
 - **Booking settings cannot be changed** after the calendar is created.
-- **How people book:** they add their name and PIN, then tap a free slot. It saves straight away - there is no Submit button. Tapping their own booking asks "Cancel this booking?". A full slot shows "This slot is taken". If two people tap the last place at the same moment, only the first gets it; the other sees "Just taken by someone else".
-- **Bookings card** (instead of Best Match): shows "N of M booked" and a **Booked / Free** toggle. Booked lists every booked slot in date order with names (as privacy allows); Free lists the slots still open with a **Book** button.
-- **As the organiser** you can book as many slots as you like (to block times off), remove anyone's booking with the x next to their name, and tap **Close bookings** to stop all changes. A "Bookings closed" banner then shows for everyone; tap **Reopen** in it to allow changes again.
+- **How people book:** they add their name and PIN, then tap a free slot to mark it Booked; tapping it again un-books it. Like a normal calendar, changes auto-save after a few seconds, or tap **Submit** to save now. The **Book** / **Cancel** buttons on the Bookings card save straight away. A full slot shows "This slot is taken", and the per-person limit counts unsaved taps too. If two people tap the last place at the same moment, only the first gets it; the other sees "Just taken by someone else".
+- **Bookings card** (instead of Best Match): shows "N of M booked" and a **Booked / Free** toggle. Booked lists every booked slot in date order; Free lists the slots still open. Each row looks like a Best Match card: tap **View** to see who booked it (as privacy allows) and the buttons - **Book** on free slots, **Add** / **Download** / **Cancel** on yours.
+- **As the organiser** you can book as many slots as you like (to block times off), remove anyone's booking with the x next to their name (tap View on the row), and tap **Close bookings** to stop all changes. A "Bookings closed" banner then shows for everyone; tap **Reopen** in it to allow changes again.
 - The calendar refreshes itself every 30 seconds while it is open, and whenever you come back to the tab.
 
 ### Template Links
@@ -85,7 +85,7 @@ You can create pre-configured calendar links from the Ideas page. These pre-fill
 index.html?template=1&title=...&category=...&slots=...&statuses=...&range=1week
 ```
 
-Add `&cap=1` (people per slot, 1-20) to make a booking calendar, and optionally `&per=2` (bookings per person in total; `0` = no limit, default 1). With `cap`, the first `statuses` label becomes the booking label. The Templates page has ready-made booking examples (interviews, workshops, gym, holiday house, shared car, meeting room) in its Bookings section.
+Add `&cap=1` (people per slot, 1-20) to make a booking calendar, and optionally `&per=2` (bookings per person, counted per day; `0` = no limit, default 1) and `&total=1` (count `per` across the whole calendar instead). With `cap`, the first `statuses` label becomes the booking label. The Templates page has ready-made booking examples (interviews, workshops, gym, holiday house, shared car, meeting room) in its Bookings section.
 
 ### Calendar Hubs
 

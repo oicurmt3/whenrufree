@@ -32,7 +32,8 @@ Core configuration for each scheduling calendar.
 | chosen_slot | VARCHAR(50) | NULL | Locked-in slot ID or NULL if open |
 | access_emoji | TINYINT UNSIGNED | NULL | Access emoji position 0-34 (list in `emoji.js`), NULL = none. Migration 003 |
 | slot_capacity | TINYINT UNSIGNED | NULL | Booking calendars: people per slot 1-20. NULL = normal availability poll. Migration 004 |
-| max_per_user | TINYINT UNSIGNED | NULL | Booking calendars: bookings each person can hold across the whole calendar 1-20, NULL = no limit. Migration 004 |
+| max_per_user | TINYINT UNSIGNED | NULL | Booking calendars: bookings each person can hold 1-20 (per day, or in total when `per_user_total` = 1), NULL = no limit. Migration 004 |
+| per_user_total | TINYINT(1) | 0 | Booking calendars: 1 = `max_per_user` counts across the whole calendar, 0 = per day. Ignored when `max_per_user` is NULL. Migration 005 |
 | bookings_closed | TINYINT(1) | 0 | Booking calendars: 1 = organiser closed bookings. Migration 004 |
 
 **Indexes:**
@@ -49,7 +50,7 @@ Core configuration for each scheduling calendar.
 - `organiser_message` app limit is 250 chars (MESSAGE_MAX_LEN in api.php). Column is VARCHAR(250) to match. Column should always be wider than or equal to the app limit
 - Token collision on create retries up to 5 times
 - A calendar with `access_emoji` NULL inside a Hub with an emoji uses the Hub's emoji
-- Booking calendars (`slot_capacity` set) have exactly one status (1 = booked, weight 1), never Blind privacy (`is_private` 0 or 1), and store bookings as `availability` rows. `save` locks the calendar row and refuses bookings beyond `slot_capacity` per slot or `max_per_user` per person (the organiser booking for themselves is exempt from `max_per_user`). The booking columns are set only at creation
+- Booking calendars (`slot_capacity` set) have exactly one status (1 = booked, weight 1), never Blind privacy (`is_private` 0 or 1), and store bookings as `availability` rows. `save` locks the calendar row and refuses bookings beyond `slot_capacity` per slot or `max_per_user` per person per day (or in total when `per_user_total` = 1; the organiser booking for themselves is exempt from `max_per_user`). The booking columns are set only at creation
 - While `bookings_closed` = 1, participants cannot save or reset; the organiser still can
 
 ---

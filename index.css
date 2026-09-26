@@ -532,6 +532,7 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 /* Booking: People per slot / Bookings per person (privacy-toggle look + stepper for "More") */
 #capacityField{ margin-top: 14px; }
 .limit-toggle .priv-btn{ min-height: 44px; padding: 10px 8px; }
+.scope-toggle{ max-width: 240px; margin-top: 10px; }
 .limit-stepper{
   display: flex;
   align-items: center;

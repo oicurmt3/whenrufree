@@ -210,23 +210,26 @@ The header Share button adds `AccessEmoji.shareLine()` under the link when an em
 
 ### Booking mode (calendar page)
 
-Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, perUser, closed}`). `renderRankings()`, `refreshCalendarValues()`, `onSlotClick()`, `renderLegend()`, `updateChosenBanner()` and `resetMyAvailability()` hand over to these; organiser dots and the Submit button are off, and pending changes are never restored.
+Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, perUser, closed}`). `renderRankings()`, `refreshCalendarValues()`, `onSlotClick()`, `renderLegend()`, `updateChosenBanner()` and `resetMyAvailability()` hand over to these; organiser dots are off. Taps are normal pending changes (Submit, auto-save, restore after reload); `savePending()` drops the server's `rejected` slots (toast "Just taken by someone else" / limit), handles `BOOKINGS_CLOSED` (`handleBookingsClosedOnSave()`), then reloads availability.
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `isBookingMode()` / `isBookingClosed()` | 3420 | Booking calendar? Bookings closed? |
-| `currentBookingView()` | 3433 | `'booked'` or `'free'` list: the user's toggle choice, else Booked for an authenticated organiser and Free for everyone else. |
-| `applyBookingChrome()` | 3444 | Page title, Booked / Free labels on `#sortToggle`, name banner text, "Cancel my bookings" titles; list limit 10. |
-| `renderBookingLegend()` | 3465 | Legend: Free / Yours / (1 left or Places left when capacity is 2+) / Full. |
-| `bookingInfo(dateStr, slotId)` | 3484 | `{ids, mine, count, left, full}` for a slot. `count` is the larger of the known rows and the anonymous summary, so it works in Hidden mode too. |
-| `bookingCellText(info)` / `renderBookingCell(el, dateStr, slot)` / `refreshBookingCells()` | 3495 | Cell sub-line (You / Free / names / "N left" / Full or the booking label) and classes `bk-mine`, `bk-partial`, `bk-full`. Names only when `shouldShowRoster()`. |
-| `onBookingSlotClick(dateStr, slotId)` | 3545 | Tap: closed / pick a name / unlock checks, then cancel your own (confirm), "This slot is taken", the per-person limit message, or book. |
-| `queueBooking(userId, dateStr, slotId, status)` / `sendBooking(...)` | 3569 | Saves one change at a time (promise chain, `bk-busy` on the cell), shows "Booked!" / "Just taken by someone else" / limit / closed messages, then reloads availability. An expired session reopens the PIN window (`handleExpiredSession()`). |
-| `cancelMyBookings(auth)` | 3621 | "Cancel my bookings": one confirm, then `reset_user`. |
-| `bookingDates()` | 3638 | Visible dates in order; past dates follow the Show/Hide past dates button. |
-| `renderBookings()` | 3741 | Bookings card: "N of M booked", organiser **Close bookings**, then Booked rows (`buildBookedRow`: names with organiser Remove, Cancel and Add on your own) or Free rows (`buildFreeRow`: Free / "N left", Book). Respects the 2 / 10 / All limit. |
-| `updateBookingClosedBanner()` / `setBookingsClosed(closed)` | 3793 | "Bookings closed" banner with organiser Reopen; POST `set_bookings_closed`. |
-| `startBookingRefresh()` / `refreshBookings()` | 3843 | Every 30 s and on tab focus: re-reads `bookings_closed` from `calendar_meta` and reloads availability (skipped while a save is in flight). |
+| `isBookingMode()` / `isBookingClosed()` | 3453 | Booking calendar? Bookings closed? |
+| `currentBookingView()` | 3466 | `'booked'` or `'free'` list: the user's toggle choice, else Booked for an authenticated organiser and Free for everyone else. |
+| `applyBookingChrome()` | 3477 | Page title, Booked / Free labels on `#sortToggle`, name banner text, "Cancel my bookings" titles; list limit 10. |
+| `renderBookingLegend()` | 3498 | Legend: Free / Yours / (1 left or Places left when capacity is 2+) / Full. |
+| `bookingInfo(dateStr, slotId)` | 3517 | `{ids, mine, count, left, full}` for a slot, including your unsaved change. Others are the larger of the known rows and the anonymous summary (minus your saved booking), so it works in Hidden mode too. |
+| `bookingCellText(info)` / `renderBookingCell(el, dateStr, slot)` / `refreshBookingCells()` | 3534 | Cell sub-line (your booking shows the booking label, e.g. "Booked", on the booking colour / Free / names / "N left" / Full or the booking label) and classes `bk-mine`, `bk-partial`, `bk-full`. Names only when `shouldShowRoster()`. |
+| `myBookingCount(dateStr)` / `myTotalBookingCount(withPending)` | 3575 | Your bookings that count towards Bookings per person, saved plus unsaved: that day's, or all of them when `state.booking.perUserTotal` / all your bookings (saved only for "Cancel my bookings"; `withPending` adds unsaved changes). |
+| `onBookingSlotClick(dateStr, slotId)` / `setPendingBooking(dateStr, slotId, status)` | 3597 | Tap: closed / pick a name / unlock checks, "This slot is taken", the per-person limit message, else toggles Booked / not booked as a pending change (repaints the cell, Submit state, auto-save). Toggling back to the saved state removes the pending entry. |
+| `bookingCardAction(dateStr, slotId)` | 3638 | Book / Cancel buttons on the Bookings card: the same toggle, saved straight away. |
+| `queueBooking(userId, dateStr, slotId, status)` / `sendBooking(...)` | 3661 | Organiser removal of someone else's booking, one at a time (`bk-busy` on the cell), then reloads availability. An expired session reopens the PIN window (`handleExpiredSession()`). |
+| `cancelMyBookings(auth)` | 3713 | "Cancel my bookings": one confirm, then `reset_user`; clears pending changes. |
+| `bookingDates()` | 3734 | Visible dates in order; past dates follow the Show/Hide past dates button. |
+| `bookingRankCard(...)` / `bookingRoster(...)` | 3754 | Booking rows built like normal Best Match cards: `.rank-card` header button (date - slot, summary, View/Hide pill) expanding to `.rank-actions` and a `.roster-inline` (name + booking tag, organiser remove x). Your own bookings get `.bk-card-mine`. |
+| `renderBookings()` | 3866 | Bookings card: "N of M booked", organiser **Close bookings**, then Booked rows (`buildBookedRow`: Add / Download on your own, Share when names are visible (`bookingShareButton()`), Cancel on your own, roster) or Free rows (`buildFreeRow`: Free / "N of M left", Share, Book, roster). Pills use the same `.btn-pill` classes and sizes as Best Match. Respects the 2 / 10 / All limit. |
+| `updateBookingClosedBanner()` / `setBookingsClosed(closed)` | 3918 | "Bookings closed" banner with organiser Reopen; POST `set_bookings_closed`. |
+| `startBookingRefresh()` / `refreshBookings()` | 3968 | Every 30 s and on tab focus: re-reads `bookings_closed` from `calendar_meta` and reloads availability (skipped while saving). |
 
 ### Hub membership (calendar page)
 
@@ -324,9 +327,10 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 | Function | Line | Description |
 |----------|------|-------------|
 | `updatePrivacyHint()` / `setPrivacyMode(mode)` | 1464 | Privacy hint (booking wording when a limit is set) and programmatic mode change. |
-| `makeLimitControl({...})` | 1542 | No limit / 1 / 2 / More segmented control with a 3-20 stepper for More. Used for **People per slot** (`capacityControl`) and **Bookings per person** (`perUserControl`, whole-calendar total, default 1). |
+| `makeLimitControl({...})` | 1542 | No limit / 1 / 2 / More segmented control with a 3-20 stepper for More. Used for **People per slot** (`capacityControl`) and **Bookings per person** (`perUserControl`, default 1). |
+| `renderPerUserScope()` / `setPerUserTotal(on)` | 1640 | **Per day / In total** toggle (`#perUserScope`) under Bookings per person. Shown only when `features.booking_total` is true and a limit is set; updates the hint and sends `per_user_total: 1` on create. |
 | `isBookingMode()` | 1608 | True when People per slot has a limit. |
-| `initBookingField(features)` | 1615 | Shows People per slot when `get_site_config` reports `features.booking`. |
+| `initBookingField(features)` | 1655 | Shows People per slot when `get_site_config` reports `features.booking`; enables the Per day / In total toggle when `features.booking_total`. |
 | `applyBookingMode()` | 1622 | Shows Bookings per person (`#perUserField`, Slots section, which also holds the booking label + colour in `#bookingPanel`), hides the Options section (`#optionsSection`) and Blind (switches to Hidden if needed), revalidates. |
 | `validateBookingLabel()` | 1634 | Booking label check (same rules as status labels). |
 

@@ -3,7 +3,8 @@
  * Booking mode: each slot can be taken by a limited number of people (first come, first served).
  *
  * calendars.slot_capacity  NULL = normal availability poll, 1..BOOKING_MAX_PER_SLOT = people per slot
- * calendars.max_per_user   NULL = no limit, 1..BOOKING_MAX_PER_USER = bookings per person across the whole calendar (organiser exempt)
+ * calendars.max_per_user   NULL = no limit, 1..BOOKING_MAX_PER_USER = bookings per person (organiser exempt)
+ * calendars.per_user_total 0 = max_per_user counts per day, 1 = across the whole calendar (migration 005)
  * calendars.bookings_closed 1 = organiser closed bookings
  *
  * Bookings reuse the availability table (status 1 = booked). The save endpoint locks the calendar
@@ -28,6 +29,21 @@ function bookingColumnsReady(PDO $pdo): bool {
     return $cache[$key];
 }
 
+/** True once migrations/005_booking_total.sql has been applied. */
+function bookingTotalColumnReady(PDO $pdo): bool {
+    static $cache = [];
+    $key = spl_object_id($pdo);
+    if (!isset($cache[$key])) {
+        try {
+            $pdo->query('SELECT per_user_total FROM calendars LIMIT 0');
+            $cache[$key] = true;
+        } catch (PDOException $e) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
+}
+
 /**
  * Parse a submitted limit. Returns null for "no limit" (null, '', 0, false), the limit (1..$max),
  * or false when the value is invalid.
@@ -41,28 +57,31 @@ function bookingLimitValue(mixed $v, int $max): int|null|false {
 }
 
 /**
- * Booking settings for a calendar row (columns may be missing before migration 004).
- * @return array{capacity:int|null, per_user:int|null, closed:bool}
+ * Booking settings for a calendar row (columns may be missing before migrations 004 / 005).
+ * per_user_total is true only when a per-person limit is set and counts across the whole calendar.
+ * @return array{capacity:int|null, per_user:int|null, per_user_total:bool, closed:bool}
  */
 function bookingSettingsFromRow(array $row): array {
     $cap = isset($row['slot_capacity']) && $row['slot_capacity'] !== null ? (int)$row['slot_capacity'] : null;
     $per = isset($row['max_per_user']) && $row['max_per_user'] !== null ? (int)$row['max_per_user'] : null;
     if ($cap !== null && ($cap < 1 || $cap > BOOKING_MAX_PER_SLOT)) $cap = null;
-    if ($per !== null && ($per < 1 || $per > BOOKING_MAX_PER_USER)) $per = null;
+    if ($cap === null || ($per !== null && ($per < 1 || $per > BOOKING_MAX_PER_USER))) $per = null;
     return [
         'capacity' => $cap,
-        'per_user' => $cap === null ? null : $per,
+        'per_user' => $per,
+        'per_user_total' => $per !== null && !empty($row['per_user_total']),
         'closed' => $cap !== null && !empty($row['bookings_closed']),
     ];
 }
 
 /**
  * Lock the calendar row for the rest of the transaction and return its booking settings.
- * @return array{capacity:int|null, per_user:int|null, closed:bool}
+ * @return array{capacity:int|null, per_user:int|null, per_user_total:bool, closed:bool}
  */
 function bookingLockCalendar(PDO $pdo, int $calId): array {
+    $totalCol = bookingTotalColumnReady($pdo) ? ', per_user_total' : '';
     $stmt = $pdo->prepare(
-        "SELECT slot_capacity, max_per_user, bookings_closed FROM calendars WHERE id = :id FOR UPDATE"
+        "SELECT slot_capacity, max_per_user, bookings_closed{$totalCol} FROM calendars WHERE id = :id FOR UPDATE"
     );
     $stmt->execute([':id' => $calId]);
     return bookingSettingsFromRow($stmt->fetch() ?: []);
@@ -105,9 +124,13 @@ function bookingApplyChanges(
         $del->execute([':cid' => $calId, ':uid' => $userId, ':day' => $day, ':slot' => $slot]);
     }
 
-    $mineStmt = $pdo->prepare("SELECT COUNT(*) FROM availability WHERE calendar_id = :cid AND user_id = :uid");
-    $mineStmt->execute([':cid' => $calId, ':uid' => $userId]);
-    $mine = (int)$mineStmt->fetchColumn();
+    // Per-person count: per day, or one running total when the limit covers the whole calendar
+    $total = !empty($settings['per_user_total']);
+    $mineStmt = $pdo->prepare($total
+        ? "SELECT COUNT(*) FROM availability WHERE calendar_id = :cid AND user_id = :uid"
+        : "SELECT COUNT(*) FROM availability WHERE calendar_id = :cid AND user_id = :uid AND day = :day"
+    );
+    $mine = [];
 
     $hasStmt = $pdo->prepare(
         "SELECT COUNT(*) FROM availability WHERE calendar_id = :cid AND user_id = :uid AND day = :day AND slot = :slot"
@@ -129,12 +152,19 @@ function bookingApplyChanges(
             $rejected[] = ['day' => $day, 'slot' => $slot, 'reason' => 'full'];
             continue;
         }
-        if (!$exempt && $settings['per_user'] !== null && $mine >= $settings['per_user']) {
+        $mineKey = $total ? '*' : $day;
+        if (!isset($mine[$mineKey])) {
+            $params = [':cid' => $calId, ':uid' => $userId];
+            if (!$total) $params[':day'] = $day;
+            $mineStmt->execute($params);
+            $mine[$mineKey] = (int)$mineStmt->fetchColumn();
+        }
+        if (!$exempt && $settings['per_user'] !== null && $mine[$mineKey] >= $settings['per_user']) {
             $rejected[] = ['day' => $day, 'slot' => $slot, 'reason' => 'limit'];
             continue;
         }
         $ins->execute([':cid' => $calId, ':uid' => $userId, ':day' => $day, ':slot' => $slot]);
-        $mine++;
+        $mine[$mineKey]++;
     }
     return $rejected;
 }

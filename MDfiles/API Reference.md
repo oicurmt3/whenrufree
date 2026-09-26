@@ -79,7 +79,7 @@ An organiser can give a calendar or Hub one of 35 emoji (stored as its position 
 
 ### GET get_site_config
 
-Public site config for the create pages. **Response:** `{ status, config, features: { access_emoji: bool, booking: bool } }` - `features.access_emoji` is `true` once migration 003 has run (the create pages show the emoji switch only then); `features.booking` is `true` once migration 004 has run (the create page shows **People per slot** only then).
+Public site config for the create pages. **Response:** `{ status, config, features: { access_emoji: bool, booking: bool, booking_total: bool } }` - `features.access_emoji` is `true` once migration 003 has run (the create pages show the emoji switch only then); `features.booking` is `true` once migration 004 has run (the create page shows **People per slot** only then); `features.booking_total` is `true` once migration 005 has also run (the create page shows the **Per day / In total** toggle only then).
 
 ### POST access_check
 
@@ -149,7 +149,8 @@ Returns full calendar configuration and metadata.
 | passkeys | bool | `true` when fingerprint / face unlock is available on this server (passkey tables exist) |
 | access | object | `{available, enabled, inherited}` - access emoji support and whether one guards this calendar (the emoji itself is never returned) |
 | slot_capacity | int/null | Booking calendars: people per slot (1-20). `null` = normal availability poll |
-| max_per_user | int/null | Booking calendars: bookings each person can hold across the whole calendar (1-20), `null` = no limit |
+| max_per_user | int/null | Booking calendars: bookings each person can hold (1-20), `null` = no limit |
+| per_user_total | bool | `true` = `max_per_user` counts across the whole calendar, `false` = per day |
 | bookings_closed | bool | Booking calendars: `true` when the organiser has closed bookings |
 
 ### GET group_meta
@@ -247,7 +248,8 @@ Creates a new calendar with an organiser account.
 | group_token | string | No | Hub token - assigns new calendar to that Hub (valid token only; no Hub organiser auth; rate limited; needs the Hub's grant if it has an emoji) |
 | access_emoji | int | No | 0-34: the calendar's own access emoji |
 | slot_capacity | int | No | 1-20: makes a booking calendar (people per slot). Omit, `null` or 0 for a normal availability poll |
-| max_per_user | int | No | Booking only: 1-20 bookings per person across the whole calendar (organiser exempt); omit, `null` or 0 for no limit |
+| max_per_user | int | No | Booking only: 1-20 bookings per person (organiser exempt); omit, `null` or 0 for no limit |
+| per_user_total | int | No | Booking only: `1` = count `max_per_user` across the whole calendar, otherwise per day. Ignored without `max_per_user`; 400 if migration 005 has not run |
 
 Booking calendars must send exactly one status (its weight is forced to 1) and cannot use Blind privacy (`is_private` 2 returns 400). Before migration 004 a `slot_capacity` returns 400 "Booking is not available yet". Booking settings cannot be changed after creation.
 
@@ -383,7 +385,7 @@ Status 0 deletes the record. Status 1..N sets the value.
 - The save runs in a transaction that first locks the calendar row (`SELECT ... FOR UPDATE`), so two people tapping the same slot are handled one after the other.
 - Each day must be inside the calendar's date range and each slot one of its slot labels; status must be 0 (cancel) or 1 (book). Anything else returns 400.
 - Cancellations run before bookings, so swapping a booking in one save works.
-- A booking is refused when the slot already has `slot_capacity` people, or when the person already has `max_per_user` bookings. The organiser booking for themselves is exempt from the per-person limit (so they can block slots), but not from capacity.
+- A booking is refused when the slot already has `slot_capacity` people, or when the person already has `max_per_user` bookings on that day (or on the whole calendar when `per_user_total` is set). The organiser booking for themselves is exempt from the per-person limit (so they can block slots), but not from capacity.
 - When bookings are closed, participants get 403 `{ code: "BOOKINGS_CLOSED", message: "Bookings are closed." }`; the organiser can still save (e.g. remove someone's booking by saving status 0 for that user).
 
 **Booking response:** `{ status: "success", rejected: [{ day, slot, reason: "full"|"limit" }] }` - accepted changes are saved; the client reverts the rejected ones and reloads.

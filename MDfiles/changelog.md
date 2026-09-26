@@ -8,19 +8,24 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ### Added
 - **Booking mode:** a calendar can limit how many people take each slot, first come, first served (like a booking form).
-  - Create page, Slots section: **People per slot** - No limit (default, normal availability poll) / 1 / 2 / More (stepper 3-20). With a limit, **Bookings per person** appears below it - how many slots each person can book in total across the whole calendar: No limit / 1 (default) / 2 / More
+  - Create page, Slots section: **People per slot** - No limit (default, normal availability poll) / 1 / 2 / More (stepper 3-20). With a limit, **Bookings per person** appears below it - how many slots each person can book per day: No limit / 1 (default) / 2 / More
   - With a limit, the Options section is hidden and a **Booking label** (default "Booked") with a colour appears under Bookings per person. No weights or Score Method. Blind privacy is hidden (Open: everyone sees who booked; Hidden: only the organiser sees names)
-  - Calendar page: taps save straight away (no Submit). Cells show Free / You (with a check) / "N left" / Full (grey, hatched) and names when privacy allows. Tapping your own slot asks "Cancel this booking?"; a full slot says "This slot is taken"; at the per-person limit: "You can book 1 slot in total - cancel it to pick another."
-  - **Bookings** card replaces Best Match: "N of M booked", a Booked / Free toggle (organiser defaults to Booked, others to Free), date order, Cancel on your own bookings, Add to Google Calendar, Book on free slots, and a per-person Remove for the organiser. The 2 / 10 / All limit stays (default 10)
+  - Calendar page: tapping a cell toggles Booked / not booked and saves like a normal calendar (auto-save after 4.5 s, or Submit; unsaved taps are kept on the device). The Bookings card's Book / Cancel buttons save straight away. Cells show Free (white) / your booking (booking colour, check and the booking label) / booked by others with "N left" (light red) / Full (red) and names when privacy allows. A full slot says "This slot is taken"; at the per-person limit: "You can book 1 slot per day - cancel it to pick another."
+  - **Bookings** card replaces Best Match, with rows styled like Best Match cards (tap to View / Hide actions and names): "N of M booked", a Booked / Free toggle (organiser defaults to Booked, others to Free), date order, Cancel on your own bookings, Add to Google Calendar, Book on free slots, and a per-person Remove for the organiser. The 2 / 10 / All limit stays (default 10)
   - Organiser **Close bookings** (replaces Choose / Reopen): a "Bookings closed" banner with Reopen; participants can no longer book or cancel, the organiser can still remove bookings
   - The grid refreshes on tab focus and every 30 seconds. "Reset my availability" becomes "Cancel my bookings"
   - Server: each booking save locks the calendar row (`SELECT ... FOR UPDATE`), checks the day is in range and the slot exists, runs cancellations before bookings, enforces capacity and the per-person limit (organiser exempt from the per-person limit) and returns `rejected` slots ("Just taken by someone else")
   - "Book a slot" wording in the share text, email, poster and .txt file; "Booking" tag in the Hub list and admin panel
-  - Template links: `cap=` (people per slot) and `per=` (bookings per person in total, 0 = no limit)
+  - Template links: `cap=` (people per slot) and `per=` (bookings per person per day, 0 = no limit)
   - Templates page (`ideas.html`): new **Interview / Appointment Slots** and **Class / Workshop Sign-up** booking templates; **Gym / Facility Booking**, **Holiday House Bookings**, **Shared Car Booking** and **Meeting Room Booking** are now real booking forms (1 per slot, single "Booked" option). Cards with "People per slot" / "Bookings per person" rows get `cap` / `per` in their Use This Template link
   - New columns `calendars.slot_capacity`, `max_per_user`, `bookings_closed`. Migration: `migrations/004_booking.sql` (option hidden until it runs)
   - API: `slot_capacity` / `max_per_user` on `create_calendar`; booking fields on `calendar_meta`; `slot_capacity` on `group_meta` calendars and `admin_calendars`; `rejected` on `save`; new `set_bookings_closed`; `features.booking` on `get_site_config`. New file `includes/booking.php`
   - Security events: `BOOKINGS_CLOSED`, `BOOKINGS_REOPENED`
+- **Bookings per person: Per day / In total.** With a per-person limit set, a new toggle under Bookings per person chooses whether it counts each day (default, e.g. court hire) or the whole calendar (e.g. one interview per candidate).
+  - "In total" calendars show "You've booked N of M" on the Bookings card, and the limit toast says "in total"
+  - Template links: `total=1`. The Interview and Workshop templates now use 1 in total; Gym stays 2 per day
+  - New column `calendars.per_user_total`. Migration: `migrations/005_booking_total.sql` (toggle hidden until it runs; existing calendars stay per day)
+  - API: `per_user_total` on `create_calendar` and `calendar_meta`; `features.booking_total` on `get_site_config`
 - **Access emoji:** an optional second barrier on top of the secret link. The organiser picks 1 of 35 emoji (5 columns x 7 rows); anyone opening the calendar or Hub must pick the same emoji first.
   - Create page: **Access emoji** switch above Privacy Mode opens a fullscreen picker. Hub create form: the same switch below the PIN
   - A calendar in a Hub uses the Hub's emoji unless it has its own; a right pick on the Hub opens all its calendars
