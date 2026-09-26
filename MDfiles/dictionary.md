@@ -51,7 +51,7 @@ Core configuration for each scheduling calendar.
 **Business rules:**
 - At most one Hub per calendar (`group_id` nullable)
 - When both `chosen_date` and `chosen_slot` are non-NULL, the calendar is "frozen" -- availability saves are blocked server-side
-- `organiser_message` app limit is 250 chars (MESSAGE_MAX_LEN in api.php). Column is VARCHAR(250) to match. Column should always be wider than or equal to the app limit
+- `organiser_message` app limit is 250 chars (MESSAGE_MAX_LEN in includes/data.php). Column is VARCHAR(250) to match. Column should always be wider than or equal to the app limit
 - Token collision on create retries up to 5 times
 - A calendar with `access_emoji` NULL inside a Hub with an emoji uses the Hub's emoji
 - Booking calendars (`slot_capacity` set) have exactly one status (1 = booked, weight 1), never Blind privacy (`is_private` 0 or 1), and store bookings as `availability` rows. `save` locks the calendar row and refuses bookings beyond `slot_capacity` per slot or `max_per_user` per person per day (or in total when `per_user_total` = 1; the organiser booking for themselves is exempt from `max_per_user`). The booking columns are set only at creation
@@ -287,7 +287,7 @@ Per-IP request throttling.
 **Notes:**
 - Upsert pattern resets count when minute_key changes (new minute window)
 - General API limit uses `minute_key` as `YYYYMMDDHHmm`
-- Hub add limits use `hg{YYYYMMDDHH}{groupId in base 36}` (per Hub) and `hi{YYYYMMDDHH}` (all Hubs) (see `enforceHubCalendarRateLimit` in api.php)
+- Hub add limits use `hg{YYYYMMDDHH}{groupId in base 36}` (per Hub) and `hi{YYYYMMDDHH}` (all Hubs) (see `enforceHubCalendarRateLimit` in includes/hubs.php)
 - Every action key must fit the 16-char column: `enforceActionRateLimit` passes keys through `rateLimitKey()`, which replaces longer keys with `x` + 15 hex chars of their SHA-256. A too-long key would be truncated on insert and never match the count query, silently disabling the limit
 - Passkey limits use `pkr{YYYYMMDDHHmm}` (enrolment) and `pkl{YYYYMMDDHHmm}` (login) - kept within the 16-char column
 - Access emoji hourly caps use `aw{YYYYMMDDHH}` (wrong picks, default 20/hour) and `nf{YYYYMMDDHH}` (unknown calendar/Hub codes, default 30/hour)

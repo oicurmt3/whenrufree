@@ -1,6 +1,6 @@
 # api.md - Quick Reference
 
-Concise endpoint list for `api.php?action=...&c=TOKEN`.
+Concise endpoint list for `api.php?action=...&c=TOKEN`. Endpoints are in `api.php`; helpers are in `includes/*.php`.
 
 ## Request Format
 

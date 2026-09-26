@@ -13,6 +13,7 @@ error_log
 # OS / editor junk
 .DS_Store
 Thumbs.db
+*.lnk
 *.swp
 .idea/
 .vscode/

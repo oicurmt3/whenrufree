@@ -31,7 +31,7 @@ An organiser creates a calendar with custom time slots, date ranges, and status 
 ## Tech Stack
 
 - **Frontend:** Vanilla JS, custom CSS, semantic HTML5
-- **Backend:** PHP 8.x (procedural), single api.php file
+- **Backend:** PHP 8.x (procedural), single api.php entry point with helpers in includes/
 - **Database:** MariaDB via PDO
 - **Hosting:** cPanel shared hosting
 - **Icons:** Material Symbols Outlined (self-hosted woff2)
@@ -48,17 +48,17 @@ index.html       - Calendar creation page
 index.js         - Creation page logic
 index.css        - Creation page styles
 calendar.html    - Calendar view/interaction page
-calendar.js      - Calendar logic (3,000+ lines)
+calendar-*.js    - Calendar logic, 6 files loaded in order: core, users, grid, rank, booking, main
 calendar.css     - Calendar styles
 passkey.js       - Fingerprint / face unlock browser helper (window.Passkey)
 emoji.js         - Access emoji list, picker, gate popup and grant storage (window.AccessEmoji)
 emoji.css        - Access emoji picker / gate styles
-includes/        - Server-only PHP (webauthn.php, lockout.php, access.php, booking.php); blocked by .htaccess
+includes/        - Server-only PHP helpers for api.php (http, data, security, sessions, hubs, webauthn, lockout, access, booking); blocked by .htaccess
 migrations/      - SQL migrations (blocked from the web)
 admin.html       - Super admin panel
-admin.js         - Admin panel logic
+admin-*.js       - Admin panel logic, 4 files loaded in order: core, calendars, hubs, setup
 admin.css        - Admin panel styles
-api.php          - All backend endpoints (~1,400 lines)
+api.php          - All backend endpoints (~2,200 lines); helpers live in includes/
 cleanup.php      - Cron maintenance script
 _htaccess        - Apache security rules
 guide.html       - User help page

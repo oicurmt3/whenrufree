@@ -9,4 +9,5 @@ alwaysApply: true
 - Mobile-responsive with 44x44px touch targets.
 - Auto-save with a manual save fallback.
 - Support template URLs for pre-configured calendars.
-- Calendar logic stays in `calendar.js`; create-page logic in `index.js`; Hub logic in `hub.js`.
+- Calendar logic lives in `calendar-*.js` (core, users, grid, rank, booking, main); admin panel in `admin-*.js` (core, calendars, hubs, setup); create-page logic in `index.js`; Hub logic in `hub.js`.
+- Split files are classic scripts sharing global scope, loaded in order by the page (no modules). Load-time code may only use names from its own or an earlier file; never declare the same top-level name in two files; startup runs on `DOMContentLoaded`.

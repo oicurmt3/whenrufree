@@ -114,6 +114,8 @@ Passkeys are tied to the domain they were created on. A passkey set up on `whenr
 
 Upload all project files to the web-accessible directory (e.g. `/home/perthrel/public_html/grape/` or equivalent subfolder on sandgroper.net).
 
+Include the whole `includes/` folder (`http.php`, `data.php`, `security.php`, `sessions.php`, `hubs.php`, `webauthn.php`, `lockout.php`, `access.php`, `booking.php`, `.htaccess`); `api.php` stops with a fatal error if any is missing. The calendar page needs all six `calendar-*.js` files and the admin panel all four `admin-*.js` files.
+
 Rename `_htaccess` to `.htaccess`.
 
 ### 4. Font File
@@ -158,6 +160,7 @@ All files must use plain ASCII only. No em dashes, curly quotes, or Unicode char
 2. Run any new SQL migrations via phpMyAdmin
 3. Clear browser cache if CSS/JS changed (or use versioned query strings)
 4. No build step required
+5. When files are renamed or split, delete the old ones from the server too. The 2026-09-27 split replaced `calendar.js` with `calendar-core.js`, `calendar-users.js`, `calendar-grid.js`, `calendar-rank.js`, `calendar-booking.js`, `calendar-main.js`, and `admin.js` with `admin-core.js`, `admin-calendars.js`, `admin-hubs.js`, `admin-setup.js`; `api.php` now needs `includes/http.php`, `data.php`, `security.php`, `sessions.php` and `hubs.php`. Upload `api.php` together with the new includes, and the HTML pages together with their new scripts.
 
 ## Monitoring
 

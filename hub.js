@@ -776,6 +776,7 @@ function updateOrganiserUI() {
 
     qs('#barShareBtn').onclick = () => hubSaveKit.shareHubLink(getHubMeta());
     qs('#barEmailBtn').onclick = () => hubSaveKit.emailHubLink(getHubMeta());
+    qs('#barPosterBtn').onclick = () => hubSaveKit.openHubPosterPopup(getHubMeta());
     qs('#barDownloadBtn').onclick = () => hubSaveKit.downloadHubDetailsTxt(getHubMeta());
   } else {
     loginBtn.classList.remove('hideme');

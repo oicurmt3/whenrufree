@@ -1,6 +1,6 @@
 /**
  * passkey.js - Browser helpers for fingerprint / face / device screen lock login (WebAuthn).
- * Shared by calendar.js and hub.js; page scripts own the API calls and UI.
+ * Shared by calendar-users.js and hub.js; page scripts own the API calls and UI.
  *
  * Remembers per device which names have a passkey (localStorage), because passkeys
  * live on the device and the server only knows which identities have one somewhere.

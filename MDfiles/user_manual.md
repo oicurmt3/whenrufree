@@ -101,7 +101,7 @@ A **Hub** gives your group one link to find all related calendars (e.g. club fix
 
 **Managing a Hub (organiser PIN required)**
 
-- **Organiser login** on the Hub page for: Share, Email, Download, and removing calendars from the Hub
+- **Organiser login** on the Hub page for: Share, Email, Poster, Download, and removing calendars from the Hub
 - **Passkey** button (after logging in) opens the **Passkeys** window: on a device without a passkey it asks **Set up a passkey?** and lists any passkeys on other devices so you can remove them; once this device has one it lists every device's passkey. PIN remains the backup
 - **Settings** button (after logging in) to turn the Hub's access emoji on, change it or turn it off
 - **Logout** on shared computers when finished managing

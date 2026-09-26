@@ -1,5 +1,5 @@
 {
-  "_note": "Categories are hardcoded in index.html and calendar.js CATEGORY_META; not loaded from site config.",
+  "_note": "Categories are hardcoded in index.html and calendar-core.js CATEGORY_META; not loaded from site config.",
   "slots": {
     "max": 6,
     "examples": [

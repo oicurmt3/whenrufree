@@ -4,6 +4,8 @@ Complete reference for the When RU Free backend API (`api.php`).
 
 All endpoints use the URL pattern `api.php?action=ACTION_NAME&c=CALENDAR_TOKEN`.
 
+Every endpoint lives in `api.php`; the shared helpers it calls (request parsing, CSRF, rate limiting, sessions, validation, Hub helpers, passkeys, lockout, access emoji, booking rules) live in `includes/*.php`, which are blocked from direct web access. See `handover.md` for the file map.
+
 ## Authentication
 
 ### Headers

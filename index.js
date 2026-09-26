@@ -526,8 +526,8 @@ function showSaveCalendarPanel(meta) {
 
 /**
  * IMPORTANT: getRelativeLuminance() and getContrastTextColor() below are
- * duplicated in calendar.js. If you change the luminance formula or contrast
- * threshold here, update calendar.js to match (and vice versa).
+ * duplicated in calendar-core.js. If you change the luminance formula or contrast
+ * threshold here, update calendar-core.js to match (and vice versa).
  *
  * Calculates relative luminance of a colour for WCAG contrast calculations.
  * Uses sRGB linearisation as per WCAG 2.1 specification.

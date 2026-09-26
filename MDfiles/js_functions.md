@@ -4,207 +4,218 @@ Complete catalogue of JavaScript functions across the When RU Free frontend.
 
 ---
 
-## calendar.js (~3,000 lines)
+## calendar-*.js (6 files, ~4,400 lines)
+
+The calendar page is split into six classic scripts that share global scope (no modules, no build step). `calendar.html` loads them after `passkey.js` and `emoji.js`, in this order. A later file may call functions from an earlier one at any time. Top-level code that runs at load (for example `els`, `debouncedRank`, listener wiring) may only use names from its own file or an earlier file. Never declare the same top-level name in two files.
+
+| File | Contents |
+|------|----------|
+| `calendar-core.js` | Constants, colours, status options, utilities (`qs`, `debounce`, `showToast`), pending queue, autosave, date formatting, `els`, `state`, CSRF, access gate, `apiGet` / `apiPost` |
+| `calendar-users.js` | Meta load, users, user-select modal, submit / user UI, Hub bar, settings modal, add / rename, PIN, passkeys, auth cache |
+| `calendar-grid.js` | Availability fetch, slot status, date filter, grid skeleton, past dates, slot click, save and reset |
+| `calendar-rank.js` | Calendar links, share, rank scores, sort / limit toggles, organiser message, chosen slot, Best Match, `debouncedRank` |
+| `calendar-booking.js` | Booking mode and booking polling |
+| `calendar-main.js` | Event wiring, session restore, `init()` on `DOMContentLoaded` |
 
 ### Colour and Contrast
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `getRelativeLuminance(hexColor)` | 22 | WCAG sRGB luminance calculation. Duplicated in index.js -- keep in sync. |
-| `getContrastTextColor(bgColor)` | 51 | Returns '#000000' or '#FFFFFF' based on luminance threshold (0.4). |
-| `updateStatusTextColors()` | 69 | Sets `--status-N-text` CSS variables for all status options. |
+| `getRelativeLuminance(hexColor)` | calendar-core.js:27 | WCAG sRGB luminance calculation. Duplicated in index.js -- keep in sync. |
+| `getContrastTextColor(bgColor)` | calendar-core.js:56 | Returns '#000000' or '#FFFFFF' based on luminance threshold (0.4). |
+| `updateStatusTextColors()` | calendar-core.js:74 | Sets `--status-N-text` CSS variables for all status options. |
 
 ### Status and Category Configuration
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `getStrengthPalette(n)` | 102 | Returns array of 1-5 colours for position-based status colouring. |
-| `parseCategories(raw)` | 138 | Parses category value (JSON array, plain string, or array) into validated keys. Max 3, defaults to `['groups']`. |
-| `setCalendarHeading(titleRaw, categoryRaw)` | 169 | Sets h1 text and appends Material Symbol icons for each category. |
-| `updatePrivacyIndicator()` | 196 | Creates/updates the lock/eye icon next to the calendar title. |
-| `normaliseStatusOptions(raw)` | 339 | Validates and normalises 1-5 status options with labels, colours, and weights. |
-| `applyStatusOptions(rawOptions)` | 385 | Sets STATUS_OPTIONS, applies CSS variables, recalculates text colours, re-renders legend. |
-| `renderLegend()` | 402 | Builds the status colour legend in `#legendWrap`. |
+| `getStrengthPalette(n)` | calendar-core.js:107 | Returns array of 1-5 colours for position-based status colouring. |
+| `parseCategories(raw)` | calendar-core.js:146 | Parses category value (JSON array, plain string, or array) into validated keys. Max 3, defaults to `['groups']`. |
+| `setCalendarHeading(titleRaw, categoryRaw)` | calendar-core.js:177 | Sets h1 text and appends Material Symbol icons for each category. |
+| `updatePrivacyIndicator()` | calendar-core.js:204 | Creates/updates the lock/eye icon next to the calendar title. |
+| `normaliseStatusOptions(raw)` | calendar-core.js:348 | Validates and normalises 1-5 status options with labels, colours, and weights. |
+| `applyStatusOptions(rawOptions)` | calendar-core.js:394 | Sets STATUS_OPTIONS, applies CSS variables, recalculates text colours, re-renders legend. |
+| `renderLegend()` | calendar-core.js:411 | Builds the status colour legend in `#legendWrap`. |
 
 ### Auth and Permissions
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `isCurrentUserOrganiser()` | 226 | Returns true if current user has admin role or matches adminUserId. |
-| `shouldShowRoster()` | 303 | Privacy-gated: returns true if roster details should be visible in rankings. |
-| `shouldShowOrganiserDots()` | 323 | Privacy-gated: returns true if organiser border indicators should show on slots. |
-| `ensureCsrfToken()` | 710 | Fetches and caches CSRF token. Called before every POST. |
-| `cacheKey(userId)` | 1798 | Returns localStorage key for cached auth: `auth_TOKEN_USERID`. |
-| `cacheAuth(userId, token, role, ttlSec)` | 1799 | Stores auth token in localStorage with expiry. |
-| `getCachedAuth(userId)` | 1805 | Retrieves valid cached auth or returns null if expired. |
-| `ensureAuthedForUser(userId)` | 1813 | Returns auth object for a user, checking cache and state. |
-| `tryAutoAuthCreator()` | 2907 | Auto-authenticates calendar creator using sessionStorage credentials. |
-| `tryRestoreCachedSession()` | 2962 | Restores cached user session from localStorage on page load. |
+| `isCurrentUserOrganiser()` | calendar-core.js:234 | Returns true if current user has admin role or matches adminUserId. |
+| `shouldShowRoster()` | calendar-core.js:311 | Privacy-gated: returns true if roster details should be visible in rankings. |
+| `shouldShowOrganiserDots()` | calendar-core.js:331 | Privacy-gated: returns true if organiser border indicators should show on slots. |
+| `ensureCsrfToken()` | calendar-core.js:752 | Fetches and caches CSRF token. Called before every POST. |
+| `cacheKey(userId)` | calendar-users.js:1056 | Returns localStorage key for cached auth: `auth_TOKEN_USERID`. |
+| `cacheAuth(userId, token, role, ttlSec)` | calendar-users.js:1057 | Stores auth token in localStorage with expiry. |
+| `getCachedAuth(userId)` | calendar-users.js:1063 | Retrieves valid cached auth or returns null if expired. |
+| `ensureAuthedForUser(userId)` | calendar-users.js:1071 | Returns auth object for a user, checking cache and state. |
+| `tryAutoAuthCreator()` | calendar-main.js:133 | Auto-authenticates calendar creator using sessionStorage credentials. |
+| `tryRestoreCachedSession()` | calendar-main.js:188 | Restores cached user session from localStorage on page load. |
 
 ### Utilities
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `qs(sel)` | 416 | Shorthand for `document.querySelector`. |
-| `debounce(fn, ms)` | 417 | Returns a debounced version of `fn`. |
-| `getToken()` | 418 | Extracts calendar token from URL `?c=` parameter. |
-| `showToast(msg)` | 419 | Shows a brief notification. Centres for "Saved to server!" messages. |
-| `fmtDate(d)` | 575 | Date object to YYYY-MM-DD string. |
-| `formatFriendlyDate(dateStr)` | 581 | YYYY-MM-DD to "Mon 24th Jan 2026" with ordinal suffix. |
-| `formatDateRange(startStr, endStr)` | 589 | Formats two dates into a compact range string. |
-| `formatDayHeader(dateStr)` | 598 | Returns `{dayNum, dayName, monthAbbr}` for grid column headers. |
-| `getDayOfWeek(date)` | 599 | Returns 0-6 (Sun-Sat) for a Date object. |
-| `tz()` | 724 | Returns the browser's IANA timezone string. |
-| `escapeHTML(str)` | 2512 | Escapes a string for safe HTML insertion via textContent. |
-| `escapeMessageHTML(str)` | 2350 | Alias for HTML escaping (used by organiser message). |
+| `qs(sel)` | calendar-core.js:426 | Shorthand for `document.querySelector`. |
+| `debounce(fn, ms)` | calendar-core.js:427 | Returns a debounced version of `fn`. |
+| `getToken()` | calendar-core.js:428 | Extracts calendar token from URL `?c=` parameter. |
+| `showToast(msg)` | calendar-core.js:429 | Shows a brief notification. Centres for "Saved to server!" messages. |
+| `fmtDate(d)` | calendar-core.js:585 | Date object to YYYY-MM-DD string. |
+| `formatFriendlyDate(dateStr)` | calendar-core.js:591 | YYYY-MM-DD to "Mon 24th Jan 2026" with ordinal suffix. |
+| `formatDateRange(startStr, endStr)` | calendar-core.js:599 | Formats two dates into a compact range string. |
+| `formatDayHeader(dateStr)` | calendar-core.js:608 | Returns `{dayNum, dayName, monthAbbr}` for grid column headers. |
+| `getDayOfWeek(date)` | calendar-core.js:614 | Returns 0-6 (Sun-Sat) for a Date object. |
+| `tz()` | calendar-core.js:768 | Returns the browser's IANA timezone string. |
+| `escapeHTML(str)` | calendar-rank.js:464 | Escapes a string for safe HTML insertion via textContent. |
+| `escapeMessageHTML(str)` | calendar-rank.js:297 | Alias for HTML escaping (used by organiser message). |
 
 ### API Communication
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `apiGet(action, params)` | 727 | GET request to api.php with calendar token. Returns parsed JSON. |
-| `apiPost(action, body, authToken)` | 745 | POST request with CSRF and optional auth token. Returns parsed JSON. |
+| `apiGet(action, params)` | calendar-core.js:829 | GET request to api.php with calendar token. Returns parsed JSON. |
+| `apiPost(action, body, authToken)` | calendar-core.js:856 | POST request with CSRF and optional auth token. Returns parsed JSON. |
 
 ### Data Loading
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `loadCalendarMeta()` | 763 | Fetches calendar config, applies slots/statuses/dates/privacy/chosen state. |
-| `loadUsers()` | 830 | Fetches user list, sorts admin first, caches adminUserId. |
-| `ensureRangeLoaded(from, to)` | 1089 | Fetches availability for a date range if not already loaded. |
-| `ensureDateRangeLoaded()` | 2092 | Loads the full calendar date range. |
-| `ensureCalendarLoadedAllDates()` | 3042 | Ensures all dates are loaded after save operations. |
+| `loadCalendarMeta()` | calendar-users.js:8 | Fetches calendar config, applies slots/statuses/dates/privacy/chosen state. |
+| `loadUsers()` | calendar-users.js:111 | Fetches user list, sorts admin first, caches adminUserId. |
+| `ensureRangeLoaded(from, to)` | calendar-grid.js:31 | Fetches availability for a date range if not already loaded. |
+| `ensureDateRangeLoaded()` | calendar-grid.js:790 | Loads the full calendar date range. |
+| `ensureCalendarLoadedAllDates()` | calendar-main.js:282 | Ensures all dates are loaded after save operations. |
 
 ### Pending Changes and Autosave
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `pendingKey(userId)` | 433 | Returns localStorage key for pending changes: `pending_TOKEN_USERID`. |
-| `prunePendingForStorage(p)` | 442 | Removes NULL (status 0) entries from pending object for localStorage. |
-| `validatePendingForSave(p)` | 464 | Validates pending object for server save, keeping NULL entries (server deletes them). |
-| `persistPendingNow()` | 483 | Immediately writes pending changes to localStorage. |
-| `persistPendingDebounced()` | 498 | Debounced (220ms) version of persistPendingNow. |
-| `clearPersistedPending(userId)` | 502 | Removes pending changes from localStorage for a user. |
-| `restorePendingForUser(userId)` | 505 | Reads and validates pending changes from localStorage. |
-| `scheduleAutosave()` | 537 | Schedules server save after AUTOSAVE_DELAY_MS (4500ms) of inactivity. |
-| `cancelAutosave()` | 568 | Clears pending autosave timer. |
-| `savePending(isAutosave)` | 1833 | Sends pending changes to server. Handles NULL status (delete) and positive statuses (upsert). |
+| `pendingKey(userId)` | calendar-core.js:443 | Returns localStorage key for pending changes: `pending_TOKEN_USERID`. |
+| `prunePendingForStorage(p)` | calendar-core.js:452 | Removes NULL (status 0) entries from pending object for localStorage. |
+| `validatePendingForSave(p)` | calendar-core.js:474 | Validates pending object for server save, keeping NULL entries (server deletes them). |
+| `persistPendingNow()` | calendar-core.js:493 | Immediately writes pending changes to localStorage. |
+| `persistPendingDebounced()` | calendar-core.js:508 | Debounced (220ms) version of persistPendingNow. |
+| `clearPersistedPending(userId)` | calendar-core.js:512 | Removes pending changes from localStorage for a user. |
+| `restorePendingForUser(userId)` | calendar-core.js:515 | Reads and validates pending changes from localStorage. |
+| `scheduleAutosave()` | calendar-core.js:547 | Schedules server save after AUTOSAVE_DELAY_MS (4500ms) of inactivity. |
+| `cancelAutosave()` | calendar-core.js:578 | Clears pending autosave timer. |
+| `savePending(isAutosave)` | calendar-grid.js:487 | Sends pending changes to server. Handles NULL status (delete) and positive statuses (upsert). |
 
 ### UI State Management
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `updateCurrentUserDisplay()` | 842 | Updates the user name badge in the header. |
-| `updateSubmitButtonState()` | 1102 | Toggles submit button between "Save"/"Saved"/"Saving" states. |
-| `setLoading(isLoading, message)` | 1123 | Shows/hides loading overlay. |
-| `updateUserUI()` | 1143 | Shows/hides buttons based on auth state and role. Hides submit when frozen. |
-| `updateSortToggleUI()` | 2274 | Updates sort toggle active state. Visible for all authenticated users. |
-| `updateLimitToggleUI()` | 2310 | Updates rank limit toggle active state. |
-| `updateOrganiserMessageUI()` | 2361 | Shows/hides organiser message area. Editable for organiser, read-only for others. |
+| `updateCurrentUserDisplay()` | calendar-users.js:123 | Updates the user name badge in the header. |
+| `updateSubmitButtonState()` | calendar-users.js:384 | Toggles submit button between "Save"/"Saved"/"Saving" states. |
+| `setLoading(isLoading, message)` | calendar-users.js:405 | Shows/hides loading overlay. |
+| `updateUserUI()` | calendar-users.js:425 | Shows/hides buttons based on auth state and role. Hides submit when frozen. |
+| `updateSortToggleUI()` | calendar-rank.js:198 | Updates sort toggle active state. Visible for all authenticated users. |
+| `updateLimitToggleUI()` | calendar-rank.js:257 | Updates rank limit toggle active state. |
+| `updateOrganiserMessageUI()` | calendar-rank.js:308 | Shows/hides organiser message area. Editable for organiser, read-only for others. |
 
 ### Calendar Grid
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `renderDateRangeSkeleton()` | 1357 | Builds the full calendar grid with day columns, headers, and slot elements. |
-| `refreshCalendarValues()` | 1447 | Updates all slot colours and organiser dots for the current user. |
-| `getStatus(userId, dateStr, slotId)` | 1177 | Returns `{status, pending}` for a user/date/slot, checking pending changes first. |
-| `getOrganiserStatus(dateStr, slotId)` | 1194 | Returns the admin's status for a slot (for organiser dots). |
-| `setSlotClass(el, status)` | 1200 | Applies `status-N` CSS class to a slot element. |
-| `updateOrganiserDot(slotEl, dateStr, slotId)` | 1216 | Applies `org-border-N` CSS class for organiser's left-border indicator. |
-| `cycleStatus(current)` | 1473 | Cycles through statuses: NULL -> 1 -> 2 -> ... -> N -> NULL. |
-| `onSlotClick(dateStr, slotId)` | 1517 | Main slot click handler. Blocks if frozen, prompts auth if needed, cycles status. |
-| `highlightLegendItem(statusIndex)` | 1486 | Adds `recently-used` class to matching legend item. |
-| `clearLegendHighlights()` | 1501 | Removes all legend highlights after save. |
+| `renderDateRangeSkeleton()` | calendar-grid.js:228 | Builds the full calendar grid with day columns, headers, and slot elements. |
+| `refreshCalendarValues()` | calendar-grid.js:366 | Updates all slot colours and organiser dots for the current user. |
+| `getStatus(userId, dateStr, slotId)` | calendar-grid.js:48 | Returns `{status, pending}` for a user/date/slot, checking pending changes first. |
+| `getOrganiserStatus(dateStr, slotId)` | calendar-grid.js:65 | Returns the admin's status for a slot (for organiser dots). |
+| `setSlotClass(el, status)` | calendar-grid.js:71 | Applies `status-N` CSS class to a slot element. |
+| `updateOrganiserDot(slotEl, dateStr, slotId)` | calendar-grid.js:87 | Applies `org-border-N` CSS class for organiser's left-border indicator. |
+| `cycleStatus(current)` | calendar-grid.js:393 | Cycles through statuses: NULL -> 1 -> 2 -> ... -> N -> NULL. |
+| `onSlotClick(dateStr, slotId)` | calendar-grid.js:437 | Main slot click handler. Blocks if frozen, prompts auth if needed, cycles status. |
+| `highlightLegendItem(statusIndex)` | calendar-grid.js:406 | Adds `recently-used` class to matching legend item. |
+| `clearLegendHighlights()` | calendar-grid.js:421 | Removes all legend highlights after save. |
 
 ### Date Filtering
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `updateDateFilterBanner()` | 235 | Shows/hides the date filter instruction banner for the organiser. |
-| `setDateFilterSaveStatus(status)` | 280 | Updates the save status pill: unsaved/saving/saved. |
-| `isDateVisible(dateStr)` | 1243 | Returns true if a date should be shown based on filter mode. Organiser always sees all. |
-| `isDateMarked(dateStr)` | 1261 | Returns true if a date is in the dateFilterDates array. |
-| `toggleDateFilter(dateStr)` | 1270 | Adds/removes a date from filter selections. Organiser only. |
-| `scheduleDateFilterSave()` | 1293 | Debounced (1500ms) save of date filter to server. |
-| `saveDateFilterDates()` | 1305 | Sends date filter selections to server via `save_date_filter`. |
-| `updateDateFilterIndicators()` | 1333 | Updates visual highlights on day headers for filtered dates. |
+| `updateDateFilterBanner()` | calendar-core.js:243 | Shows/hides the date filter instruction banner for the organiser. |
+| `setDateFilterSaveStatus(status)` | calendar-core.js:288 | Updates the save status pill: unsaved/saving/saved. |
+| `isDateVisible(dateStr)` | calendar-grid.js:114 | Returns true if a date should be shown based on filter mode. Organiser always sees all. |
+| `isDateMarked(dateStr)` | calendar-grid.js:132 | Returns true if a date is in the dateFilterDates array. |
+| `toggleDateFilter(dateStr)` | calendar-grid.js:141 | Adds/removes a date from filter selections. Organiser only. |
+| `scheduleDateFilterSave()` | calendar-grid.js:164 | Debounced (1500ms) save of date filter to server. |
+| `saveDateFilterDates()` | calendar-grid.js:176 | Sends date filter selections to server via `save_date_filter`. |
+| `updateDateFilterIndicators()` | calendar-grid.js:204 | Updates visual highlights on day headers for filtered dates. |
 
 ### Rankings and Analysis
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `buildRankScores()` | 2213 | Scores all date+slot combinations. Returns sorted array of `{dateStr, slotId, slotLabel, counts, score, details}`. |
-| `rankKey(item)` | 2624 | Returns unique key for a rank item: `dateStr\nslotId`. |
-| `toggleRankExpand(key)` | 2625 | Toggles expanded state for a rank card and re-renders. |
-| `renderRankings()` | 2629 | Builds rank cards with roster, actions, and choose button. Pins chosen card when frozen. |
-| `buildCalendarLinks(item)` | 2095 | Generates Google Calendar URL and ICS blob for a rank item. |
-| `shareRankingDetails(item, opts)` | 2156 | Shares rank card details via Web Share API or clipboard. |
-| `saveSortOrderToServer()` | 2327 | Saves organiser's rank sort preference to server. |
+| `buildRankScores()` | calendar-rank.js:126 | Scores all date+slot combinations. Returns sorted array of `{dateStr, slotId, slotLabel, counts, score, details}`. |
+| `rankKey(item)` | calendar-rank.js:576 | Returns unique key for a rank item: `dateStr\nslotId`. |
+| `toggleRankExpand(key)` | calendar-rank.js:577 | Toggles expanded state for a rank card and re-renders. |
+| `renderRankings()` | calendar-rank.js:581 | Builds rank cards with roster, actions, and choose button. Pins chosen card when frozen. |
+| `buildCalendarLinks(item)` | calendar-rank.js:8 | Generates Google Calendar URL and ICS blob for a rank item. |
+| `shareRankingDetails(item, opts)` | calendar-rank.js:69 | Shares rank card details via Web Share API or clipboard. |
+| `saveSortOrderToServer()` | calendar-rank.js:274 | Saves organiser's rank sort preference to server. |
 
 ### Chosen/Frozen State
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `isCalendarFrozen()` | 2453 | Returns true if organiser has locked in a chosen date+slot. |
-| `canReopenCalendar()` | 2870 | True when the selected user is the organiser and has a valid session. |
-| `updateChosenBanner()` | 2874 | Renders/removes the green "Decided" banner; Reopen shown when `canReopenCalendar()`. Called from `updateUserUI()`, so it follows login / logout / name switches. |
-| `applyFrozenState()` | 2524 | Adds `chosen-slot`/`frozen-slot` classes to grid. Dims non-chosen slots. |
-| `chooseSlot(dateStr, slotId)` | 2556 | Sends `choose_slot` API call with confirmation dialog. Updates all UI. |
-| `unchooseSlot()` | 2596 | Sends `unchoose_slot` API call with confirmation dialog. Reopens calendar. |
+| `isCalendarFrozen()` | calendar-rank.js:400 | Returns true if organiser has locked in a chosen date+slot. |
+| `canReopenCalendar()` | calendar-rank.js:408 | True when the selected user is the organiser and has a valid session. |
+| `updateChosenBanner()` | calendar-rank.js:412 | Renders/removes the green "Decided" banner; Reopen shown when `canReopenCalendar()`. Called from `updateUserUI()`, so it follows login / logout / name switches. |
+| `applyFrozenState()` | calendar-rank.js:476 | Adds `chosen-slot`/`frozen-slot` classes to grid. Dims non-chosen slots. |
+| `chooseSlot(dateStr, slotId)` | calendar-rank.js:508 | Sends `choose_slot` API call with confirmation dialog. Updates all UI. |
+| `unchooseSlot()` | calendar-rank.js:548 | Sends `unchoose_slot` API call with confirmation dialog. Reopens calendar. |
 
 ### Organiser Message
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `openMessageEdit()` | 2399 | Opens inline textarea for editing organiser message. |
-| `cancelMessageEdit()` | 2412 | Closes edit mode without saving. |
-| `updateMessageCharCount()` | 2420 | Updates the character counter below the textarea. |
-| `saveOrganiserMessage()` | 2428 | Saves message to server and updates local state. |
+| `openMessageEdit()` | calendar-rank.js:346 | Opens inline textarea for editing organiser message. |
+| `cancelMessageEdit()` | calendar-rank.js:359 | Closes edit mode without saving. |
+| `updateMessageCharCount()` | calendar-rank.js:367 | Updates the character counter below the textarea. |
+| `saveOrganiserMessage()` | calendar-rank.js:375 | Saves message to server and updates local state. |
 
 ### User Management Modals
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `populateUserSelectModal()` | 864 | Builds user list with avatars, roles, logout/delete buttons. |
-| `openUserSelectModal()` | 968 | Shows the user selection modal. |
-| `closeUserSelectModal()` | 973 | Hides the user selection modal. |
-| `logoutCurrentUser()` | 981 | Clears auth and reloads the page. |
-| `confirmDeleteCalendarUser(userId, displayName)` | 1007 | Confirmation dialog then DELETE API call. Organiser only. |
-| `onUserSelectItemClick(userId)` | 1045 | Handles user selection -- switches or prompts PIN. |
-| `openUserModal(mode)` | 1555 | Opens add/rename modal. Mode: 'add' or 'rename'. |
-| `closeUserModal()` | 1582 | Closes the user modal. |
-| `validateName(name)` | 1583 | Validates display name (1-40 chars, allowed characters). |
-| `validatePin4(s)` | 1589 | Returns true if string is exactly 4 digits. |
-| `openPinModal(userId, userObj)` | 1715 | Opens PIN entry modal for authentication. |
-| `wirePinToggle(inputEl, btnEl)` | 1784 | Wires show/hide toggle for PIN input fields. |
-| `showInfoModal()` | 1508 | Shows the "Select a Name" prompt modal. |
-| `closeInfoModal()` | 1514 | Closes the info modal. |
+| `populateUserSelectModal()` | calendar-users.js:145 | Builds user list with avatars, roles, logout/delete buttons. |
+| `openUserSelectModal()` | calendar-users.js:265 | Shows the user selection modal. |
+| `closeUserSelectModal()` | calendar-users.js:270 | Hides the user selection modal. |
+| `logoutCurrentUser()` | calendar-users.js:278 | Clears auth and reloads the page. |
+| `confirmDeleteCalendarUser(userId, displayName)` | calendar-users.js:304 | Confirmation dialog then DELETE API call. Organiser only. |
+| `onUserSelectItemClick(userId)` | calendar-users.js:342 | Handles user selection -- switches or prompts PIN. |
+| `openUserModal(mode)` | calendar-users.js:640 | Opens add/rename modal. Mode: 'add' or 'rename'. |
+| `closeUserModal()` | calendar-users.js:667 | Closes the user modal. |
+| `validateName(name)` | calendar-users.js:668 | Validates display name (1-40 chars, allowed characters). |
+| `validatePin4(s)` | calendar-users.js:674 | Returns true if string is exactly 4 digits. |
+| `openPinModal(userId, userObj)` | calendar-users.js:801 | Opens PIN entry modal for authentication. |
+| `wirePinToggle(inputEl, btnEl)` | calendar-users.js:1042 | Wires show/hide toggle for PIN input fields. |
+| `showInfoModal()` | calendar-grid.js:428 | Shows the "Select a Name" prompt modal. |
+| `closeInfoModal()` | calendar-grid.js:434 | Closes the info modal. |
 
 ### Fingerprint / face unlock (calendar page)
 
 Device memory key: `passkeyId(userId)` = `cal_{calendarToken}_{userId}` (see `passkey.js`).
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `finishUnlock(userId, res)` | 1993 | Shared success path for PIN and passkey login: caches auth, sets current user, refreshes UI. |
-| `passkeyId(userId)` | 2014 | Device-local id for this calendar user. |
-| `passkeysUsable()` | 2015 | True when server reports `passkeys` and the browser supports WebAuthn. |
-| `unlockWithPasskey(userId)` | 2017 | `passkey_login_begin` -> device prompt -> `passkey_login_finish`. Falls back to PIN on cancel / error; forgets device on `NO_PASSKEY`. |
-| `maybeOfferPasskey(userId)` | 2048 | After PIN login or add-name, shows the "Turn on" offer once (skipped if enrolled, dismissed, or no platform authenticator). |
-| `enrolPasskey(userId, errorEl, btn)` | 2068 | `passkey_register_begin` -> device prompt -> `passkey_register_finish` (sends `device_label`); remembers the device. |
+| `finishUnlock(userId, res)` | calendar-users.js:846 | Shared success path for PIN and passkey login: caches auth, sets current user, refreshes UI. |
+| `passkeyId(userId)` | calendar-users.js:867 | Device-local id for this calendar user. |
+| `passkeysUsable()` | calendar-users.js:868 | True when server reports `passkeys` and the browser supports WebAuthn. |
+| `unlockWithPasskey(userId)` | calendar-users.js:870 | `passkey_login_begin` -> device prompt -> `passkey_login_finish`. Falls back to PIN on cancel / error; forgets device on `NO_PASSKEY`. |
+| `maybeOfferPasskey(userId)` | calendar-users.js:901 | After PIN login or add-name, shows the "Turn on" offer once (skipped if enrolled, dismissed, or no platform authenticator). |
+| `enrolPasskey(userId, errorEl, btn)` | calendar-users.js:910 | `passkey_register_begin` -> device prompt -> `passkey_register_finish` (sends `device_label`); remembers the device. |
 | `openPasskeyWindow(userId, silent)` | - | The one **Passkeys** window (`#passkeyModal`), opened from the fingerprint icon in the user list or once after a PIN login (`maybeOfferPasskey`, `silent` = no list errors). No passkey on this device: "Set up a passkey?" (Not now / Set up passkey) plus "Passkeys on other devices" with Remove, if any. This device has one: full device list with Remove (`passkey_remove`) and Close. "Not now" records the dismissal. |
 
 ### Access emoji (calendar page)
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `accessHubToken()` | 764 | Hub token of this calendar (from meta), used to send the Hub grant too. |
-| `accessGrantKeys(extraHubToken)` | 770 | Grant storage keys to send: `c_{calendar}`, `g_{hub}` and an optional extra Hub (for `confirmAddToHub`). |
-| `requireAccess(info)` | 779 | Shows the blocking emoji popup (`AccessEmoji.gate`), posts `access_check` and saves the grant. Resolves false if the user leaves. |
-| `accessFetch(url, opts, extraHubToken)` | 806 | `fetch` wrapper used by `apiGet`, `apiPost` and `postSave`: adds `X-Access-Grant`; on 403 `ACCESS_REQUIRED` clears stale grants, shows the popup and retries (max 3 tries). |
-| `loadAccessEmoji()` / `applyAccessSettings(data)` | 1456 | Organiser only: GET `access_settings` into `accessAvailable`, `accessEmoji`, `accessHubEmoji`. |
-| `openSettingsModal()` / `hideSettingsModal()` | 1464 | Organiser **Settings** window (`#settingsModal`, gear `#settingsBtn`): emoji on/off/change via `AccessEmoji.field`, confirms, then POST `set_access_emoji` and stores the fresh grant. |
+| `accessHubToken()` | calendar-core.js:773 | Hub token of this calendar (from meta), used to send the Hub grant too. |
+| `accessGrantKeys(extraHubToken)` | calendar-core.js:779 | Grant storage keys to send: `c_{calendar}`, `g_{hub}` and an optional extra Hub (for `confirmAddToHub`). |
+| `requireAccess(info)` | calendar-core.js:788 | Shows the blocking emoji popup (`AccessEmoji.gate`), posts `access_check` and saves the grant. Resolves false if the user leaves. |
+| `accessFetch(url, opts, extraHubToken)` | calendar-core.js:815 | `fetch` wrapper used by `apiGet`, `apiPost` and `postSave`: adds `X-Access-Grant`; on 403 `ACCESS_REQUIRED` clears stale grants, shows the popup and retries (max 3 tries). |
+| `loadAccessEmoji()` / `applyAccessSettings(data)` | calendar-users.js:577 | Organiser only: GET `access_settings` into `accessAvailable`, `accessEmoji`, `accessHubEmoji`. |
+| `openSettingsModal()` / `hideSettingsModal()` | calendar-users.js:585 | Organiser **Settings** window (`#settingsModal`, gear `#settingsBtn`): emoji on/off/change via `AccessEmoji.field`, confirms, then POST `set_access_emoji` and stores the fresh grant. |
 
 The header Share button adds `AccessEmoji.shareLine()` under the link when an emoji is set.
 
@@ -212,51 +223,51 @@ The header Share button adds `AccessEmoji.shareLine()` under the link when an em
 
 Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, perUser, closed}`). `renderRankings()`, `refreshCalendarValues()`, `onSlotClick()`, `renderLegend()`, `updateChosenBanner()` and `resetMyAvailability()` hand over to these; organiser dots are off. Taps are normal pending changes (Submit, auto-save, restore after reload); `savePending()` drops the server's `rejected` slots (toast "Just taken by someone else" / limit), handles `BOOKINGS_CLOSED` (`handleBookingsClosedOnSave()`), then reloads availability.
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `isBookingMode()` / `isBookingClosed()` | 3453 | Booking calendar? Bookings closed? |
-| `currentBookingView()` | 3491 | `'booked'`, `'mine'` or `'free'` list. Organiser: Booked / Free; everyone else: Mine / Free. Always opens on Booked / Mine; only an explicit Free choice sticks, anything else maps to the role's first button. |
-| `setBookingViewButton(btn, mode, icon, label)` | 3510 | Sets a `#sortToggle` button's mode, icon and label (text only, no HTML). `updateSortToggleUI()` labels the first button Booked (organiser) or "Mine (N)" / "Mine (N of M)" (In total limit) on every render. |
-| `applyBookingChrome()` | 3500 | Page title, name banner text, "Cancel my bookings" titles; list limit 2. |
-| `applyBookingColors(partial, full)` | 3503 | Sets `--bk-partial` / `--bk-full` (and `-text` contrast colours via `getContrastTextColor()`) from `calendar_meta`; `null` keeps the CSS defaults (orange / red). |
-| `bookingStateName(name, fallback)` | 3509 | Organiser's Partly booked / Full name from `calendar_meta`, or the default. |
-| `renderBookingLegend()` | 3525 | Legend: Free / Yours / (partly booked name when capacity is 2+) / full name (`state.booking.partialLabel` / `fullLabel`). |
-| `bookingInfo(dateStr, slotId)` | 3517 | `{ids, mine, count, left, full}` for a slot, including your unsaved change. Others are the larger of the known rows and the anonymous summary (minus your saved booking), so it works in Hidden mode too. |
-| `bookingCellText(info)` / `renderBookingCell(el, dateStr, slot)` / `refreshBookingCells()` | 3534 | Cell sub-line (your booking shows the booking label, e.g. "Booked", on the booking colour / Free / the booking label when taken) and classes `bk-mine`, `bk-partial`, `bk-full`. Slots for 2+ people start the sub-line with a `.bk-count` "N/M" (people booked so far / people per slot), then the label, Free, "booked" or Full. Cells never show names (no room); names are on the Bookings card. |
-| `myBookingCount(dateStr)` / `myTotalBookingCount(withPending)` | 3575 | Your bookings that count towards Bookings per person, saved plus unsaved: that day's, or all of them when `state.booking.perUserTotal` / all your bookings (saved only for "Cancel my bookings"; `withPending` adds unsaved changes). |
-| `onBookingSlotClick(dateStr, slotId)` / `setPendingBooking(dateStr, slotId, status)` | 3597 | Tap: closed / pick a name / unlock checks, "This slot is taken", the per-person limit message, else toggles Booked / not booked as a pending change (repaints the cell, Submit state, auto-save). Toggling back to the saved state removes the pending entry. |
-| `bookingCardAction(dateStr, slotId)` | 3638 | Book / Cancel buttons on the Bookings card: the same toggle, saved straight away. |
-| `queueBooking(userId, dateStr, slotId, status)` / `sendBooking(...)` | 3661 | Organiser removal of someone else's booking, one at a time (`bk-busy` on the cell), then reloads availability. An expired session reopens the PIN window (`handleExpiredSession()`). |
-| `cancelMyBookings(auth)` | 3713 | "Cancel my bookings": one confirm, then `reset_user`; clears pending changes. |
-| `bookingDates()` | 3734 | Visible dates in order; past dates follow the Show/Hide past dates button. |
-| `bookingRankCard(...)` / `bookingRoster(...)` | 3754 | Booking rows built like normal Best Match cards: `.rank-card` header button (date - slot, summary, View/Hide pill) expanding to `.rank-actions` and a `.roster-inline` (name + booking tag, organiser remove x). Your own bookings get `.bk-card-mine`. |
-| `renderBookings()` | 3866 | Bookings card: "N of M booked", organiser **Close bookings**, then Booked or Mine rows (`buildBookedRow`; Mine = only your own slots, including unsaved: Add / Download / Share (`bookingShareButton()`) / Cancel on your own bookings only, roster) or Free rows (`buildFreeRow`: Free / "N of M left", Book, roster; no Share). Pills use the same `.btn-pill` classes and sizes as Best Match. Respects the 2 / 10 / All limit. |
-| `updateBookingClosedBanner()` / `setBookingsClosed(closed)` | 3918 | "Bookings closed" banner with organiser Reopen; POST `set_bookings_closed`. |
-| `startBookingRefresh()` / `refreshBookings()` | 3968 | Every 30 s and on tab focus: re-reads `bookings_closed` from `calendar_meta` and reloads availability (skipped while saving). |
+| `isBookingMode()` / `isBookingClosed()` | calendar-booking.js:16 | Booking calendar? Bookings closed? |
+| `currentBookingView()` | calendar-booking.js:33 | `'booked'`, `'mine'` or `'free'` list. Organiser: Booked / Free; everyone else: Mine / Free. Always opens on Booked / Mine; only an explicit Free choice sticks, anything else maps to the role's first button. |
+| `setBookingViewButton(btn, mode, icon, label)` | calendar-booking.js:38 | Sets a `#sortToggle` button's mode, icon and label (text only, no HTML). `updateSortToggleUI()` labels the first button Booked (organiser) or "Mine (N)" / "Mine (N of M)" (In total limit) on every render. |
+| `applyBookingChrome()` | calendar-booking.js:57 | Page title, name banner text, "Cancel my bookings" titles; list limit 2. |
+| `applyBookingColors(partial, full)` | calendar-booking.js:76 | Sets `--bk-partial` / `--bk-full` (and `-text` contrast colours via `getContrastTextColor()`) from `calendar_meta`; `null` keeps the CSS defaults (orange / red). |
+| `bookingStateName(name, fallback)` | calendar-booking.js:71 | Organiser's Partly booked / Full name from `calendar_meta`, or the default. |
+| `renderBookingLegend()` | calendar-booking.js:85 | Legend: Free / Yours / (partly booked name when capacity is 2+) / full name (`state.booking.partialLabel` / `fullLabel`). |
+| `bookingInfo(dateStr, slotId)` | calendar-booking.js:104 | `{ids, mine, count, left, full}` for a slot, including your unsaved change. Others are the larger of the known rows and the anonymous summary (minus your saved booking), so it works in Hidden mode too. |
+| `bookingCellText(info)` / `renderBookingCell(el, dateStr, slot)` / `refreshBookingCells()` | calendar-booking.js:126 | Cell sub-line (your booking shows the booking label, e.g. "Booked", on the booking colour / Free / the booking label when taken) and classes `bk-mine`, `bk-partial`, `bk-full`. Slots for 2+ people start the sub-line with a `.bk-count` "N/M" (people booked so far / people per slot), then the label, Free, "booked" or Full. Cells never show names (no room); names are on the Bookings card. |
+| `myBookingCount(dateStr)` / `myTotalBookingCount(withPending)` | calendar-booking.js:171 | Your bookings that count towards Bookings per person, saved plus unsaved: that day's, or all of them when `state.booking.perUserTotal` / all your bookings (saved only for "Cancel my bookings"; `withPending` adds unsaved changes). |
+| `onBookingSlotClick(dateStr, slotId)` / `setPendingBooking(dateStr, slotId, status)` | calendar-booking.js:214 | Tap: closed / pick a name / unlock checks, "This slot is taken", the per-person limit message, else toggles Booked / not booked as a pending change (repaints the cell, Submit state, auto-save). Toggling back to the saved state removes the pending entry. |
+| `bookingCardAction(dateStr, slotId)` | calendar-booking.js:255 | Book / Cancel buttons on the Bookings card: the same toggle, saved straight away. |
+| `queueBooking(userId, dateStr, slotId, status)` / `sendBooking(...)` | calendar-booking.js:278 | Organiser removal of someone else's booking, one at a time (`bk-busy` on the cell), then reloads availability. An expired session reopens the PIN window (`handleExpiredSession()`). |
+| `cancelMyBookings(auth)` | calendar-booking.js:330 | "Cancel my bookings": one confirm, then `reset_user`; clears pending changes. |
+| `bookingDates()` | calendar-booking.js:351 | Visible dates in order; past dates follow the Show/Hide past dates button. |
+| `bookingRankCard(...)` / `bookingRoster(...)` | calendar-booking.js:371 | Booking rows built like normal Best Match cards: `.rank-card` header button (date - slot, summary, View/Hide pill) expanding to `.rank-actions` and a `.roster-inline` (name + booking tag, organiser remove x). Your own bookings get `.bk-card-mine`. |
+| `renderBookings()` | calendar-booking.js:495 | Bookings card: "N of M booked", organiser **Close bookings**, then Booked or Mine rows (`buildBookedRow`; Mine = only your own slots, including unsaved: Add / Download / Share (`bookingShareButton()`) / Cancel on your own bookings only, roster) or Free rows (`buildFreeRow`: Free / "N of M left", Book, roster; no Share). Pills use the same `.btn-pill` classes and sizes as Best Match. Respects the 2 / 10 / All limit. |
+| `updateBookingClosedBanner()` / `setBookingsClosed(closed)` | calendar-booking.js:552 | "Bookings closed" banner with organiser Reopen; POST `set_bookings_closed`. |
+| `startBookingRefresh()` / `refreshBookings()` | calendar-booking.js:602 | Every 30 s and on tab focus: re-reads `bookings_closed` from `calendar_meta` and reloads availability (skipped while saving). |
 
 ### Hub membership (calendar page)
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `updateHubBarUI()` | 1231 | Shows Hub breadcrumb link or "Not in a Hub"; organiser add/remove buttons. |
-| `extractHubToken(raw)` | 1263 | Parses Hub code or URL from user input for attach modal. |
-| `showHubModal()` | 1280 | Opens modal to enter Hub code/link. |
-| `hideHubModal()` | 1288 | Closes Hub attach modal. |
-| `confirmAddToHub()` | 1292 | POST `add_calendar_to_group` (calendar organiser). |
-| `removeFromHub()` | 1315 | POST `remove_calendar_from_group` (calendar organiser). |
+| `updateHubBarUI()` | calendar-users.js:468 | Shows Hub breadcrumb link or "Not in a Hub"; organiser add/remove buttons. |
+| `extractHubToken(raw)` | calendar-users.js:500 | Parses Hub code or URL from user input for attach modal. |
+| `showHubModal()` | calendar-users.js:517 | Opens modal to enter Hub code/link. |
+| `hideHubModal()` | calendar-users.js:525 | Closes Hub attach modal. |
+| `confirmAddToHub()` | calendar-users.js:529 | POST `add_calendar_to_group` (calendar organiser). |
+| `removeFromHub()` | calendar-users.js:552 | POST `remove_calendar_from_group` (calendar organiser). |
 
 ### Reset Operations
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `resetMyAvailability()` | 1971 | Confirmation then API call to delete current user's availability. |
-| `resetAllUsers()` | 2039 | Double confirmation (confirm + type "RESET") then API call. Admin only. |
+| `resetMyAvailability()` | calendar-grid.js:658 | Confirmation then API call to delete current user's availability. |
+| `resetAllUsers()` | calendar-grid.js:728 | Double confirmation (confirm + type "RESET") then API call. Admin only. |
 
 ### Initialisation
 
-| Function | Line | Description |
+| Function | File:Line | Description |
 |----------|------|-------------|
-| `init()` | 2979 | Main entry point. Loads meta, users, restores session, renders grid and rankings. |
+| `init()` | calendar-main.js:205 | Main entry point. Loads meta, users, restores session, renders grid and rankings. |
 
 ---
 
@@ -273,8 +284,8 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `getRelativeLuminance(hexColor)` | 51 | Same as calendar.js -- keep in sync. |
-| `getContrastTextColor(bgColor)` | 80 | Same as calendar.js -- keep in sync. |
+| `getRelativeLuminance(hexColor)` | 51 | Same as calendar-core.js -- keep in sync. |
+| `getContrastTextColor(bgColor)` | 80 | Same as calendar-core.js -- keep in sync. |
 | `applyColorPreview(colorPicker, labelInput)` | 99 | Applies colour picker value as background to status label input. |
 
 ### Helpers
@@ -409,7 +420,7 @@ Device memory key: `passkeyId()` = `hub_{hubToken}`.
 | `createHub()` | 495 | POST `create_group`, then show save panel. |
 | `loadHubView()` | 656 | GET `group_meta`, render calendar grid. |
 | `updateHubPublicUI()` | 607 | Link bar, copy handlers, Create new calendar link. |
-| `updateOrganiserUI()` | 631 | Shows/hides organiser-only Share/Email/Download/Remove. |
+| `updateOrganiserUI()` | 764 | Shows/hides organiser-only Share/Email/Poster/Download/Remove and wires the link bar buttons. |
 | `renderCalendarGrid()` | 558 | Lists child calendars with links to `calendar.html?c=`. |
 
 ---
@@ -453,6 +464,15 @@ Shared access emoji helper loaded by `index.html`, `calendar.html`, `hub.html` a
 
 ---
 
-## admin.js (~1,070 lines)
+## admin-*.js (4 files, ~2,600 lines)
 
-Admin panel logic. Access emoji: `emojiBadge(emoji, inherited)` shows the emoji (or the Hub's, faded) next to calendars and Hubs; `clearAccessEmoji(kind, item, btn, rerender)` confirms and posts `admin_set_access_emoji` (key_off button). Not documented in detail here as it is a separate internal tool. Key functions: `loadCalendars()`, `renderCalendarList()`, `deleteCalendar()`, `togglePermanent()`, `loadUsers()`, `deleteUser()`. PIN lockouts: `renderUserPills()` adds an amber Unlock pill for users with `locked_seconds > 0` (`unlockUser()` -> `admin_unlock_user`); `renderHubTable()` adds a lock_open action on locked Hubs (`unlockHub()` -> `admin_unlock_group`); `formatWait(seconds)` matches the API's "5 minutes" / "2 hours" / "2 days" wording.
+Admin panel logic, split like the calendar page into classic scripts sharing global scope. `admin.html` loads them after `emoji.js`, in this order:
+
+| File | Contents |
+|------|----------|
+| `admin-core.js` | Tokens, `apiRequest()`, `formatDate()`, `truncateToken()`, `escapeHtml()`, login / logout, `checkExistingSession()` (runs on `DOMContentLoaded`), `emojiBadge()`, `clearAccessEmoji()`, Escape-key handler, `switchTab()` |
+| `admin-calendars.js` | Calendars tab: `loadCalendars()`, filters, sort, `renderTable()`, selection, `handleTogglePermanent()`, `executeDelete()`, bulk delete, pagination, Users expander (`toggleUsersExpand()`, `executeDeleteUser()`) |
+| `admin-hubs.js` | Hubs tab: `loadHubs()`, filters, sort, `renderHubTable()`, selection, delete, bulk delete, pagination, calendars expander |
+| `admin-setup.js` | Setup tab: `loadSiteConfig()`, slot / option / preset / date editors, `saveConfig()` |
+
+Other details: Access emoji: `emojiBadge(emoji, inherited)` shows the emoji (or the Hub's, faded) next to calendars and Hubs; `clearAccessEmoji(kind, item, btn, rerender)` confirms and posts `admin_set_access_emoji` (key_off button). PIN lockouts: `renderUserPills()` adds an amber Unlock pill for users with `locked_seconds > 0` (`unlockUser()` -> `admin_unlock_user`); `renderHubTable()` adds a lock_open action on locked Hubs (`unlockHub()` -> `admin_unlock_group`); `formatWait(seconds)` matches the API's "5 minutes" / "2 hours" / "2 days" wording.

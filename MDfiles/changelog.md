@@ -4,6 +4,19 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
+## 2026-09-27
+
+### Added
+- **Hub Poster button:** a logged-in Hub organiser now gets a **Poster** button in the Hub link bar (same poster as the post-create save panel, including the access emoji). To make room, Share and Email are icon-only buttons (with tooltips and screen-reader labels)
+
+### Changed
+- **Split the three largest files** so each part is easier to find, review and edit. Pure moves: no behaviour changes, no build step, no modules.
+  - `api.php` keeps every endpoint (~2,200 lines, was ~3,000). Its helpers moved to `includes/http.php` (responses, request parsing, config, client IP, secure session, CSRF), `includes/data.php` (normalise / validate, `MESSAGE_MAX_LEN`, availability summary), `includes/security.php` (DB connection, security log, rate limiting, admin login lockout and `requireAdminSession()`, PIN hashing and lockout wrappers), `includes/sessions.php` (user and Hub sessions, passkey subject) and `includes/hubs.php` (Hub limits, lookup, activity, lockout wrappers)
+  - `calendar.js` became six classic scripts sharing global scope, loaded in order by `calendar.html`: `calendar-core.js`, `calendar-users.js`, `calendar-grid.js`, `calendar-rank.js`, `calendar-booking.js`, `calendar-main.js`
+  - `admin.js` lost its IIFE wrapper and became `admin-core.js`, `admin-calendars.js`, `admin-hubs.js`, `admin-setup.js`, loaded in order by `admin.html`. `checkExistingSession()` now runs on `DOMContentLoaded`, after all four have loaded
+  - Deploying: upload the new files and delete `calendar.js` and `admin.js` from the server
+  - `js_functions.md` now lists each calendar function as `file:line`
+
 ## 2026-09-26
 
 ### Added

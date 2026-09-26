@@ -85,11 +85,11 @@
     <main id="main-content">
       <p class="palette-intro">
         Reference for colours used across <b>When RU Free</b>. Status slot colours are configurable per calendar;
-        CSS defaults are from <code>calendar.css</code>; runtime defaults also appear in <code>calendar.js</code> and
+        CSS defaults are from <code>calendar.css</code>; runtime defaults also appear in <code>calendar-core.js</code> and
         <code>index.js</code>. Sources: stylesheets
         (<code>page.css</code>, <code>index.css</code>, <code>calendar.css</code>, <code>hub.css</code>, <code>admin.css</code>),
         inline HTML (<code>go/index.html</code>, <code>index.html</code>, <code>calendar.html</code>),
-        and JS string templates (<code>index.js</code>, <code>hub.js</code>, <code>calendar.js</code>, <code>admin.js</code>).
+        and JS string templates (<code>index.js</code>, <code>hub.js</code>, <code>calendar-*.js</code>, <code>admin-*.js</code>).
       </p>
 
       <nav class="palette-nav" aria-label="Palette sections">
@@ -452,7 +452,7 @@
           </div>
         </div>
         <p style="font-size:0.88rem;color:var(--text-muted);margin-top:12px;">
-          Contrast text on slots uses <code>--status-N-text</code> (#fff or #000), computed at runtime via <code>getContrastTextColor()</code> in calendar.js / index.js.
+          Contrast text on slots uses <code>--status-N-text</code> (#fff or #000), computed at runtime via <code>getContrastTextColor()</code> in calendar-core.js / index.js.
         </p>
       </section>
 
@@ -753,7 +753,7 @@
           </div>
         </div>
 
-        <h3 style="font-size:1rem;margin:20px 0 8px;">Default status options — calendar (<code>calendar.js</code>)</h3>
+        <h3 style="font-size:1rem;margin:20px 0 8px;">Default status options — calendar (<code>calendar-core.js</code>)</h3>
         <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 10px;">
           Fallback when a calendar has no custom status colours. Applied to CSS variables at load time.
         </p>
@@ -764,7 +764,7 @@
               <p class="swatch-name">Yes (default)</p>
               <p class="swatch-hex">STATUS_OPTIONS[0]</p>
               <p class="swatch-use">Also used for choose/finalise icon tint in rank cards.</p>
-              <span class="swatch-file">calendar.js</span>
+              <span class="swatch-file">calendar-core.js</span>
             </div>
           </div>
           <div class="swatch">
@@ -772,7 +772,7 @@
             <div class="swatch-body">
               <p class="swatch-name">Maybe (default)</p>
               <p class="swatch-hex">STATUS_OPTIONS[1]</p>
-              <span class="swatch-file">calendar.js</span>
+              <span class="swatch-file">calendar-core.js</span>
             </div>
           </div>
           <div class="swatch">
@@ -780,12 +780,12 @@
             <div class="swatch-body">
               <p class="swatch-name">No (default)</p>
               <p class="swatch-hex">STATUS_OPTIONS[2]</p>
-              <span class="swatch-file">calendar.js</span>
+              <span class="swatch-file">calendar-core.js</span>
             </div>
           </div>
         </div>
 
-        <h3 style="font-size:1rem;margin:20px 0 8px;">Strength palette — calendar (<code>calendar.js</code>)</h3>
+        <h3 style="font-size:1rem;margin:20px 0 8px;">Strength palette — calendar (<code>calendar-core.js</code>)</h3>
         <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 10px;">
           Matches <code>calendar.css</code> status slot defaults; used when auto-assigning colours by weight rank.
         </p>
@@ -836,7 +836,7 @@
               <td><code>showTemplateBanner()</code> — template loaded notice (overrides default warn styling).</td>
             </tr>
             <tr>
-              <td><code>index.js</code>, <code>calendar.js</code></td>
+              <td><code>index.js</code>, <code>calendar-core.js</code></td>
               <td><span class="mini-swatch" style="background:#fff;border:1px solid #000;"></span>#FFFFFF / #000000</td>
               <td><code>getContrastTextColor()</code> — slot label text on custom status backgrounds.</td>
             </tr>
@@ -851,12 +851,12 @@
               <td>Status colour picker default and fallback when unset.</td>
             </tr>
             <tr>
-              <td><code>calendar.js</code></td>
+              <td><code>calendar-rank.js</code></td>
               <td><span class="mini-swatch" style="background:#777;"></span>#777</td>
               <td>“No responses yet” in rank expand panel.</td>
             </tr>
             <tr>
-              <td><code>admin.js</code></td>
+              <td><code>admin-calendars.js</code>, <code>admin-hubs.js</code></td>
               <td><span class="mini-swatch" style="background:#999;"></span>#999 / <span class="mini-swatch" style="background:#c00;"></span>#c00</td>
               <td>Loading spinner, empty users, and expand-row error messages.</td>
             </tr>
