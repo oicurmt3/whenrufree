@@ -25,6 +25,12 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 | `create_calendar` | POST | CSRF | - | Create calendar + organiser (optional `group_token`) |
 | `add_user` | POST | CSRF | - | Add participant |
 | `auth_user` | POST | CSRF | - | PIN login, returns auth_token |
+| `passkey_register_begin` | POST | Auth | self / Hub organiser | Start fingerprint / face enrolment (`c` or `g`) |
+| `passkey_register_finish` | POST | Auth | self / Hub organiser | Save device credential |
+| `passkey_login_begin` | POST | CSRF | - | Start fingerprint / face login (`user_id` for calendars) |
+| `passkey_login_finish` | POST | CSRF | - | Verify passkey, returns auth_token (same shape as PIN login) |
+| `passkey_list` | POST | Auth | self / Hub organiser | List devices with fingerprint / face unlock |
+| `passkey_remove` | POST | Auth | self / Hub organiser | Remove any one of the owner's devices (`credential_id`) |
 | `rename_user` | POST | Auth | self/admin | Rename user |
 | `save` | POST | Auth | self/admin | Save availability changes |
 | `reset_user` | POST | Auth | self/admin | Delete user's availability |
@@ -54,14 +60,16 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 | 400 | Validation error |
 | 401 | Auth required or invalid session |
 | 403 | CSRF failure or insufficient role, or calendar frozen |
-| 404 | Calendar/user/action not found |
+| 404 | Calendar/user/action not found, or no passkey set up (`NO_PASSKEY`) |
+| 409 | Passkey already set up (`PASSKEY_EXISTS`) or device limit reached (`PASSKEY_LIMIT`) |
 | 429 | Rate limited or account locked |
 | 500 | Server misconfiguration |
+| 503 | Rate limiter unavailable on a sensitive POST, or passkey tables missing (`PASSKEYS_UNAVAILABLE`) |
 
 ## Data Conventions
 
 - Calendar token: `?c=TOKEN` on all calendar-scoped requests
-- Hub token: `?g=TOKEN` on `group_meta`, `auth_group`, and Hub pages
+- Hub token: `?g=TOKEN` on `group_meta`, `auth_group`, Hub `passkey_*` calls, and Hub pages
 - Hub organiser header: `X-Group-Auth-Token`
 - Dates: YYYY-MM-DD strings
 - Availability status: integer (0=null/clear, 1..N=status option)

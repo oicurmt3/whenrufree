@@ -388,6 +388,25 @@ async function apiGet(action, params = {}) {
   return resp.json();
 }
 
+/** POST to a Hub action (?g=) with CSRF, plus the organiser session when withAuth. */
+async function hubPost(action, body = {}, withAuth = false) {
+  const url = new URL('api.php', window.location.href);
+  url.searchParams.set('action', action);
+  url.searchParams.set('g', state.token);
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': (await ensureCsrfToken()) || ''
+  };
+  if (withAuth && state.auth?.token) headers['X-Group-Auth-Token'] = state.auth.token;
+  const resp = await fetch(url.toString(), {
+    method: 'POST',
+    headers,
+    credentials: 'same-origin',
+    body: JSON.stringify(body)
+  });
+  return resp.json();
+}
+
 // -------------------------
 // Group auth cache
 // -------------------------
@@ -430,7 +449,9 @@ const state = {
   token: null,
   title: '',
   auth: null,
-  calendars: []
+  calendars: [],
+  passkeysEnabled: false, // Server has fingerprint / face unlock tables (group_meta.group.passkeys)
+  platformPasskey: false  // This device has a built-in fingerprint / face / screen-lock authenticator
 };
 
 // -------------------------
@@ -643,6 +664,14 @@ function updateOrganiserUI() {
     badge.classList.add('hideme');
     organiserBtns.forEach(btn => btn.classList.add('hideme'));
   }
+
+  const pkBtn = qs('#organiserPasskeyBtn');
+  const pkOn = passkeysUsable() && !!Passkey.deviceCredential(passkeyId());
+  const showPk = !!state.auth && passkeysUsable();
+  pkBtn.classList.toggle('hideme', !showPk);
+  pkBtn.classList.toggle('on', pkOn);
+  pkBtn.title = pkOn ? 'Fingerprint / face unlock is on for this device - manage devices' : 'Fingerprint / face unlock';
+  pkBtn.setAttribute('aria-label', pkBtn.title);
 }
 
 async function loadHubView() {
@@ -655,6 +684,10 @@ async function loadHubView() {
 
   state.title = data.group?.title || 'Hub';
   state.calendars = data.calendars || [];
+  state.passkeysEnabled = data.group?.passkeys === true;
+  if (state.passkeysEnabled && window.Passkey && !state.platformPasskey) {
+    state.platformPasskey = await Passkey.platformAvailable();
+  }
 
   const displayTitle = state.title || 'Hub';
   qs('#hubTitleDisplay').innerHTML =
@@ -712,7 +745,15 @@ function showPinModal() {
   qs('#pinModal').classList.remove('hideme');
   qs('#pinInput').value = '';
   qs('#pinError').textContent = '';
-  qs('#pinInput').focus();
+
+  const hasPasskey = passkeysUsable() && !!Passkey.deviceCredential(passkeyId());
+  qs('#pinPasskeyWrap').classList.toggle('hideme', !hasPasskey);
+  if (hasPasskey) {
+    // Go straight to the fingerprint / face prompt; the PIN field stays as the backup.
+    unlockWithPasskey();
+  } else {
+    qs('#pinInput').focus();
+  }
 }
 
 function hidePinModal() {
@@ -732,6 +773,12 @@ async function confirmPinLogin() {
     return;
   }
 
+  finishOrganiserLogin(data);
+  maybeOfferPasskey();
+}
+
+/** Applies a successful organiser login (PIN or passkey). */
+function finishOrganiserLogin(data) {
   state.auth = {
     token: data.auth_token,
     role: data.role,
@@ -742,6 +789,151 @@ async function confirmPinLogin() {
   updateOrganiserUI();
   renderCalendarGrid();
   showToast('Logged in as organiser');
+}
+
+// -------------------------
+// Passkeys: fingerprint / face / device screen lock login (PIN stays as backup)
+// -------------------------
+
+function passkeyId() { return `hub_${state.token}`; }
+function passkeysUsable() { return state.passkeysEnabled && !!window.Passkey && Passkey.supported(); }
+
+async function unlockWithPasskey() {
+  const btn = qs('#pinPasskeyBtn');
+  const errEl = qs('#pinError');
+  errEl.textContent = '';
+  btn.disabled = true;
+  try {
+    const begin = await hubPost('passkey_login_begin');
+    if (begin.status !== 'success') {
+      if (begin.code === 'NO_PASSKEY') {
+        Passkey.forgetDevice(passkeyId());
+        qs('#pinPasskeyWrap').classList.add('hideme');
+      }
+      throw new Error(begin.message || 'Fingerprint unlock failed. Use your PIN.');
+    }
+    const credential = await Passkey.get(begin.publicKey);
+    const data = await hubPost('passkey_login_finish', { credential });
+    if (data.status !== 'success') {
+      if (data.code === 'NO_PASSKEY') {
+        Passkey.forgetDevice(passkeyId());
+        qs('#pinPasskeyWrap').classList.add('hideme');
+      }
+      throw new Error(data.message || 'Fingerprint unlock failed. Use your PIN.');
+    }
+    Passkey.rememberDevice(passkeyId(), credential.rawId);
+    finishOrganiserLogin(data);
+  } catch (e) {
+    if (Passkey.isCancel(e)) {
+      qs('#pinInput').focus();
+      return;
+    }
+    errEl.textContent = e.message || 'Fingerprint unlock failed. Use your PIN.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/** After a PIN login, offers fingerprint / face unlock once per Hub on capable devices. */
+async function maybeOfferPasskey() {
+  if (!passkeysUsable() || !state.platformPasskey) return;
+  const id = passkeyId();
+  if (Passkey.deviceCredential(id) || Passkey.wasDismissed(id)) return;
+  qs('#passkeyOfferError').textContent = '';
+  qs('#passkeyOfferModal').classList.remove('hideme');
+}
+
+/** Registers this device for the logged-in organiser. Returns true when fingerprint unlock is on. */
+async function enrolPasskey(errEl, btn) {
+  if (!state.auth?.token) return false;
+  const id = passkeyId();
+  const fail = (msg) => { if (errEl) errEl.textContent = msg; else showToast(msg); };
+
+  if (btn) btn.disabled = true;
+  if (errEl) errEl.textContent = '';
+  try {
+    const begin = await hubPost('passkey_register_begin', {}, true);
+    if (begin.status !== 'success') {
+      fail(begin.message || 'Could not turn on fingerprint unlock.');
+      return false;
+    }
+    const credential = await Passkey.create(begin.publicKey);
+    const res = await hubPost('passkey_register_finish', { credential, device_label: Passkey.deviceLabel() }, true);
+    if (res.status !== 'success' && res.code !== 'PASSKEY_EXISTS') {
+      fail(res.message || 'Could not turn on fingerprint unlock.');
+      return false;
+    }
+    Passkey.rememberDevice(id, res.credential_id || credential.rawId);
+    showToast('Fingerprint / face unlock is on');
+    return true;
+  } catch (e) {
+    if (Passkey.isDuplicate(e)) {
+      Passkey.rememberDevice(id, null);
+      showToast('Fingerprint / face unlock is on');
+      return true;
+    }
+    if (!Passkey.isCancel(e)) fail('Could not turn on fingerprint unlock.');
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/** Lists the organiser's fingerprint / face unlock devices; any can be removed (e.g. a lost phone). */
+async function openPasskeyManager() {
+  if (!state.auth?.token) return;
+  const id = passkeyId();
+  const modal = qs('#passkeyManageModal');
+  const listEl = qs('#passkeyList');
+  const errEl = qs('#passkeyManageError');
+  const addBtn = qs('#passkeyManageAdd');
+
+  const render = (credentials) => {
+    const mine = Passkey.syncDevice(id, credentials);
+    Passkey.renderList(listEl, credentials, mine, removeDevice);
+    addBtn.classList.toggle('hideme', !!mine);
+    updateOrganiserUI();
+  };
+
+  const removeDevice = async (cred, btn) => {
+    const isThis = cred.credential_id === Passkey.deviceCredential(id);
+    const what = isThis ? 'this device' : (cred.device_label || 'this device');
+    if (!confirm(`Remove fingerprint / face unlock from ${what}? The PIN still works.`)) return;
+    btn.disabled = true;
+    errEl.textContent = '';
+    const res = await hubPost('passkey_remove', { credential_id: cred.credential_id }, true);
+    if (res.status !== 'success') {
+      btn.disabled = false;
+      errEl.textContent = res.message || 'Could not remove this device.';
+      return;
+    }
+    if (isThis) Passkey.forgetDevice(id);
+    Passkey.signalRemoved(cred.credential_id);
+    render(res.credentials);
+    showToast('Device removed');
+  };
+
+  errEl.textContent = '';
+  listEl.textContent = '';
+  addBtn.classList.add('hideme');
+  modal.classList.remove('hideme');
+  addBtn.onclick = async () => {
+    if (await enrolPasskey(errEl, addBtn)) {
+      const again = await hubPost('passkey_list', {}, true);
+      if (again.status === 'success') render(again.credentials);
+    }
+  };
+
+  try {
+    const res = await hubPost('passkey_list', {}, true);
+    if (res.status !== 'success') {
+      errEl.textContent = res.message || 'Could not load devices.';
+      return;
+    }
+    render(res.credentials);
+  } catch (e) {
+    errEl.textContent = 'Could not load devices. Check your connection.';
+  }
 }
 
 async function removeCalendarFromHub(calToken, btn) {
@@ -819,6 +1011,19 @@ async function initViewMode() {
   });
   qs('#pinConfirmBtn').addEventListener('click', confirmPinLogin);
   qs('#pinCancelBtn').addEventListener('click', hidePinModal);
+  qs('#pinPasskeyBtn').addEventListener('click', unlockWithPasskey);
+  qs('#organiserPasskeyBtn').addEventListener('click', openPasskeyManager);
+  qs('#passkeyManageClose').addEventListener('click', () => qs('#passkeyManageModal').classList.add('hideme'));
+  qs('#passkeyOfferNo').addEventListener('click', () => {
+    Passkey.dismiss(passkeyId());
+    qs('#passkeyOfferModal').classList.add('hideme');
+  });
+  qs('#passkeyOfferYes').addEventListener('click', async () => {
+    if (await enrolPasskey(qs('#passkeyOfferError'), qs('#passkeyOfferYes'))) {
+      qs('#passkeyOfferModal').classList.add('hideme');
+      updateOrganiserUI();
+    }
+  });
   qs('#pinInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') confirmPinLogin();
   });

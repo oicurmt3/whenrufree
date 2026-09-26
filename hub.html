@@ -22,7 +22,7 @@
       -webkit-font-smoothing:antialiased;
     }
   </style>
-  <link rel="stylesheet" href="hub.css">
+  <link rel="stylesheet" href="hub.css?v=20260926b">
 </head>
 <body>
   <div class="hub-wrap">
@@ -59,6 +59,10 @@
           <div class="hub-controls">
             <span id="organiserBadge" class="organiser-badge hideme"></span>
             <button type="button" id="organiserLoginBtn" class="btn btn-secondary btn-small">Organiser login</button>
+            <button type="button" id="organiserPasskeyBtn" class="btn btn-ghost btn-passkey-toggle hideme">
+              <span class="material-symbols-outlined" aria-hidden="true">fingerprint</span>
+              <span>Fingerprint</span>
+            </button>
             <button type="button" id="organiserLogoutBtn" class="btn btn-ghost hideme">Logout</button>
           </div>
         </div>
@@ -166,6 +170,15 @@
   <div id="pinModal" class="modal-overlay hideme" role="dialog" aria-modal="true">
     <div class="modal-box">
       <h3>Organiser PIN</h3>
+      <div id="pinPasskeyWrap" class="hideme">
+        <button type="button" id="pinPasskeyBtn" class="btn btn-primary btn-passkey">
+          <span class="passkey-icons" aria-hidden="true">
+            <span class="material-symbols-outlined">fingerprint</span><span class="material-symbols-outlined">face</span><span class="material-symbols-outlined">pattern</span>
+          </span>
+          Use fingerprint / face / screen lock
+        </button>
+        <p class="hint passkey-or">or enter your PIN</p>
+      </div>
       <p class="hint">Enter your 4-digit PIN to manage this Hub.</p>
       <input type="password" id="pinInput" maxlength="4" inputmode="numeric" class="field" style="width:100%;padding:12px;margin-bottom:8px;" autocomplete="off">
       <p id="pinError" class="hint" style="color:var(--danger);min-height:1.2em;"></p>
@@ -176,7 +189,35 @@
     </div>
   </div>
 
+  <!-- Offer fingerprint / face unlock after a PIN login -->
+  <div id="passkeyOfferModal" class="modal-overlay hideme" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <h3><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">fingerprint</span> Unlock faster next time?</h3>
+      <p class="hint">Use your fingerprint, face or device screen lock instead of your organiser PIN on this device. Your PIN still works as a backup.</p>
+      <p id="passkeyOfferError" class="hint" style="color:var(--danger);min-height:1.2em;"></p>
+      <div class="btn-row">
+        <button type="button" id="passkeyOfferYes" class="btn btn-primary">Turn on</button>
+        <button type="button" id="passkeyOfferNo" class="btn btn-secondary">Not now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage fingerprint / face unlock devices for the Hub organiser -->
+  <div id="passkeyManageModal" class="modal-overlay hideme" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <h3><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">fingerprint</span> Fingerprint / face unlock</h3>
+      <p class="hint">Devices that can open organiser tools without the PIN. Your PIN always works as a backup.</p>
+      <ul class="passkey-list" id="passkeyList"></ul>
+      <p id="passkeyManageError" class="hint" style="color:var(--danger);min-height:1.2em;"></p>
+      <div class="btn-row">
+        <button type="button" id="passkeyManageAdd" class="btn btn-primary hideme">Turn on for this device</button>
+        <button type="button" id="passkeyManageClose" class="btn btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
-  <script src="hub.js" defer></script>
+  <script src="passkey.js?v=20260926b" defer></script>
+  <script src="hub.js?v=20260926b" defer></script>
 </body>
 </html>

@@ -64,6 +64,8 @@ Key patterns:
 
 Config is loaded from a fixed path: `/home/perthrel/grape_private/config.php`.
 
+Passkey (WebAuthn) verification lives in `includes/webauthn.php`, required by api.php. See "Built: Fingerprint / Face Unlock" below.
+
 ### calendar.js (~3,000 lines)
 
 The largest and most complex file. Structure (top to bottom):
@@ -175,6 +177,20 @@ See the "Adding a Category" Word document. Two files: `CATEGORY_META` in calenda
 - Remove from Hub: Hub organiser or calendar organiser (`remove_calendar_from_group`).
 - `go/index.html`: Calendar/Hub toggle; accepts code or full URL (`normalizeLinkInput` prepends `https://` when needed).
 - Hub rate limits in `api.php`: max 50 calendars/Hub; 5 adds/IP/Hub/hour; 15 adds/IP/hour global (override via `config.php` `hub_limits`).
+
+## Built: Fingerprint / Face Unlock (Passkeys)
+
+- Optional WebAuthn login for calendar users (organisers included) and Hub organisers. The PIN is always the backup and is still required to enrol a device.
+- Server: `includes/webauthn.php` (dependency-free; CBOR/COSE parsing, ES256 + RS256 via `openssl_verify`). `includes/` is blocked by its own `.htaccess`.
+- `api.php`: `resolvePasskeySubject()` maps `?c=` + user / `?g=` to a subject; `createUserSession()` / `createGroupSession()` are shared by PIN and passkey logins. Actions: `passkey_register_begin|finish`, `passkey_login_begin|finish`, `passkey_list`, `passkey_remove`.
+- Device list (modelled on the loyalty app's Account page): owners see all their devices (`device_label`, added, last used) and can remove any, so a lost phone can be revoked from another device after a PIN login. `Passkey.syncDevice()` clears stale local enrolment when a device was removed elsewhere.
+- Tables `user_passkeys` / `group_passkeys` (`migrations/001_passkeys.sql`); FK cascades mean cleanup.php needs no changes.
+- Self-disabling: if the tables are missing, `calendar_meta` / `group_meta` return `passkeys: false` and the UI hides everything.
+- Challenges live in the PHP session (`$_SESSION['wruf_webauthn']`), 5-minute TTL, single-use, bound to the subject.
+- `residentKey: 'discouraged'` + `allowCredentials` per user, so the user picks their name first and the device prompts immediately. No usernameless login.
+- Passkeys are domain-bound: whenrufree.net and sandgroper.net passkeys are separate. Leave `webauthn.rp_id` unset unless you want to pin one domain.
+- Browser: `passkey.js` (`window.Passkey`). Enrolment state is remembered per device in localStorage; if the server no longer knows the credential (`NO_PASSKEY`), the client forgets it.
+- Local test: there is no automated test suite in the repo. Verification was done with a throwaway PHP script that emulates an authenticator. On Windows PHP, `openssl_pkey_new()` needs `OPENSSL_CONF` pointing at `extras/ssl/openssl.cnf`.
 
 ## Contact and Access
 

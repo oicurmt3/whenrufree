@@ -4,6 +4,26 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
+## 2026-09-26
+
+### Added
+- **Fingerprint / face unlock (passkeys):** Calendar users, calendar organisers and Hub organisers can unlock with their device's fingerprint, face or screen lock. The 4-digit PIN stays as the backup.
+  - After a successful PIN login (or adding your name), the app offers "Turn on" once per device; "Not now" is remembered on that device
+  - PIN modal shows "Use fingerprint / face / screen lock" and prompts automatically on enrolled devices
+  - Device list (calendar: fingerprint icon next to your name; Hub: organiser **Fingerprint** button): see every device with its name and added / last used dates, remove any of them (e.g. a lost phone), or turn on the current device
+  - New tables: `user_passkeys`, `group_passkeys` (FK cascade, `device_label`). Migration: `migrations/001_passkeys.sql`
+  - API: `passkey_register_begin`, `passkey_register_finish`, `passkey_login_begin`, `passkey_login_finish`, `passkey_list`, `passkey_remove`; `calendar_meta` and `group_meta` report `passkeys`
+  - New files: `includes/webauthn.php` (dependency-free WebAuthn verifier, ES256 + RS256), `includes/.htaccess`, `passkey.js`
+  - Optional config: `webauthn.rp_id`, `webauthn.origin`
+  - Security events: `PASSKEY_ADDED`, `PASSKEY_LOGIN`, `PASSKEY_REMOVED`, `PASSKEY_COUNTER_REPLAY`
+
+### Changed
+- `.htaccess` now blocks direct access to `*.sql` files
+- A successful passkey login clears PIN failed attempts / lockout
+- `calendar.css`, `hub.css`, `passkey.js`, `calendar.js`, `hub.js` links carry `?v=20260926b` cache-busters
+
+---
+
 ## 2026-06-27
 
 ### Added

@@ -246,6 +246,30 @@ h1{
 }
 .footer-links a{color:inherit;}
 
+.btn-passkey{width:100%;}
+.passkey-or{text-align:center;margin:10px 0 4px;}
+.passkey-title-icon{vertical-align:-4px;font-size:26px;}
+.btn-passkey-toggle.on{color:#2e7d32;border-color:#2e7d32;}
+.passkey-icons{display:inline-flex;gap:2px;flex-shrink:0;}
+.passkey-icons .material-symbols-outlined{font-size:20px;}
+
+.passkey-list{list-style:none;margin:8px 0;padding:0;}
+.passkey-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #e0e0e0;}
+.passkey-item:last-child{border-bottom:none;}
+.passkey-item-icon{color:var(--text-muted);font-size:24px;flex-shrink:0;}
+.passkey-item-text{display:flex;flex-direction:column;flex:1;min-width:0;}
+.passkey-item-text strong{font-size:0.95rem;color:var(--text-main);overflow-wrap:anywhere;}
+.passkey-item-sub{font-size:0.8rem;color:var(--text-muted);}
+.passkey-empty{padding:8px 0;color:var(--text-muted);font-size:0.9rem;}
+.passkey-remove{
+  min-height:44px;min-width:44px;padding:0 12px;
+  border:1px solid var(--danger);border-radius:6px;
+  background:transparent;color:var(--danger);
+  font-weight:600;font-size:0.85rem;cursor:pointer;flex-shrink:0;
+}
+.passkey-remove:hover{background:#ffebee;}
+.passkey-remove:disabled{opacity:0.5;cursor:wait;}
+
 .hideme{display:none !important;}
 
 @media (max-width:480px){

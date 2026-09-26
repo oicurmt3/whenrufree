@@ -29,7 +29,7 @@
       This Policy is intended to align with the <b>Privacy Act 1988 (Cth)</b> and the <b>Australian Privacy Principles (APPs)</b>.
     </p>
 
-    <p class="meta">Last updated: 27 June 2026</p>
+    <p class="meta">Last updated: 26 September 2026</p>
 
     <div class="warn">
       <strong>Important:</strong> Calendar and Hub access links act as shared secrets. Anyone with the link can view and respond (calendars) or see the calendar list (Hubs).
@@ -65,6 +65,10 @@
       <p>
         <b>PINs</b> used for access controls are stored as a <b>hashed value</b> (not plaintext) using industry-standard password hashing.
       </p>
+      <p>
+        <b>Fingerprint / face unlock (optional):</b> if you turn this on, we store a <b>public key</b> for your device, a short device name (for example "iPhone"), and when it was added and last used.
+        Your fingerprint, face or screen lock is checked by your own device and <b>is never sent to us</b>. You can remove a device at any time from the device list; it is also deleted with the calendar, name or Hub.
+      </p>
     </div>
 
     <div class="section">
@@ -84,7 +88,7 @@
       <ul>
         <li>Create and display calendars and Hubs and allow participants to record availability.</li>
         <li>Provide ranking and aggregation features based on participant selections.</li>
-        <li>Apply basic access controls (including PIN verification) and reduce misuse.</li>
+        <li>Apply basic access controls (including PIN verification and optional fingerprint / face unlock) and reduce misuse.</li>
         <li>Maintain, troubleshoot, and secure the Service.</li>
       </ul>
       <p>
@@ -168,6 +172,7 @@
         <li>Remembering your calendar login on this browser (until it expires or you log out)</li>
         <li>Storing unsaved availability changes temporarily before they are sent to the server</li>
         <li>Caching Hub organiser login on this browser (until you tap <b>Logout</b> on the Hub page or the session expires)</li>
+        <li>Remembering which names or Hubs have fingerprint / face unlock turned on for this device, and whether you chose <b>Not now</b></li>
       </ul>
       <p>
         We do not store lists of your Hubs or calendars in the browser for quick access. If enabled on the server, essential session cookies may be used for security controls (such as CSRF protection).

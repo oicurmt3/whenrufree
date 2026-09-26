@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- PHP 8.x with PDO MySQL extension
+- PHP 8.x with PDO MySQL and OpenSSL extensions
 - MariaDB 10.x or MySQL 8.x
 - Apache with mod_rewrite (shared hosting via cPanel)
 - HTTPS certificate (Let's Encrypt or cPanel AutoSSL)
@@ -29,6 +29,8 @@ ALTER TABLE calendars
 ```
 
 2. **Calendar Hubs** — run `migrations/add_groups.sql` (creates `groups`, `group_sessions`, adds `calendars.group_id`).
+
+3. **Fingerprint / face unlock** — run `migrations/001_passkeys.sql` (creates `user_passkeys`, `group_passkeys`). Safe to re-run (`CREATE TABLE IF NOT EXISTS`). Until this runs, the feature is hidden automatically and the site works with PINs only.
 
 And fix the known column width issue:
 
@@ -71,8 +73,16 @@ return [
         'max_attempts' => 5,
         'lockout_minutes' => 15,
     ],
+    // Optional. Fingerprint / face unlock (passkeys). Leave out to use the request host,
+    // which is best when the site answers on more than one domain.
+    // 'webauthn' => [
+    //     'rp_id' => 'whenrufree.net',
+    //     'origin' => 'https://whenrufree.net',
+    // ],
 ];
 ```
+
+Passkeys are tied to the domain they were created on. A passkey set up on `whenrufree.net` will not work on `sandgroper.net` (the PIN still does). Changing `rp_id` later invalidates every existing passkey; users simply fall back to their PIN and can turn it on again.
 
 ### 3. File Upload
 
@@ -97,8 +107,10 @@ This handles: inactive calendar deletion, expired session cleanup, rate limit ta
 ## Security Checklist
 
 - [ ] Config file is outside webroot (`/home/perthrel/grape_private/config.php`)
-- [ ] `.htaccess` blocks `cleanup.php`, `config.php`, `error_log`
-- [ ] HTTPS is enabled and HSTS header is active
+- [ ] `.htaccess` blocks `cleanup.php`, `config.php`, `error_log`, `*.sql`
+- [ ] `includes/.htaccess` (`Require all denied`) is uploaded
+- [ ] HTTPS is enabled and HSTS header is active (browsers only allow fingerprint / face unlock over HTTPS)
+- [ ] PHP `openssl` extension is enabled (needed to verify passkey signatures)
 - [ ] Log directory (`grape_private/logs/`) exists with 0750 permissions
 - [ ] `cleanup.php` runs as CLI only (has `php_sapi_name()` guard)
 - [ ] Database user has minimal privileges (SELECT, INSERT, UPDATE, DELETE on app tables only)

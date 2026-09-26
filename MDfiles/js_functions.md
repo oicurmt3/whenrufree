@@ -180,6 +180,20 @@ Complete catalogue of JavaScript functions across the When RU Free frontend.
 | `showInfoModal()` | 1508 | Shows the "Select a Name" prompt modal. |
 | `closeInfoModal()` | 1514 | Closes the info modal. |
 
+### Fingerprint / face unlock (calendar page)
+
+Device memory key: `passkeyId(userId)` = `cal_{calendarToken}_{userId}` (see `passkey.js`).
+
+| Function | Line | Description |
+|----------|------|-------------|
+| `finishUnlock(userId, res)` | 1993 | Shared success path for PIN and passkey login: caches auth, sets current user, refreshes UI. |
+| `passkeyId(userId)` | 2014 | Device-local id for this calendar user. |
+| `passkeysUsable()` | 2015 | True when server reports `passkeys` and the browser supports WebAuthn. |
+| `unlockWithPasskey(userId)` | 2017 | `passkey_login_begin` -> device prompt -> `passkey_login_finish`. Falls back to PIN on cancel / error; forgets device on `NO_PASSKEY`. |
+| `maybeOfferPasskey(userId)` | 2048 | After PIN login or add-name, shows the "Turn on" offer once (skipped if enrolled, dismissed, or no platform authenticator). |
+| `enrolPasskey(userId, errorEl, btn)` | 2068 | `passkey_register_begin` -> device prompt -> `passkey_register_finish` (sends `device_label`); remembers the device. |
+| `openPasskeyManager(userId)` | 2108 | Opened from the fingerprint icon in the user list. `passkey_list` -> device list with Remove per device (`passkey_remove`) and "Turn on for this device". |
+
 ### Hub membership (calendar page)
 
 | Function | Line | Description |
@@ -296,6 +310,20 @@ Hub create/view page. Uses `hubSaveKit` object for copy, share, email, download,
 | `clearCachedGroupAuth(token)` | 425 | Clears Hub organiser cache on Logout. |
 | `authGroup(pin)` | 678 | POST `auth_group`; returns auth token. |
 | `removeCalendarFromHub(calToken, btn)` | 755 | POST `remove_calendar_from_group` (Hub organiser). |
+| `hubPost(action, body, withAuth)` | 392 | POST helper: adds `?g=`, CSRF and (optionally) `X-Group-Auth-Token`. |
+
+### Fingerprint / face unlock (Hub organiser)
+
+Device memory key: `passkeyId()` = `hub_{hubToken}`.
+
+| Function | Line | Description |
+|----------|------|-------------|
+| `finishOrganiserLogin(data)` | 781 | Shared success path for PIN and passkey login: caches auth, closes modal, updates organiser UI. |
+| `passkeysUsable()` | 799 | True when `group_meta` reports `passkeys` and the browser supports WebAuthn. |
+| `unlockWithPasskey()` | 801 | Passkey login for the Hub organiser; falls back to PIN. |
+| `maybeOfferPasskey()` | 838 | One-time "Turn on" offer after PIN login. |
+| `enrolPasskey(errEl, btn)` | 847 | Registers this device for the Hub organiser (sends `device_label`). |
+| `openPasskeyManager()` | 883 | Handler for the organiser toolbar **Fingerprint** button: device list, Remove per device, "Turn on for this device". |
 
 ### UI
 
@@ -307,6 +335,27 @@ Hub create/view page. Uses `hubSaveKit` object for copy, share, email, download,
 | `updateHubPublicUI()` | 607 | Link bar, copy handlers, Create new calendar link. |
 | `updateOrganiserUI()` | 631 | Shows/hides organiser-only Share/Email/Download/Remove. |
 | `renderCalendarGrid()` | 558 | Lists child calendars with links to `calendar.html?c=`. |
+
+---
+
+## passkey.js (~200 lines)
+
+Shared browser helper loaded by `calendar.html` and `hub.html`. Exposes `window.Passkey`. Converts WebAuthn options/credentials to and from base64url JSON, remembers per-device enrolment in localStorage (`wruf_pk_{id}` = credential ID, `wruf_pk_no_{id}` = "Not now" dismissed), and renders the device list used by both pages.
+
+| Method | Line | Description |
+|--------|------|-------------|
+| `supported()` | 73 | Browser exposes `PublicKeyCredential` and `navigator.credentials` (only available over HTTPS or localhost). |
+| `platformAvailable()` | 78 | Device has a built-in fingerprint / face / screen-lock authenticator. |
+| `create(publicKey)` | 87 | Runs `navigator.credentials.create()` and serializes the result for the API. |
+| `get(publicKey)` | 93 | Runs `navigator.credentials.get()` and serializes the result for the API. |
+| `isCancel(e)` | 100 | True when the user cancelled or the prompt timed out. |
+| `isDuplicate(e)` | 105 | True when this device is already registered. |
+| `deviceCredential(id)` / `rememberDevice(id, credId)` / `forgetDevice(id)` | 110 | Device-local enrolment memory. |
+| `wasDismissed(id)` / `dismiss(id)` | 114 | "Not now" memory for the enrolment offer. |
+| `deviceLabel()` | 118 | Short device name from the user agent ("iPhone", "Android phone", "Windows PC", ...), sent as `device_label` on enrolment. |
+| `syncDevice(id, credentials)` | 134 | Forgets this device's enrolment if it is no longer in the server list (removed from another device). Returns the remembered credential ID or null. |
+| `renderList(listEl, credentials, thisDeviceCredId, onRemove)` | 150 | Fills a `<ul>` with devices (label, "this device" marker, added / last used dates, Remove button). Text only, no innerHTML. |
+| `signalRemoved(credentialId)` | 197 | Tells the OS password manager the passkey was removed (where supported). |
 
 ---
 

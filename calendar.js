@@ -670,6 +670,17 @@ const els = {
   pinModalError: qs('#pinModalError'),
   pinCancel: qs('#pinCancel'),
   pinConfirm: qs('#pinConfirm'),
+  pinPasskeyWrap: qs('#pinPasskeyWrap'),
+  pinPasskeyBtn: qs('#pinPasskeyBtn'),
+  passkeyOfferModal: qs('#passkeyOfferModal'),
+  passkeyOfferError: qs('#passkeyOfferError'),
+  passkeyOfferYes: qs('#passkeyOfferYes'),
+  passkeyOfferNo: qs('#passkeyOfferNo'),
+  passkeyManageModal: qs('#passkeyManageModal'),
+  passkeyList: qs('#passkeyList'),
+  passkeyManageError: qs('#passkeyManageError'),
+  passkeyManageAdd: qs('#passkeyManageAdd'),
+  passkeyManageClose: qs('#passkeyManageClose'),
   infoModal: qs('#infoModal'),
   infoModalCancel:qs('#infoModalCancel'),
   infoModalAdd: qs('#infoModalAdd')
@@ -709,6 +720,8 @@ const state = {
   auth:new Map(), // user_id -> {token, role, exp}
   _pendingAuthUserId:null, // Tracks user ID during PIN authentication flow
   _pendingAuthUserObj:null, // Tracks user object during PIN authentication flow
+  passkeysEnabled:false, // Server has fingerprint / face unlock tables (calendar_meta.passkeys)
+  platformPasskey:false, // This device has a built-in fingerprint / face / screen-lock authenticator
   hidePastDates:true // Whether past date columns are currently hidden
 };
 
@@ -794,6 +807,10 @@ async function loadCalendarMeta(){
     const cat=meta.calendar.category ?? 'groups';
     state.calendarTitle=t;
     state.calendarCategories=parseCategories(cat);
+    state.passkeysEnabled = meta.calendar.passkeys === true;
+    if(state.passkeysEnabled && window.Passkey){
+      Passkey.platformAvailable().then(v => { state.platformPasskey = v; });
+    }
     setCalendarHeading(t, cat);
     const slots = Array.isArray(meta.calendar.slots) ? meta.calendar.slots : null;
     if(slots && slots.length){ TIME_SLOTS = slots.map(s=>({id:s, label:s})); }
@@ -963,6 +980,22 @@ function populateUserSelectModal(){
       item.appendChild(check);
     }
     
+    // Fingerprint / face unlock devices for the authenticated selected user
+    if(isAuthenticated && passkeysUsable()){
+      const pkOn = !!Passkey.deviceCredential(passkeyId(u.id));
+      const pkBtn = document.createElement('button');
+      pkBtn.className = 'user-select-passkey' + (pkOn ? ' on' : '');
+      pkBtn.type = 'button';
+      pkBtn.title = pkOn ? 'Fingerprint / face unlock is on for this device - manage devices' : 'Fingerprint / face unlock';
+      pkBtn.setAttribute('aria-label', pkBtn.title);
+      pkBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">fingerprint</span>';
+      pkBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // prevent selecting this user
+        openPasskeyManager(u.id);
+      });
+      item.appendChild(pkBtn);
+    }
+
     // Logout button for authenticated selected user
     if(isAuthenticated){
       const logoutBtn = document.createElement('button');
@@ -1875,6 +1908,7 @@ els.userModalConfirm.addEventListener('click', async ()=>{
       updateCurrentUserDisplay();
       closeUserModal();
       updateUserUI();
+      maybeOfferPasskey(state.currentUserId);
       await ensureDateRangeLoaded();
       renderDateRangeSkeleton();
       updateDateFilterBanner();
@@ -1915,7 +1949,17 @@ function openPinModal(userId, userObj){
   els.pinModalError.style.display='none';
   els.pinInput.value='';
   els.pinModal.classList.add('active');
-  setTimeout(() => els.pinInput.focus(), 50);
+
+  const hasPasskey = passkeysUsable() && !!Passkey.deviceCredential(passkeyId(userId));
+  els.pinPasskeyWrap.hidden = !hasPasskey;
+  els.pinPasskeyBtn.onclick = () => unlockWithPasskey(userId);
+  if(hasPasskey){
+    // Go straight to the fingerprint / face prompt; the PIN field stays as the backup.
+    unlockWithPasskey(userId);
+  } else {
+    setTimeout(() => els.pinInput.focus(), 50);
+  }
+
   els.pinConfirm.onclick = async ()=>{
     const pin=(els.pinInput.value??'').trim();
     if(!validatePin4(pin)){
@@ -1936,30 +1980,188 @@ function openPinModal(userId, userObj){
         return;
       }
       
-      // Auth successful - NOW switch to this user
-      cacheAuth(userId, res.auth_token, res.role, 86400);
-      const u = state._pendingAuthUserObj;
-      state.currentUserId = userId;
-      state.currentUserName = u ? (u.role === 'admin' ? `${u.display_name} (organiser)` : u.display_name) : '';
-      state.currentUserRole = u ? u.role : null;
-      state.pending = restorePendingForUser(userId);
-      
-      // Clear pending auth state
-      state._pendingAuthUserId = null;
-      state._pendingAuthUserObj = null;
-      
-      els.pinModal.classList.remove('active');
-      updateCurrentUserDisplay();
-      updateUserUI();
-      await reloadAvailability();
-      renderDateRangeSkeleton();
-      updateDateFilterBanner();
-      showToast('Unlocked');
+      await finishUnlock(userId, res);
+      maybeOfferPasskey(userId);
     }catch(e){
       els.pinModalError.textContent='Auth failed. Try again.';
       els.pinModalError.style.display='block';
     }
   };
+}
+
+/** Switches to the user after a successful PIN or passkey login. */
+async function finishUnlock(userId, res){
+  cacheAuth(userId, res.auth_token, res.role, 86400);
+  const u = state._pendingAuthUserObj || state.users.find(x => x.id === userId);
+  state.currentUserId = userId;
+  state.currentUserName = u ? (u.role === 'admin' ? `${u.display_name} (organiser)` : u.display_name) : '';
+  state.currentUserRole = u ? u.role : null;
+  state.pending = restorePendingForUser(userId);
+
+  state._pendingAuthUserId = null;
+  state._pendingAuthUserObj = null;
+
+  els.pinModal.classList.remove('active');
+  updateCurrentUserDisplay();
+  updateUserUI();
+  await reloadAvailability();
+  renderDateRangeSkeleton();
+  updateDateFilterBanner();
+  showToast('Unlocked');
+}
+
+/*** Passkeys: fingerprint / face / device screen lock unlock (PIN stays as backup) */
+function passkeyId(userId){ return `cal_${state.token}_${userId}`; }
+function passkeysUsable(){ return state.passkeysEnabled && !!window.Passkey && Passkey.supported(); }
+
+async function unlockWithPasskey(userId){
+  const id = passkeyId(userId);
+  els.pinModalError.style.display='none';
+  els.pinPasskeyBtn.disabled = true;
+  try{
+    const begin = await apiPost('passkey_login_begin', {user_id: userId});
+    if(begin.status !== 'success'){
+      if(begin.code === 'NO_PASSKEY'){ Passkey.forgetDevice(id); els.pinPasskeyWrap.hidden = true; }
+      throw new Error(begin.message || 'Fingerprint unlock failed. Use your PIN.');
+    }
+    const credential = await Passkey.get(begin.publicKey);
+    const res = await apiPost('passkey_login_finish', {user_id: userId, credential});
+    if(res.status !== 'success'){
+      if(res.code === 'NO_PASSKEY'){ Passkey.forgetDevice(id); els.pinPasskeyWrap.hidden = true; }
+      throw new Error(res.message || 'Fingerprint unlock failed. Use your PIN.');
+    }
+    Passkey.rememberDevice(id, credential.rawId);
+    await finishUnlock(userId, res);
+  }catch(e){
+    if(Passkey.isCancel(e)){
+      els.pinInput.focus();
+      return;
+    }
+    els.pinModalError.textContent = e.message || 'Fingerprint unlock failed. Use your PIN.';
+    els.pinModalError.style.display='block';
+  }finally{
+    els.pinPasskeyBtn.disabled = false;
+  }
+}
+
+/** After a PIN login, offers fingerprint / face unlock once per name on capable devices. */
+async function maybeOfferPasskey(userId){
+  if(!passkeysUsable()) return;
+  const id = passkeyId(userId);
+  if(Passkey.deviceCredential(id) || Passkey.wasDismissed(id)) return;
+  if(!(await Passkey.platformAvailable())) return;
+
+  els.passkeyOfferError.style.display='none';
+  els.passkeyOfferModal.classList.add('active');
+  els.passkeyOfferNo.onclick = () => {
+    Passkey.dismiss(id);
+    els.passkeyOfferModal.classList.remove('active');
+  };
+  els.passkeyOfferYes.onclick = async () => {
+    if(await enrolPasskey(userId, els.passkeyOfferError, els.passkeyOfferYes)){
+      els.passkeyOfferModal.classList.remove('active');
+    }
+  };
+}
+
+/** Registers this device for a logged-in user. Returns true when fingerprint unlock is on. */
+async function enrolPasskey(userId, errorEl, btn){
+  const auth = state.auth.get(userId) || getCachedAuth(userId);
+  if(!auth?.token) return false;
+  const id = passkeyId(userId);
+  const fail = (msg) => {
+    if(errorEl){ errorEl.textContent = msg; errorEl.style.display='block'; }
+    else showToast(msg);
+  };
+
+  if(btn) btn.disabled = true;
+  if(errorEl) errorEl.style.display='none';
+  try{
+    const begin = await apiPost('passkey_register_begin', {}, auth.token);
+    if(begin.status !== 'success'){
+      fail(begin.message || 'Could not turn on fingerprint unlock.');
+      return false;
+    }
+    const credential = await Passkey.create(begin.publicKey);
+    const res = await apiPost('passkey_register_finish', {credential, device_label: Passkey.deviceLabel()}, auth.token);
+    if(res.status !== 'success' && res.code !== 'PASSKEY_EXISTS'){
+      fail(res.message || 'Could not turn on fingerprint unlock.');
+      return false;
+    }
+    Passkey.rememberDevice(id, res.credential_id || credential.rawId);
+    showToast('Fingerprint / face unlock is on');
+    return true;
+  }catch(e){
+    if(Passkey.isDuplicate(e)){
+      Passkey.rememberDevice(id, null);
+      showToast('Fingerprint / face unlock is on');
+      return true;
+    }
+    if(!Passkey.isCancel(e)) fail('Could not turn on fingerprint unlock.');
+    return false;
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
+/** Lists this name's fingerprint / face unlock devices; any can be removed (e.g. a lost phone). */
+async function openPasskeyManager(userId){
+  const auth = state.auth.get(userId) || getCachedAuth(userId);
+  if(!auth?.token) return;
+  const id = passkeyId(userId);
+  const showError = (msg) => {
+    els.passkeyManageError.textContent = msg;
+    els.passkeyManageError.style.display = msg ? 'block' : 'none';
+  };
+
+  const render = (credentials) => {
+    const mine = Passkey.syncDevice(id, credentials);
+    Passkey.renderList(els.passkeyList, credentials, mine, removeDevice);
+    els.passkeyManageAdd.hidden = !!mine;
+  };
+
+  const removeDevice = async (cred, btn) => {
+    const isThis = cred.credential_id === Passkey.deviceCredential(id);
+    const what = isThis ? 'this device' : (cred.device_label || 'this device');
+    if(!confirm(`Remove fingerprint / face unlock from ${what}? The PIN still works.`)) return;
+    btn.disabled = true;
+    showError('');
+    const res = await apiPost('passkey_remove', {credential_id: cred.credential_id}, auth.token);
+    if(res.status !== 'success'){
+      btn.disabled = false;
+      showError(res.message || 'Could not remove this device.');
+      return;
+    }
+    if(isThis) Passkey.forgetDevice(id);
+    Passkey.signalRemoved(cred.credential_id);
+    render(res.credentials);
+    populateUserSelectModal();
+    showToast('Device removed');
+  };
+
+  showError('');
+  els.passkeyList.textContent = '';
+  els.passkeyManageAdd.hidden = true;
+  els.passkeyManageModal.classList.add('active');
+  els.passkeyManageClose.onclick = () => els.passkeyManageModal.classList.remove('active');
+  els.passkeyManageAdd.onclick = async () => {
+    if(await enrolPasskey(userId, els.passkeyManageError, els.passkeyManageAdd)){
+      const again = await apiPost('passkey_list', {}, auth.token);
+      if(again.status === 'success') render(again.credentials);
+      populateUserSelectModal();
+    }
+  };
+
+  try{
+    const res = await apiPost('passkey_list', {}, auth.token);
+    if(res.status !== 'success'){
+      showError(res.message || 'Could not load devices.');
+      return;
+    }
+    render(res.credentials);
+  }catch(e){
+    showError('Could not load devices. Check your connection.');
+  }
 }
 
 /**

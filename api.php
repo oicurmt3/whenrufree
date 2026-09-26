@@ -456,6 +456,11 @@ function isSensitivePostAction(string $action): bool {
         'create_group',
         'save',
         'add_user',
+        'passkey_register_begin',
+        'passkey_register_finish',
+        'passkey_login_begin',
+        'passkey_login_finish',
+        'passkey_remove',
     ];
     return in_array($action, $sensitive, true);
 }
@@ -597,6 +602,16 @@ function recordFailedAttempt(PDO $pdo, int $userId, int $maxAttempts = 5, int $l
 function resetFailedAttempts(PDO $pdo, int $userId): void {
     $pdo->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = :uid")
         ->execute([':uid' => $userId]);
+}
+
+/** Issue a 24-hour calendar user session token (sent back via X-Auth-Token). */
+function createUserSession(PDO $pdo, int $calendarId, int $userId): string {
+    $tok = bin2hex(random_bytes(32));
+    $pdo->prepare(
+        "INSERT INTO user_sessions (calendar_id, user_id, token, created_at, expires_at)
+         VALUES (:cid, :uid, :tok, NOW(), DATE_ADD(NOW(), INTERVAL 1 DAY))"
+    )->execute([':cid' => $calendarId, ':uid' => $userId, ':tok' => $tok]);
+    return $tok;
 }
 
 /**
@@ -766,6 +781,16 @@ function resetGroupFailedAttempts(PDO $pdo, int $groupId): void {
         ->execute([':gid' => $groupId]);
 }
 
+/** Issue a 24-hour Hub organiser session token (sent back via X-Group-Auth-Token). */
+function createGroupSession(PDO $pdo, int $groupId): string {
+    $tok = bin2hex(random_bytes(32));
+    $pdo->prepare(
+        "INSERT INTO group_sessions (group_id, token, created_at, expires_at)
+         VALUES (:gid, :tok, NOW(), DATE_ADD(NOW(), INTERVAL 1 DAY))"
+    )->execute([':gid' => $groupId, ':tok' => $tok]);
+    return $tok;
+}
+
 /**
  * @returns array{group_id:int, role:string}|null
  */
@@ -802,6 +827,58 @@ function resolveGroupTokenFromPost(): ?string {
         respond(400, ['status' => 'error', 'message' => 'Invalid group token']);
     }
     return $gt;
+}
+
+// -------------------------
+// Passkey (fingerprint / face) helpers
+// -------------------------
+
+require_once __DIR__ . '/includes/webauthn.php';
+
+/**
+ * Resolve who a passkey request is for.
+ * ?g= targets the Hub organiser; ?c= targets a calendar user - the logged-in user
+ * when $requireSession, otherwise the POSTed user_id (login).
+ */
+function resolvePasskeySubject(PDO $pdo, bool $requireSession): array {
+    if (isset($_GET['g'])) {
+        $grp = getGroupByToken($pdo, requireGroupTokenParam());
+        if (!$grp) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
+        if ($requireSession) requireGroupOrganiserSession($pdo, (int)$grp['id']);
+        return [
+            'kind' => 'group',
+            'id' => (int)$grp['id'],
+            'name' => (string)$grp['organiser_name'],
+            'context' => (string)($grp['title'] ?: 'Hub'),
+        ];
+    }
+
+    $stmtC = $pdo->prepare("SELECT id, title FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+
+    if ($requireSession) {
+        $userId = requireSession($pdo, $calId)['user_id'];
+    } else {
+        $userId = (int)($_POST['user_id'] ?? 0);
+        if ($userId <= 0) respond(400, ['status' => 'error', 'message' => 'Invalid request']);
+    }
+
+    $stmtU = $pdo->prepare("SELECT id, display_name, role FROM users WHERE id = :uid AND calendar_id = :cid");
+    $stmtU->execute([':uid' => $userId, ':cid' => $calId]);
+    $user = $stmtU->fetch();
+    if (!$user) respond(404, ['status' => 'error', 'message' => 'User not found']);
+
+    return [
+        'kind' => 'user',
+        'id' => (int)$user['id'],
+        'calendar_id' => $calId,
+        'role' => (string)$user['role'],
+        'name' => (string)$user['display_name'],
+        'context' => (string)($cal['title'] ?: 'Calendar'),
+    ];
 }
 
 // -------------------------
@@ -1063,6 +1140,7 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             'title' => (string)($grp['title'] ?? ''),
             'token' => (string)$grp['token'],
             'calendar_count' => count($calendars),
+            'passkeys' => webauthnTablesReady($pdo),
         ],
         'calendars' => $calendars,
     ]);
@@ -1092,12 +1170,7 @@ if ($action === 'auth_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     resetGroupFailedAttempts($pdo, $groupId);
 
-    $sessTok = bin2hex(random_bytes(32));
-    $stmtS = $pdo->prepare(
-        "INSERT INTO group_sessions (group_id, token, created_at, expires_at)
-         VALUES (:gid, :tok, NOW(), DATE_ADD(NOW(), INTERVAL 1 DAY))"
-    );
-    $stmtS->execute([':gid' => $groupId, ':tok' => $sessTok]);
+    $sessTok = createGroupSession($pdo, $groupId);
 
     touchGroupActivity($pdo, $groupId);
 
@@ -1278,6 +1351,8 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     unset($cal['group_id'], $cal['group_token'], $cal['group_title']);
+
+    $cal['passkeys'] = webauthnTablesReady($pdo);
 
     respond(200, ['status' => 'success', 'calendar' => $cal]);
 }
@@ -1539,16 +1614,96 @@ if ($action === 'auth_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     resetFailedAttempts($pdo, $userId);
 
-    $tok = bin2hex(random_bytes(32));
-    $stmtS = $pdo->prepare(
-        "INSERT INTO user_sessions (calendar_id, user_id, token, created_at, expires_at)
-         VALUES (:cid, :uid, :tok, NOW(), DATE_ADD(NOW(), INTERVAL 1 DAY))"
-    );
-    $stmtS->execute([':cid' => $calId, ':uid' => $userId, ':tok' => $tok]);
+    $tok = createUserSession($pdo, $calId, $userId);
 
     $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
 
     respond(200, ['status' => 'success', 'auth_token' => $tok, 'role' => (string)$user['role'], 'user_id' => $userId]);
+}
+
+// -------------------------
+// Passkeys: fingerprint / face / device screen lock login (PIN stays as backup)
+// Every action takes ?c=<calendar token> (calendar user) or ?g=<hub token> (Hub organiser).
+// -------------------------
+if (str_starts_with($action, 'passkey_') && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    webauthnRequireTables($pdo);
+    $ip = clientIp();
+    $minute = gmdate('YmdHi');
+
+    // Start enrolling this device (must already be logged in with PIN)
+    if ($action === 'passkey_register_begin') {
+        $subject = resolvePasskeySubject($pdo, true);
+        enforceActionRateLimit($pdo, $ip, 'pkr' . $minute, 20, 'Too many attempts. Try again shortly.');
+        respond(200, ['status' => 'success', 'publicKey' => webauthnRegisterOptions($pdo, $config, $subject)]);
+    }
+
+    if ($action === 'passkey_register_finish') {
+        $subject = resolvePasskeySubject($pdo, true);
+        enforceActionRateLimit($pdo, $ip, 'pkr' . $minute, 20, 'Too many attempts. Try again shortly.');
+        $cred = $_POST['credential'] ?? null;
+        if (!is_array($cred)) respond(400, ['status' => 'error', 'message' => 'Invalid request']);
+
+        $credentialId = webauthnRegisterFinish($pdo, $config, $subject, $cred, $_POST['device_label'] ?? null);
+        logSecurityEvent('PASSKEY_ADDED', ['subject' => webauthnSubjectKey($subject)]);
+        respond(200, ['status' => 'success', 'credential_id' => $credentialId]);
+    }
+
+    // Start a passkey login for a chosen name (calendar: POST user_id) or the Hub organiser
+    if ($action === 'passkey_login_begin') {
+        $subject = resolvePasskeySubject($pdo, false);
+        enforceActionRateLimit($pdo, $ip, 'pkl' . $minute, 30, 'Too many attempts. Try again shortly.');
+        respond(200, ['status' => 'success', 'publicKey' => webauthnLoginOptions($pdo, $config, $subject)]);
+    }
+
+    if ($action === 'passkey_login_finish') {
+        $subject = resolvePasskeySubject($pdo, false);
+        enforceActionRateLimit($pdo, $ip, 'pkl' . $minute, 30, 'Too many attempts. Try again shortly.');
+        $cred = $_POST['credential'] ?? null;
+        if (!is_array($cred)) respond(400, ['status' => 'error', 'message' => 'Invalid request']);
+
+        webauthnLoginFinish($pdo, $config, $subject, $cred);
+        logSecurityEvent('PASSKEY_LOGIN', ['subject' => webauthnSubjectKey($subject)]);
+
+        // A verified passkey is stronger than a PIN, so it also clears any PIN lockout.
+        if ($subject['kind'] === 'group') {
+            resetGroupFailedAttempts($pdo, $subject['id']);
+            $sessTok = createGroupSession($pdo, $subject['id']);
+            touchGroupActivity($pdo, $subject['id']);
+            respond(200, [
+                'status' => 'success',
+                'auth_token' => $sessTok,
+                'role' => 'admin',
+                'organiser_name' => $subject['name'],
+            ]);
+        }
+
+        resetFailedAttempts($pdo, $subject['id']);
+        $tok = createUserSession($pdo, $subject['calendar_id'], $subject['id']);
+        $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")
+            ->execute([':cid' => $subject['calendar_id']]);
+        respond(200, [
+            'status' => 'success',
+            'auth_token' => $tok,
+            'role' => $subject['role'],
+            'user_id' => $subject['id'],
+        ]);
+    }
+
+    // Devices with fingerprint / face unlock for the logged-in user or Hub organiser
+    if ($action === 'passkey_list') {
+        $subject = resolvePasskeySubject($pdo, true);
+        respond(200, ['status' => 'success', 'credentials' => webauthnList($pdo, $subject)]);
+    }
+
+    // Turn off fingerprint / face unlock for one device (owner only, from any of their devices)
+    if ($action === 'passkey_remove') {
+        $subject = resolvePasskeySubject($pdo, true);
+        $credentialId = (string)($_POST['credential_id'] ?? '');
+        $removed = webauthnDelete($pdo, $subject, $credentialId);
+        if ($removed) logSecurityEvent('PASSKEY_REMOVED', ['subject' => webauthnSubjectKey($subject)]);
+        respond(200, ['status' => 'success', 'removed' => $removed, 'credentials' => webauthnList($pdo, $subject)]);
+    }
 }
 
 // Availability fetch (read-only)

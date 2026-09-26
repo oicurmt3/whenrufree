@@ -10,3 +10,8 @@ SetEnv GRAPE_CONFIG_PATH /home/perthrel/grape_private/config.php
     Require all denied
 </FilesMatch>
 
+# SQL migrations - schema files, not for web access
+<FilesMatch "\.sql$">
+    Require all denied
+</FilesMatch>
+

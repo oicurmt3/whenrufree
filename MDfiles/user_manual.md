@@ -78,6 +78,7 @@ A **Hub** gives your group one link to find all related calendars (e.g. club fix
 **Managing a Hub (organiser PIN required)**
 
 - **Organiser login** on the Hub page for: Share, Email, Download, and removing calendars from the Hub
+- **Fingerprint** button (after logging in) lists your fingerprint / face unlock devices: turn it on for this device or remove any device. PIN remains the backup
 - **Logout** on shared computers when finished managing
 - Your organiser PIN is not stored in the download file — remember it separately
 
@@ -129,7 +130,26 @@ Your PIN is private -- it protects your selections from being changed by others.
 
 - Open the same calendar link
 - If your session is still active (24 hours), you will be automatically logged in
-- Otherwise, tap the person icon, select your name, and enter your PIN
+- Otherwise, tap the person icon, select your name, and enter your PIN (or use your fingerprint or face, if turned on)
+
+### Fingerprint / Face Unlock
+
+On phones, tablets and laptops that support it (fingerprint, Face ID, Windows Hello or a device screen lock), you can skip typing your PIN:
+
+1. Log in with your PIN (or add your name). The app asks **Turn on fingerprint / face unlock?**
+2. Tap **Turn on** and confirm with your fingerprint or face
+3. Next time, select your name and your device will prompt straight away
+
+Good to know:
+- It works per device and per calendar. Turn it on separately on each phone or computer you use
+- Your PIN always still works. If the fingerprint prompt fails or is cancelled, just type your PIN
+- Your fingerprint or face never leaves your device. The site only stores a public key
+
+**Managing your devices:** open the user list and tap the fingerprint icon next to your name (green = on for this device). You will see every device set up for your name, when it was added and last used:
+- **Remove** turns it off for that device. Lost your phone? Log in with your PIN on another device and remove it here
+- **Turn on for this device** appears if the device you are holding is not set up yet (handy if you tapped **Not now** earlier)
+
+Hub organisers get the same options: after logging in on the Hub page, use the **Fingerprint** button in the organiser toolbar.
 
 ### Viewing Results
 

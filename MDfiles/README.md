@@ -11,6 +11,7 @@ An organiser creates a calendar with custom time slots, date ranges, and status 
 ## Key Features
 
 - No sign-up required -- PIN-based authentication per calendar
+- Optional fingerprint / face unlock (WebAuthn passkeys) for users and organisers, with the PIN as backup
 - Three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices)
 - Customisable time slots (1-6), status options (1-5 with colours and weights), and date ranges (up to 360 days)
 - Date filtering: organiser can show/hide specific dates for participants
@@ -47,6 +48,9 @@ index.css        - Creation page styles
 calendar.html    - Calendar view/interaction page
 calendar.js      - Calendar logic (3,000+ lines)
 calendar.css     - Calendar styles
+passkey.js       - Fingerprint / face unlock browser helper (window.Passkey)
+includes/        - Server-only PHP (webauthn.php); blocked by .htaccess
+migrations/      - SQL migrations (blocked from the web)
 admin.html       - Super admin panel
 admin.js         - Admin panel logic
 admin.css        - Admin panel styles
@@ -69,6 +73,7 @@ robots.txt       - Search engine directives
 - `users` - Participants per calendar (name, PIN hash, role)
 - `availability` - Status selections per user/date/slot
 - `user_sessions` - Auth tokens with expiry
+- `user_passkeys` / `group_passkeys` - Fingerprint / face unlock public keys
 - `api_rate_limit` - Per-IP request throttling
 
 ## Security Model
@@ -77,6 +82,7 @@ robots.txt       - Search engine directives
 - Per-IP rate limiting (configurable, default 120/min)
 - PIN hashing with password_hash/password_verify
 - Account lockout after 5 failed attempts (15 min)
+- Passkeys: user verification required, origin + RP ID checked, single-use challenges bound to the user, sign-counter replay detection
 - Session tokens: 64-char hex, 24-hour expiry
 - Calendar tokens: 8-char URL-safe (new) or 48-char (legacy)
 - All dynamic HTML output escaped

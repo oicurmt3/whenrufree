@@ -18,7 +18,7 @@ All endpoints use the URL pattern `api.php?action=ACTION_NAME&c=CALENDAR_TOKEN`.
 ### Obtaining Tokens
 
 1. **CSRF token:** `GET api.php?action=csrf_token` returns `{csrf_token: "..."}`. Cached per browser session.
-2. **Auth token:** `POST api.php?action=auth_user` with valid PIN returns `{auth_token: "..."}`. Expires after 24 hours.
+2. **Auth token:** `POST api.php?action=auth_user` with valid PIN (or `passkey_login_finish` with a verified fingerprint / face unlock) returns `{auth_token: "..."}`. Expires after 24 hours.
 
 ## Rate Limiting
 
@@ -26,7 +26,7 @@ All requests are rate-limited per IP address. Default: 120 requests per minute. 
 
 Client IP is taken from `REMOTE_ADDR` by default. `X-Forwarded-For` is honoured only when the direct connection comes from an IP listed in `config.php` `trusted_proxies` (empty by default).
 
-If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `auth_user`, `auth_group`, `create_calendar`, `create_group`, `save`, `add_user`) return HTTP 503 instead of running unthrottled.
+If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `auth_user`, `auth_group`, `create_calendar`, `create_group`, `save`, `add_user`, and the five `passkey_*` actions) return HTTP 503 instead of running unthrottled.
 
 Exceeding the limit returns HTTP 429:
 ```json
@@ -92,12 +92,13 @@ Returns full calendar configuration and metadata.
 | chosen_date | string/null | Locked-in date (YYYY-MM-DD) or null |
 | chosen_slot | string/null | Locked-in slot ID or null |
 | group | object/null | `{token, title}` when calendar belongs to a Hub |
+| passkeys | bool | `true` when fingerprint / face unlock is available on this server (passkey tables exist) |
 
 ### GET group_meta
 
 Public hub listing (secret URL). Parameter: `g` (hub token).
 
-**Response:** `{ group: {title, token, calendar_count}, calendars: [{token, title, start_date, end_date, is_frozen, last_activity}] }`
+**Response:** `{ group: {title, token, calendar_count, passkeys}, calendars: [{token, title, start_date, end_date, is_frozen, last_activity}] }`
 
 ### POST create_group
 
@@ -221,6 +222,68 @@ Renames a user. Self or organiser.
 Organiser deletes a participant (not themselves). Cascades to availability and sessions.
 
 **Auth required (admin).** Body: `user_id`
+
+---
+
+## Passkeys (fingerprint / face unlock)
+
+Optional WebAuthn login for calendar users (including organisers) and Hub organisers. The 4-digit PIN always remains as the backup. Server code lives in `includes/webauthn.php` (no libraries): ES256 and RS256 keys, attestation `none`, user verification required.
+
+All six actions are **POST + CSRF** and take either:
+- `?c=CALENDAR_TOKEN` — a calendar user, or
+- `?g=HUB_TOKEN` — the Hub organiser.
+
+If the passkey tables have not been created, every action returns HTTP 503 with code `PASSKEYS_UNAVAILABLE` (and `calendar_meta` / `group_meta` report `passkeys: false`, so the UI hides the feature).
+
+Rate limits per IP: enrolment 20/min (`pkr` key), login 30/min (`pkl` key). Challenges are single-use, bound to the specific user or Hub, and expire after 5 minutes.
+
+### POST passkey_register_begin
+
+Starts enrolling this device. **Auth required** — `X-Auth-Token` (calendar) or `X-Group-Auth-Token` (Hub). No body.
+
+**Response:** `{status, publicKey}` — options for `navigator.credentials.create()` (binary fields base64url-encoded). Returns 409 `PASSKEY_LIMIT` when the user or Hub already has 10 devices.
+
+### POST passkey_register_finish
+
+**Auth required.** Body: `credential` (serialized `PublicKeyCredential` from `passkey.js`), optional `device_label` (e.g. "iPhone"; reduced server-side to letters, digits, spaces and `. ( ) / -`, max 40 chars).
+
+**Response:** `{status, credential_id}`. Returns 409 `PASSKEY_EXISTS` if this device is already set up.
+
+### POST passkey_login_begin
+
+Starts a login. No session. Body (calendar only): `user_id`.
+
+**Response:** `{status, publicKey}` — options for `navigator.credentials.get()`, with `allowCredentials` limited to that user's (or Hub's) devices. Returns 404 `NO_PASSKEY` when none are set up.
+
+### POST passkey_login_finish
+
+No session. Body: `credential`, plus `user_id` for calendars.
+
+Verifies origin, RP ID hash, user-presence and user-verification flags, signature and sign counter. On success it clears any PIN lockout and responds exactly like the PIN login:
+- Calendar: `{status, auth_token, role, user_id}` (same as `auth_user`)
+- Hub: `{status, auth_token, role: "admin", organiser_name}` (same as `auth_group`)
+
+### POST passkey_list
+
+Devices set up for the logged-in user or Hub organiser. **Auth required.** No body.
+
+**Response:**
+```json
+{
+  "status": "success",
+  "credentials": [
+    {"credential_id": "base64url", "device_label": "iPhone", "created_at": "2026-09-26 08:51:00", "last_used_at": null}
+  ]
+}
+```
+
+The client marks the entry whose `credential_id` matches its own remembered ID as "this device". Dates are server-local.
+
+### POST passkey_remove
+
+Turns off fingerprint / face unlock for one device — any of the owner's devices, so a lost phone can be removed from another device. **Auth required.** Body: `credential_id` (base64url).
+
+**Response:** `{status, removed, credentials}` (`removed` is false if the credential did not belong to this user or Hub; `credentials` is the updated list).
 
 ---
 
@@ -363,6 +426,10 @@ All security-relevant actions are logged to `grape_private/logs/security_YYYY-MM
 | CHOOSE_SLOT | Organiser locks in a date+slot |
 | UNCHOOSE_SLOT | Organiser reopens the calendar |
 | GROUP_AUTH_FAILED | Invalid Hub organiser PIN attempt |
+| PASSKEY_ADDED | Fingerprint / face unlock turned on for a device |
+| PASSKEY_LOGIN | Successful fingerprint / face unlock |
+| PASSKEY_REMOVED | Fingerprint / face unlock turned off for a device |
+| PASSKEY_COUNTER_REPLAY | Passkey sign counter went backwards (possible cloned authenticator); login rejected |
 | ADD_CALENDAR_TO_GROUP | Calendar attached to a Hub |
 | REMOVE_CALENDAR_FROM_GROUP | Calendar detached from a Hub |
 | ADMIN_DELETE_CALENDAR | Super admin deletes a calendar |

@@ -174,6 +174,37 @@ Hub organiser auth sessions.
 
 ---
 
+## Table: user_passkeys
+
+Fingerprint / face unlock (WebAuthn) credentials for calendar users. Created by `migrations/001_passkeys.sql`.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
+| calendar_id | BIGINT UNSIGNED | - | FK to calendars.id (CASCADE DELETE) |
+| user_id | BIGINT UNSIGNED | - | FK to users.id (CASCADE DELETE) |
+| credential_id | VARBINARY(255) | - | Raw WebAuthn credential ID (unique across the site) |
+| public_key_pem | TEXT | - | Device public key (SPKI PEM). Not a secret |
+| alg | SMALLINT | -7 | COSE algorithm: -7 = ES256, -257 = RS256 |
+| sign_count | INT UNSIGNED | 0 | Last authenticator counter (replay / clone detection) |
+| transports_json | VARCHAR(255) | NULL | JSON array of transports reported by the browser |
+| device_label | VARCHAR(40) | NULL | Short device name shown in the device list ("iPhone", "Windows PC"). Sanitised plain text |
+| created_at | DATETIME | CURRENT_TIMESTAMP | When the device was set up |
+| last_used_at | DATETIME | NULL | Last successful unlock |
+
+**Business rules:**
+- Max 10 devices per user (`WEBAUTHN_MAX_PER_SUBJECT`)
+- Deleting a calendar or user deletes its passkeys (FK cascade) — no cleanup.php changes needed
+- No biometric data is stored; the fingerprint / face check happens on the device
+
+---
+
+## Table: group_passkeys
+
+Same as `user_passkeys`, but for Hub organisers. `group_id` (FK to groups.id, CASCADE DELETE) replaces `calendar_id` / `user_id`.
+
+---
+
 ## Table: api_rate_limit
 
 Per-IP request throttling.
@@ -193,5 +224,6 @@ Per-IP request throttling.
 - Upsert pattern resets count when minute_key changes (new minute window)
 - General API limit uses `minute_key` as `YYYYMMDDHHmm`
 - Hub add limits use action keys such as `hub_add_{groupId}_{YYYYMMDDHH}` and `hub_add_global_{YYYYMMDDHH}` (see `enforceActionRateLimit` in api.php)
+- Passkey limits use `pkr{YYYYMMDDHHmm}` (enrolment) and `pkl{YYYYMMDDHHmm}` (login) — kept within the 16-char column
 - Known race condition on concurrent upserts (acceptable at current scale)
 - Pruned by cleanup.php (default: entries older than 60 minutes)
