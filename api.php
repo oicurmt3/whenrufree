@@ -1066,6 +1066,7 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($slotCapacity === false) respond(400, ['status' => 'error', 'message' => 'Invalid people per slot']);
     $maxPerUser = null;
     $perUserTotal = false;
+    $bookingStyles = [];
     if ($slotCapacity !== null) {
         if (!bookingColumnsReady($pdo)) {
             respond(400, ['status' => 'error', 'message' => 'Booking is not available yet']);
@@ -1076,6 +1077,16 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($perUserTotal && !bookingTotalColumnReady($pdo)) {
             respond(400, ['status' => 'error', 'message' => 'Bookings per person in total is not available yet']);
         }
+        // Partly booked / Full colours and names are cosmetic: ignored until migration 006 has run
+        foreach (['partial_color', 'full_color'] as $k) {
+            $bookingStyles[$k] = bookingColorValue($_POST[$k] ?? null);
+            if ($bookingStyles[$k] === false) respond(400, ['status' => 'error', 'message' => 'Invalid booking colour']);
+        }
+        foreach (['partial_label', 'full_label'] as $k) {
+            $bookingStyles[$k] = bookingStateLabelValue($_POST[$k] ?? null);
+            if ($bookingStyles[$k] === false) respond(400, ['status' => 'error', 'message' => 'Invalid booking name']);
+        }
+        if (!bookingStyleColumnsReady($pdo)) $bookingStyles = [];
         if (count($statuses) !== 1) respond(400, ['status' => 'error', 'message' => 'Bookings use one choice']);
         $statuses[0]['weight'] = 1;
         if ($isPrivate === 2) {
@@ -1139,6 +1150,16 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($perUserTotal) {
                     $pdo->prepare("UPDATE calendars SET per_user_total = 1 WHERE id = :id")
                         ->execute([':id' => $calId]);
+                }
+                if (array_filter($bookingStyles, fn ($v) => $v !== null)) {
+                    $pdo->prepare(
+                        "UPDATE calendars SET partial_color = :pc, full_color = :fc, partial_label = :pl, full_label = :fl
+                         WHERE id = :id"
+                    )->execute([
+                        ':pc' => $bookingStyles['partial_color'], ':fc' => $bookingStyles['full_color'],
+                        ':pl' => $bookingStyles['partial_label'], ':fl' => $bookingStyles['full_label'],
+                        ':id' => $calId,
+                    ]);
                 }
             }
 
@@ -1411,6 +1432,9 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $token = requireToken();
     $bookingCols = bookingColumnsReady($pdo) ? 'c.slot_capacity, c.max_per_user, c.bookings_closed,' : '';
     if ($bookingCols !== '' && bookingTotalColumnReady($pdo)) $bookingCols .= ' c.per_user_total,';
+    if ($bookingCols !== '' && bookingStyleColumnsReady($pdo)) {
+        $bookingCols .= ' c.partial_color, c.full_color, c.partial_label, c.full_label,';
+    }
     $stmt = $pdo->prepare(
         "SELECT c.id, c.token, c.group_id, c.title, c.category, c.slots_json, c.statuses_json,
                 c.start_date, c.end_date, c.exclude_weekends, c.date_filter_mode, c.date_filter_dates,
@@ -1479,6 +1503,9 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $cal['max_per_user'] = $booking['per_user'];
     $cal['per_user_total'] = $booking['per_user_total'];
     $cal['bookings_closed'] = $booking['closed'];
+    foreach (bookingStylesFromRow($cal) as $k => $v) {
+        $cal[$k] = $booking['capacity'] !== null ? $v : null;
+    }
 
     // Hub breadcrumb when calendar belongs to a group
     if (!empty($cal['group_id']) && !empty($cal['group_token'])) {
@@ -2797,6 +2824,7 @@ if ($action === 'get_site_config' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         'access_emoji' => accessTablesReady($pdo),
         'booking' => bookingColumnsReady($pdo),
         'booking_total' => bookingColumnsReady($pdo) && bookingTotalColumnReady($pdo),
+        'booking_styles' => bookingColumnsReady($pdo) && bookingStyleColumnsReady($pdo),
     ];
     try {
         $stmt = $pdo->query("SELECT config_json FROM site_config WHERE id = 1 LIMIT 1");

@@ -39,7 +39,7 @@
     </style>
 
   <!-- Page styles -->
-  <link rel="stylesheet" href="index.css?v=20260926d">
+  <link rel="stylesheet" href="index.css?v=20260926g">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
 </head>
 <body>
@@ -204,6 +204,21 @@ celebration
             <input type="text" id="bookingLabel" class="label-input" maxlength="20" value="Booked" />
           </div>
           <div id="bookingLabelErr" class="error"></div>
+          <!-- Partly booked / Full colours and names (shown once migrations/006 has run) -->
+          <div id="bookingStyleRows" class="hideme">
+            <div id="bookingPartialRow">
+              <div class="booking-label-row">
+                <input type="color" id="bookingPartialColor" class="color-pick" value="#ffb74d" title="Choose color" aria-label="Partly booked colour" />
+                <input type="text" id="bookingPartialLabel" class="label-input" maxlength="20" value="Partly booked" aria-label="Name for partly booked slots" />
+              </div>
+              <div id="bookingPartialLabelErr" class="error"></div>
+            </div>
+            <div class="booking-label-row">
+              <input type="color" id="bookingFullColor" class="color-pick" value="#c62828" title="Choose color" aria-label="Full colour" />
+              <input type="text" id="bookingFullLabel" class="label-input" maxlength="20" value="Full" aria-label="Name for full slots" />
+            </div>
+            <div id="bookingFullLabelErr" class="error"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -459,6 +474,6 @@ celebration
 
   <!-- Page script -->
   <script src="emoji.js?v=20260926b" defer></script>
-  <script src="index.js?v=20260926l" defer></script>
+  <script src="index.js?v=20260926n" defer></script>
 </body>
 </html>

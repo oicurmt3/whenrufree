@@ -5,6 +5,8 @@
  * calendars.slot_capacity  NULL = normal availability poll, 1..BOOKING_MAX_PER_SLOT = people per slot
  * calendars.max_per_user   NULL = no limit, 1..BOOKING_MAX_PER_USER = bookings per person (organiser exempt)
  * calendars.per_user_total 0 = max_per_user counts per day, 1 = across the whole calendar (migration 005)
+ * calendars.partial_color / full_color  #rrggbb cell colours, NULL = defaults (migration 006)
+ * calendars.partial_label / full_label  names for partly booked / full slots, NULL = defaults (migration 006)
  * calendars.bookings_closed 1 = organiser closed bookings
  *
  * Bookings reuse the availability table (status 1 = booked). The save endpoint locks the calendar
@@ -44,6 +46,40 @@ function bookingTotalColumnReady(PDO $pdo): bool {
     return $cache[$key];
 }
 
+/** True once migrations/006_booking_styles.sql has been applied. */
+function bookingStyleColumnsReady(PDO $pdo): bool {
+    static $cache = [];
+    $key = spl_object_id($pdo);
+    if (!isset($cache[$key])) {
+        try {
+            $pdo->query('SELECT partial_color, full_color, partial_label, full_label FROM calendars LIMIT 0');
+            $cache[$key] = true;
+        } catch (PDOException $e) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
+}
+
+/** Normalise a submitted #rrggbb colour: lowercase string, null when empty, false when invalid. */
+function bookingColorValue(mixed $v): string|null|false {
+    if ($v === null || $v === '') return null;
+    if (!is_string($v) || !preg_match('/^#[0-9a-fA-F]{6}$/', $v)) return false;
+    return strtolower($v);
+}
+
+/**
+ * Normalise a submitted slot-state name (same rules as status labels): trimmed string,
+ * null when empty, false when invalid.
+ */
+function bookingStateLabelValue(mixed $v): string|null|false {
+    if ($v === null) return null;
+    if (!is_string($v)) return false;
+    $v = trim(preg_replace('/\s+/', ' ', $v));
+    if ($v === '') return null;
+    return preg_match("/^[A-Za-z0-9][A-Za-z0-9'\\- ]{0,19}$/u", $v) ? $v : false;
+}
+
 /**
  * Parse a submitted limit. Returns null for "no limit" (null, '', 0, false), the limit (1..$max),
  * or false when the value is invalid.
@@ -59,6 +95,7 @@ function bookingLimitValue(mixed $v, int $max): int|null|false {
 /**
  * Booking settings for a calendar row (columns may be missing before migrations 004 / 005).
  * per_user_total is true only when a per-person limit is set and counts across the whole calendar.
+ * Colours and names are not part of this (see bookingStylesFromRow).
  * @return array{capacity:int|null, per_user:int|null, per_user_total:bool, closed:bool}
  */
 function bookingSettingsFromRow(array $row): array {
@@ -72,6 +109,24 @@ function bookingSettingsFromRow(array $row): array {
         'per_user_total' => $per !== null && !empty($row['per_user_total']),
         'closed' => $cap !== null && !empty($row['bookings_closed']),
     ];
+}
+
+/**
+ * Partly booked / Full colours and names for a booking calendar row
+ * (null = client default; columns may be missing before migration 006).
+ * @return array{partial_color:string|null, full_color:string|null, partial_label:string|null, full_label:string|null}
+ */
+function bookingStylesFromRow(array $row): array {
+    $out = [];
+    foreach (['partial_color', 'full_color'] as $k) {
+        $v = bookingColorValue($row[$k] ?? null);
+        $out[$k] = is_string($v) ? $v : null;
+    }
+    foreach (['partial_label', 'full_label'] as $k) {
+        $v = bookingStateLabelValue($row[$k] ?? null);
+        $out[$k] = is_string($v) ? $v : null;
+    }
+    return $out;
 }
 
 /**

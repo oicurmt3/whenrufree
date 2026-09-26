@@ -37,7 +37,7 @@ ALTER TABLE calendars
 
 5. **Access emoji** - run `migrations/003_access_emoji.sql` (adds `access_emoji` to `calendars` and `groups`; creates `access_grants`, `access_attempts`). Safe to re-run. Until this runs, the emoji switch is hidden and no calendar or Hub asks for an emoji.
 
-6. **Booking** - run `migrations/004_booking.sql` (adds `slot_capacity`, `max_per_user`, `bookings_closed` to `calendars`). Safe to re-run. Until this runs, **People per slot** is hidden on the create page and every calendar is a normal availability poll. Then run `migrations/005_booking_total.sql` (adds `per_user_total`) to show the **Per day / In total** toggle under Bookings per person; until then every limit is per day.
+6. **Booking** - run `migrations/004_booking.sql` (adds `slot_capacity`, `max_per_user`, `bookings_closed` to `calendars`). Safe to re-run. Until this runs, **People per slot** is hidden on the create page and every calendar is a normal availability poll. Then run `migrations/005_booking_total.sql` (adds `per_user_total`) to show the **Per day / In total** toggle under Bookings per person; until then every limit is per day. Then run `migrations/006_booking_styles.sql` (adds `partial_color`, `full_color`, `partial_label`, `full_label`) to show the Partly booked / Full colour and name settings; until then cells use the default orange / red and names.
 
 And fix the known column width issue:
 

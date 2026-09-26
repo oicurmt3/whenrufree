@@ -18,7 +18,7 @@ An organiser creates a calendar with custom time slots, date ranges, and status 
 - Date filtering: organiser can show/hide specific dates for participants
 - Auto-ranked "Best Match" analysis with expandable rosters
 - Organiser can lock in a chosen date+slot to finalise the calendar
-- Booking mode: limit each slot to 1-20 people (first come, first served) and optionally the bookings per person (per day or in total); taps toggle and save like a normal calendar, full slots are locked, and a Bookings card lists Booked / Free slots
+- Booking mode: limit each slot to 1-20 people (first come, first served) and optionally the bookings per person (per day or in total); taps toggle and save like a normal calendar, full slots are locked, and a Bookings card lists your own (Mine) or Free slots, or Booked / Free for the organiser
 - Organiser message visible to all participants
 - Auto-save with manual save fallback
 - Template URLs for pre-configured calendars

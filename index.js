@@ -1546,6 +1546,13 @@ const BOOKING_PRIVACY_HINTS = {
 const bookingLabelEl = document.getElementById('bookingLabel');
 const bookingColorEl = document.getElementById('bookingColor');
 const bookingLabelErrEl = document.getElementById('bookingLabelErr');
+// Partly booked / Full colours and names (migrations/006)
+const bookingPartialColorEl = document.getElementById('bookingPartialColor');
+const bookingFullColorEl = document.getElementById('bookingFullColor');
+const bookingPartialLabelEl = document.getElementById('bookingPartialLabel');
+const bookingFullLabelEl = document.getElementById('bookingFullLabel');
+const bookingPartialLabelErrEl = document.getElementById('bookingPartialLabelErr');
+const bookingFullLabelErrEl = document.getElementById('bookingFullLabelErr');
 
 /**
  * Segmented No limit / 1 / 2 / More control; "More" shows a stepper (3..BOOKING_LIMIT_MAX).
@@ -1653,13 +1660,16 @@ function isBookingMode() {
 }
 
 let bookingSupported = false;
+let bookingStylesSupported = false;
 
 /** Shows People per slot once the server supports booking. */
 function initBookingField(features) {
   if (!features || features.booking !== true) return;
   bookingSupported = true;
   bookingTotalSupported = features.booking_total === true;
+  bookingStylesSupported = features.booking_styles === true;
   document.getElementById('capacityField').classList.remove('hideme');
+  document.getElementById('bookingStyleRows').classList.toggle('hideme', !bookingStylesSupported);
   renderPerUserScope();
 }
 
@@ -1668,6 +1678,8 @@ function applyBookingMode() {
   const booking = isBookingMode();
   document.getElementById('perUserField').classList.toggle('hideme', !booking);
   document.getElementById('optionsSection').classList.toggle('hideme', booking);
+  // A one-person slot is either free or full, never partly booked
+  document.getElementById('bookingPartialRow').classList.toggle('hideme', capacityControl.value === 1);
   const blindBtn = document.querySelector('#privacyToggle .priv-btn[data-mode="blind"]');
   if (blindBtn) blindBtn.classList.toggle('hideme', booking);
   if (booking && privacyMode === 'blind') setPrivacyMode('hidden');
@@ -1676,19 +1688,43 @@ function applyBookingMode() {
   validateAll();
 }
 
-function validateBookingLabel() {
-  const v = normaliseStatusLabel(bookingLabelEl.value);
-  let msg = '';
-  if (!v) msg = 'Required';
-  else if (!STATUS_REGEX.test(v)) msg = 'Use letters, numbers, spaces, apostrophes and hyphens only (max 20).';
-  bookingLabelErrEl.textContent = msg;
-  bookingLabelErrEl.style.display = msg ? 'block' : 'none';
+/** Error for a booking name (same rules as option labels); others = names it must differ from. */
+function bookingNameError(v, others) {
+  if (!v) return 'Required';
+  if (!STATUS_REGEX.test(v)) return 'Use letters, numbers, spaces, apostrophes and hyphens only (max 20).';
+  if (others.some(o => o && o.toLowerCase() === v.toLowerCase())) return 'Duplicate label';
+  return '';
+}
+
+function showBookingNameError(el, msg) {
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
   return !msg;
 }
 
-bookingLabelEl.addEventListener('input', () => { validateBookingLabel(); validateAll(); });
-bookingColorEl.addEventListener('input', () => applyColorPreview(bookingColorEl, bookingLabelEl));
-applyColorPreview(bookingColorEl, bookingLabelEl);
+/** Validates the Booked label and, when shown, the Partly booked / Full names. */
+function validateBookingLabel() {
+  const booked = normaliseStatusLabel(bookingLabelEl.value);
+  let ok = showBookingNameError(bookingLabelErrEl, bookingNameError(booked, []));
+  if (bookingStylesSupported) {
+    const hasPartial = capacityControl.value !== 1;
+    const partial = normaliseStatusLabel(bookingPartialLabelEl.value);
+    const full = normaliseStatusLabel(bookingFullLabelEl.value);
+    ok = showBookingNameError(bookingPartialLabelErrEl, hasPartial ? bookingNameError(partial, [booked]) : '') && ok;
+    ok = showBookingNameError(bookingFullLabelErrEl, bookingNameError(full, hasPartial ? [booked, partial] : [booked])) && ok;
+  }
+  return ok;
+}
+
+for (const [picker, input] of [
+  [bookingColorEl, bookingLabelEl],
+  [bookingPartialColorEl, bookingPartialLabelEl],
+  [bookingFullColorEl, bookingFullLabelEl]
+]) {
+  input.addEventListener('input', () => { validateBookingLabel(); validateAll(); });
+  picker.addEventListener('input', () => applyColorPreview(picker, input));
+  applyColorPreview(picker, input);
+}
 
 /************** CREATE CALENDAR **************/
 const createBtn   = document.getElementById('createBtn');
@@ -1794,6 +1830,14 @@ async function createCalendar(){
       body.slot_capacity = capacityControl.value;
       body.max_per_user = perUserControl.value;
       if (perUserTotal && perUserControl.value !== null) body.per_user_total = 1;
+      if (bookingStylesSupported) {
+        if (capacityControl.value > 1) {
+          body.partial_color = bookingPartialColorEl.value;
+          body.partial_label = normaliseStatusLabel(bookingPartialLabelEl.value);
+        }
+        body.full_color = bookingFullColorEl.value;
+        body.full_label = normaliseStatusLabel(bookingFullLabelEl.value);
+      }
     }
 
     const resp = await accessFetch('api.php?action=create_calendar', {

@@ -723,7 +723,7 @@ const state = {
   chosenSlot:null, // Slot ID if organiser has locked in a slot (null = open)
   hubGroup:null, // { token, title } when calendar belongs to a Hub
   booking:null, // { capacity, perUser, perUserTotal, closed } for booking calendars (null = availability poll)
-  bookingView:null, // 'booked' or 'free' once chosen; null = default for the role
+  bookingView:null, // 'booked' (organiser) / 'mine' (others) / 'free' once chosen; null = default for the role
   expandedRanks:new Set(),
   auth:new Map(), // user_id -> {token, role, exp}
   _pendingAuthUserId:null, // Tracks user ID during PIN authentication flow
@@ -897,10 +897,15 @@ async function loadCalendarMeta(){
           capacity: cap,
           perUser: per >= 1 ? per : null,
           perUserTotal: per >= 1 && meta.calendar.per_user_total === true,
-          closed: meta.calendar.bookings_closed === true
+          closed: meta.calendar.bookings_closed === true,
+          partialLabel: bookingStateName(meta.calendar.partial_label, 'Partly booked'),
+          fullLabel: bookingStateName(meta.calendar.full_label, 'Full')
         }
       : null;
-    if(state.booking) applyBookingChrome();
+    if(state.booking){
+      applyBookingColors(meta.calendar.partial_color, meta.calendar.full_color);
+      applyBookingChrome();
+    }
 
     // Custom status options (1..5). Falls back to defaults if absent/invalid.
     applyStatusOptions(meta.calendar.statuses ?? null);
@@ -2911,10 +2916,22 @@ function buildRankScores(){
 function updateSortToggleUI(){
   if(!els.sortToggle) return;
 
-  // Booking calendars: Booked / Free list toggle for everyone
+  // Booking calendars: Booked / Free for the organiser, Mine / Free for everyone else
   if(isBookingMode()){
     els.sortToggle.style.display = 'flex';
     if(els.analysisTitleText) els.analysisTitleText.style.display = 'none';
+    const [firstBtn, freeBtn] = els.sortToggle.querySelectorAll('.sort-btn');
+    if(isAuthedOrganiser()){
+      setBookingViewButton(firstBtn, 'booked', 'check_circle', 'Booked');
+    } else {
+      let label = 'Mine';
+      if(state.currentUserId && state.auth.get(state.currentUserId)){
+        const n = myTotalBookingCount(true);
+        label = state.booking.perUserTotal ? `Mine (${n} of ${state.booking.perUser})` : `Mine (${n})`;
+      }
+      setBookingViewButton(firstBtn, 'mine', 'person', label);
+    }
+    setBookingViewButton(freeBtn, 'free', 'event_available', 'Free');
     const view = currentBookingView();
     els.sortToggle.querySelectorAll('.sort-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.mode === view);
@@ -3467,9 +3484,26 @@ function isAuthedOrganiser(){
   return !!(auth && auth.role === 'admin');
 }
 
-/** Booked list by default for the organiser, Free list for everyone else. */
+/**
+ * Bookings card list. The organiser toggles Booked / Free, everyone else Mine / Free; the page
+ * always opens on Booked / Mine. A choice that doesn't fit the current role (e.g. after signing
+ * in as organiser) falls back to that role's first button.
+ */
 function currentBookingView(){
-  return state.bookingView || (isAuthedOrganiser() ? 'booked' : 'free');
+  const first = isAuthedOrganiser() ? 'booked' : 'mine';
+  return state.bookingView === 'free' ? 'free' : first;
+}
+
+function setBookingViewButton(btn, mode, icon, label){
+  if(!btn) return;
+  btn.dataset.mode = mode;
+  const iconEl = document.createElement('span');
+  iconEl.className = 'material-symbols-outlined';
+  iconEl.setAttribute('aria-hidden', 'true');
+  iconEl.textContent = icon;
+  const text = document.createElement('span');
+  text.textContent = label;
+  btn.replaceChildren(iconEl, text);
 }
 
 function bookingUserName(uid){
@@ -3481,16 +3515,8 @@ function bookingUserName(uid){
 /** Page wording and toggle labels for booking calendars. */
 function applyBookingChrome(){
   document.title = state.calendarTitle ? `${state.calendarTitle} - book a slot` : 'When RU Free';
-  const views = [['booked', 'check_circle', 'Booked'], ['free', 'event_available', 'Free']];
-  const btns = els.sortToggle ? els.sortToggle.querySelectorAll('.sort-btn') : [];
-  btns.forEach((btn, i) => {
-    const v = views[i];
-    if(!v) return;
-    btn.dataset.mode = v[0];
-    btn.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${v[1]}</span><span>${v[2]}</span>`;
-  });
   if(els.analysisTitleText) els.analysisTitleText.textContent = 'Bookings';
-  state.rankLimit = 10;
+  state.rankLimit = 2;
   const bannerText = els.nameBanner ? els.nameBanner.querySelector('p') : null;
   if(bannerText) bannerText.textContent = 'Add your name, then tap a free slot to book it.';
   for(const [el, label] of [[els.resetMineBtn, 'Cancel my bookings'], [els.resetAllBtn, 'Cancel ALL bookings (admin)']]){
@@ -3500,12 +3526,27 @@ function applyBookingChrome(){
   }
 }
 
+/** Organiser-chosen Partly booked / Full name, or the default. */
+function bookingStateName(name, fallback){
+  return typeof name === 'string' && name.trim() ? name.trim() : fallback;
+}
+
+/** Organiser-chosen Partly booked / Full colours (null keeps the CSS defaults). */
+function applyBookingColors(partial, full){
+  const root = document.documentElement;
+  for(const [name, color] of [['partial', partial], ['full', full]]){
+    if(typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) continue;
+    root.style.setProperty(`--bk-${name}`, color);
+    root.style.setProperty(`--bk-${name}-text`, getContrastTextColor(color));
+  }
+}
+
 function renderBookingLegend(){
   els.legendWrap.innerHTML = '';
   const cap = state.booking.capacity;
   const items = [['free', 'Free'], ['mine', 'Yours']];
-  if(cap >= 2) items.push(['partial', cap === 2 ? '1 left' : 'Places left']);
-  items.push(['full', 'Full']);
+  if(cap >= 2) items.push(['partial', state.booking.partialLabel]);
+  items.push(['full', state.booking.fullLabel]);
   for(const [kind, text] of items){
     const item = document.createElement('div'); item.className = 'legend-item';
     const dot = document.createElement('div'); dot.className = `dot bk-dot bk-dot-${kind}`;
@@ -3536,16 +3577,16 @@ function bookingInfo(dateStr, slotId){
   return { ids, mine, count, left: Math.max(0, cap - count), full: count >= cap };
 }
 
+/**
+ * Cell sub-line text. People's names never go in the cell (no room); they are on the Bookings card.
+ * Slots for 2+ people get a separate "N/M" count (see renderBookingCell), so here they return
+ * just the booking label, Free or the Full name ('' when only the count applies).
+ */
 function bookingCellText(info){
-  const roster = shouldShowRoster();
-  const others = info.ids.filter(id => id !== state.currentUserId).map(bookingUserName);
   if(info.mine) return bookingLabel();
   if(info.count === 0) return 'Free';
-  if(roster && others.length){
-    return info.full ? others.join(', ') : `${others.join(', ')} - ${info.left} left`;
-  }
-  if(info.full) return state.booking.capacity === 1 ? bookingLabel() : 'Full';
-  return `${info.left} left`;
+  if(state.booking.capacity >= 2) return info.full ? state.booking.fullLabel : '';
+  return state.booking.fullLabel;
 }
 
 function renderBookingCell(el, dateStr, slot){
@@ -3554,9 +3595,20 @@ function renderBookingCell(el, dateStr, slot){
   el.classList.toggle('bk-mine', info.mine);
   el.classList.toggle('bk-full', !info.mine && info.full);
   el.classList.toggle('bk-partial', !info.mine && !info.full && info.count > 0);
-  const text = bookingCellText(info);
+  const cap = state.booking.capacity;
+  let text = bookingCellText(info);
   const sub = el.querySelector('.bk-sub');
-  if(sub) sub.textContent = text;
+  if(cap >= 2){
+    if(sub){
+      const count = document.createElement('span');
+      count.className = 'bk-count';
+      count.textContent = `${info.count}/${cap}`;
+      sub.replaceChildren(count, ` ${text || 'booked'}`);
+    }
+    text = text ? `${text}, ${info.count} of ${cap} booked` : `${info.count} of ${cap} booked`;
+  } else if(sub){
+    sub.textContent = text;
+  }
   el.title = `${slot.label}: ${text}`;
   el.setAttribute('aria-label', `${formatFriendlyDate(dateStr)}, ${slot.label}: ${text}`);
 }
@@ -3840,7 +3892,7 @@ function bookingRoster(info, dateStr, slot, isOrg){
   return list;
 }
 
-/** Share pill (same as Best Match) listing who booked the slot. */
+/** Share pill (same as Best Match) listing who booked the slot; only on your own bookings. */
 function bookingShareButton(info, dateStr, slot){
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -3867,9 +3919,7 @@ function buildBookedRow({ dateStr, slot, info }, { cap, closed, isOrg, roster })
       ics.className = 'btn-pill btn-ics';
       ics.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">download</span> Download';
       actions.appendChild(add); actions.appendChild(ics);
-    }
-    if(roster && info.ids.length) actions.appendChild(bookingShareButton(info, dateStr, slot));
-    if(info.mine){
+      actions.appendChild(bookingShareButton(info, dateStr, slot));
       if(!closed || isOrg){
         const cancel = document.createElement('button');
         cancel.type = 'button';
@@ -3888,7 +3938,6 @@ function buildBookedRow({ dateStr, slot, info }, { cap, closed, isOrg, roster })
 function buildFreeRow({ dateStr, slot, info }, { cap, closed, isOrg, roster }){
   const summary = info.count === 0 ? 'Free' : `${info.left} of ${cap} left`;
   return bookingRankCard(dateStr, slot, { mine: false, summary, fillDetails: (details, actions) => {
-    if(roster && info.ids.length) actions.appendChild(bookingShareButton(info, dateStr, slot));
     if(!closed){
       const book = document.createElement('button');
       book.type = 'button';
@@ -3901,7 +3950,7 @@ function buildFreeRow({ dateStr, slot, info }, { cap, closed, isOrg, roster }){
   }});
 }
 
-/** Bookings card: "N of M booked", then the Booked or Free list in date order. */
+/** Bookings card: "N of M booked", then the Booked, Mine or Free list in date order. */
 function renderBookings(){
   updateSortToggleUI();
   updateLimitToggleUI();
@@ -3919,7 +3968,9 @@ function renderBookings(){
       const info = bookingInfo(dateStr, slot.id);
       taken += Math.min(info.count, cap);
       places += cap;
-      const include = view === 'booked' ? info.count > 0 : (!info.full && !info.mine);
+      const include = view === 'booked' ? info.count > 0
+        : view === 'mine' ? info.mine
+        : (!info.full && !info.mine);
       if(include) rows.push({ dateStr, slot, info });
     }
   }
@@ -3930,12 +3981,6 @@ function renderBookings(){
   count.className = 'bk-summary-text';
   count.textContent = cap === 1 ? `${taken} of ${places} booked` : `${taken} of ${places} places booked`;
   head.appendChild(count);
-  if(state.booking.perUserTotal && !isOrg && state.currentUserId && state.auth.get(state.currentUserId)){
-    const mine = document.createElement('span');
-    mine.className = 'bk-summary-mine';
-    mine.textContent = `You've booked ${myTotalBookingCount(true)} of ${state.booking.perUser}`;
-    head.appendChild(mine);
-  }
   if(isOrg && !closed){
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
@@ -3947,14 +3992,17 @@ function renderBookings(){
   els.rankWrap.appendChild(head);
 
   if(!rows.length){
-    els.rankEmpty.textContent = view === 'booked' ? 'No bookings yet.' : (closed ? 'Bookings are closed.' : 'No free slots.');
+    const signedIn = !!(state.currentUserId && state.auth.get(state.currentUserId));
+    els.rankEmpty.textContent = view === 'booked' ? 'No bookings yet.'
+      : view === 'mine' ? (signedIn ? "You haven't booked anything yet - tap a free slot to book it." : 'Pick your name to see your bookings.')
+      : (closed ? 'Bookings are closed.' : 'No free slots.');
     els.rankEmpty.style.display = 'block';
     return;
   }
   els.rankEmpty.style.display = 'none';
   const shown = state.rankLimit === 0 ? rows : rows.slice(0, state.rankLimit);
   for(const row of shown){
-    els.rankWrap.appendChild(view === 'booked'
+    els.rankWrap.appendChild(view !== 'free'
       ? buildBookedRow(row, { cap, closed, isOrg, roster })
       : buildFreeRow(row, { cap, closed, isOrg, roster }));
   }
@@ -4084,7 +4132,7 @@ els.sortToggle.addEventListener('click', (e)=>{
   if(!btn) return;
   const mode = btn.dataset.mode;
   if(isBookingMode()){
-    if(mode === 'booked' || mode === 'free'){ state.bookingView = mode; renderRankings(); }
+    if(mode === 'booked' || mode === 'mine' || mode === 'free'){ state.bookingView = mode; renderRankings(); }
     return;
   }
   if(!mode || mode === state.rankSortOrder) return;

@@ -33,6 +33,10 @@ Core configuration for each scheduling calendar.
 | access_emoji | TINYINT UNSIGNED | NULL | Access emoji position 0-34 (list in `emoji.js`), NULL = none. Migration 003 |
 | slot_capacity | TINYINT UNSIGNED | NULL | Booking calendars: people per slot 1-20. NULL = normal availability poll. Migration 004 |
 | max_per_user | TINYINT UNSIGNED | NULL | Booking calendars: bookings each person can hold 1-20 (per day, or in total when `per_user_total` = 1), NULL = no limit. Migration 004 |
+| partial_color | CHAR(7) | NULL | Booking calendars: `#rrggbb` cell colour for partly booked slots, NULL = default orange. Migration 006 |
+| partial_label | VARCHAR(20) | NULL | Booking calendars: legend name for partly booked slots (option-label rules), NULL = "Partly booked". Migration 006 |
+| full_label | VARCHAR(20) | NULL | Booking calendars: legend and cell name for full slots (option-label rules), NULL = "Full". Migration 006 |
+| full_color | CHAR(7) | NULL | Booking calendars: `#rrggbb` cell colour for full slots, NULL = default red. Migration 006 |
 | per_user_total | TINYINT(1) | 0 | Booking calendars: 1 = `max_per_user` counts across the whole calendar, 0 = per day. Ignored when `max_per_user` is NULL. Migration 005 |
 | bookings_closed | TINYINT(1) | 0 | Booking calendars: 1 = organiser closed bookings. Migration 004 |
 

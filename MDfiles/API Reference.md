@@ -79,7 +79,7 @@ An organiser can give a calendar or Hub one of 35 emoji (stored as its position 
 
 ### GET get_site_config
 
-Public site config for the create pages. **Response:** `{ status, config, features: { access_emoji: bool, booking: bool, booking_total: bool } }` - `features.access_emoji` is `true` once migration 003 has run (the create pages show the emoji switch only then); `features.booking` is `true` once migration 004 has run (the create page shows **People per slot** only then); `features.booking_total` is `true` once migration 005 has also run (the create page shows the **Per day / In total** toggle only then).
+Public site config for the create pages. **Response:** `{ status, config, features: { access_emoji: bool, booking: bool, booking_total: bool, booking_styles: bool } }` - `features.access_emoji` is `true` once migration 003 has run (the create pages show the emoji switch only then); `features.booking` is `true` once migration 004 has run (the create page shows **People per slot** only then); `features.booking_total` is `true` once migration 005 has also run (the create page shows the **Per day / In total** toggle only then); `features.booking_styles` is `true` once migration 006 has also run (the create page shows the Partly booked / Full colour and name settings only then).
 
 ### POST access_check
 
@@ -151,6 +151,8 @@ Returns full calendar configuration and metadata.
 | slot_capacity | int/null | Booking calendars: people per slot (1-20). `null` = normal availability poll |
 | max_per_user | int/null | Booking calendars: bookings each person can hold (1-20), `null` = no limit |
 | per_user_total | bool | `true` = `max_per_user` counts across the whole calendar, `false` = per day |
+| partial_color / full_color | string/null | Booking calendars: `#rrggbb` cell colours for partly booked / full slots, `null` = default (orange / red) |
+| partial_label / full_label | string/null | Booking calendars: names for partly booked / full slots, `null` = default ("Partly booked" / "Full") |
 | bookings_closed | bool | Booking calendars: `true` when the organiser has closed bookings |
 
 ### GET group_meta
@@ -250,6 +252,8 @@ Creates a new calendar with an organiser account.
 | slot_capacity | int | No | 1-20: makes a booking calendar (people per slot). Omit, `null` or 0 for a normal availability poll |
 | max_per_user | int | No | Booking only: 1-20 bookings per person (organiser exempt); omit, `null` or 0 for no limit |
 | per_user_total | int | No | Booking only: `1` = count `max_per_user` across the whole calendar, otherwise per day. Ignored without `max_per_user`; 400 if migration 005 has not run |
+| partial_color / full_color | string | No | Booking only: `#rrggbb` cell colours for partly booked / full slots (400 if not `#rrggbb`). Ignored until migration 006 has run |
+| partial_label / full_label | string | No | Booking only: names for partly booked / full slots, same rules as option labels (400 if invalid). Ignored until migration 006 has run |
 
 Booking calendars must send exactly one status (its weight is forced to 1) and cannot use Blind privacy (`is_private` 2 returns 400). Before migration 004 a `slot_capacity` returns 400 "Booking is not available yet". Booking settings cannot be changed after creation.
 

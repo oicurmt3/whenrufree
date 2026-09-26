@@ -215,11 +215,14 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 | Function | Line | Description |
 |----------|------|-------------|
 | `isBookingMode()` / `isBookingClosed()` | 3453 | Booking calendar? Bookings closed? |
-| `currentBookingView()` | 3466 | `'booked'` or `'free'` list: the user's toggle choice, else Booked for an authenticated organiser and Free for everyone else. |
-| `applyBookingChrome()` | 3477 | Page title, Booked / Free labels on `#sortToggle`, name banner text, "Cancel my bookings" titles; list limit 10. |
-| `renderBookingLegend()` | 3498 | Legend: Free / Yours / (1 left or Places left when capacity is 2+) / Full. |
+| `currentBookingView()` | 3491 | `'booked'`, `'mine'` or `'free'` list. Organiser: Booked / Free; everyone else: Mine / Free. Always opens on Booked / Mine; only an explicit Free choice sticks, anything else maps to the role's first button. |
+| `setBookingViewButton(btn, mode, icon, label)` | 3510 | Sets a `#sortToggle` button's mode, icon and label (text only, no HTML). `updateSortToggleUI()` labels the first button Booked (organiser) or "Mine (N)" / "Mine (N of M)" (In total limit) on every render. |
+| `applyBookingChrome()` | 3500 | Page title, name banner text, "Cancel my bookings" titles; list limit 2. |
+| `applyBookingColors(partial, full)` | 3503 | Sets `--bk-partial` / `--bk-full` (and `-text` contrast colours via `getContrastTextColor()`) from `calendar_meta`; `null` keeps the CSS defaults (orange / red). |
+| `bookingStateName(name, fallback)` | 3509 | Organiser's Partly booked / Full name from `calendar_meta`, or the default. |
+| `renderBookingLegend()` | 3525 | Legend: Free / Yours / (partly booked name when capacity is 2+) / full name (`state.booking.partialLabel` / `fullLabel`). |
 | `bookingInfo(dateStr, slotId)` | 3517 | `{ids, mine, count, left, full}` for a slot, including your unsaved change. Others are the larger of the known rows and the anonymous summary (minus your saved booking), so it works in Hidden mode too. |
-| `bookingCellText(info)` / `renderBookingCell(el, dateStr, slot)` / `refreshBookingCells()` | 3534 | Cell sub-line (your booking shows the booking label, e.g. "Booked", on the booking colour / Free / names / "N left" / Full or the booking label) and classes `bk-mine`, `bk-partial`, `bk-full`. Names only when `shouldShowRoster()`. |
+| `bookingCellText(info)` / `renderBookingCell(el, dateStr, slot)` / `refreshBookingCells()` | 3534 | Cell sub-line (your booking shows the booking label, e.g. "Booked", on the booking colour / Free / the booking label when taken) and classes `bk-mine`, `bk-partial`, `bk-full`. Slots for 2+ people start the sub-line with a `.bk-count` "N/M" (people booked so far / people per slot), then the label, Free, "booked" or Full. Cells never show names (no room); names are on the Bookings card. |
 | `myBookingCount(dateStr)` / `myTotalBookingCount(withPending)` | 3575 | Your bookings that count towards Bookings per person, saved plus unsaved: that day's, or all of them when `state.booking.perUserTotal` / all your bookings (saved only for "Cancel my bookings"; `withPending` adds unsaved changes). |
 | `onBookingSlotClick(dateStr, slotId)` / `setPendingBooking(dateStr, slotId, status)` | 3597 | Tap: closed / pick a name / unlock checks, "This slot is taken", the per-person limit message, else toggles Booked / not booked as a pending change (repaints the cell, Submit state, auto-save). Toggling back to the saved state removes the pending entry. |
 | `bookingCardAction(dateStr, slotId)` | 3638 | Book / Cancel buttons on the Bookings card: the same toggle, saved straight away. |
@@ -227,7 +230,7 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 | `cancelMyBookings(auth)` | 3713 | "Cancel my bookings": one confirm, then `reset_user`; clears pending changes. |
 | `bookingDates()` | 3734 | Visible dates in order; past dates follow the Show/Hide past dates button. |
 | `bookingRankCard(...)` / `bookingRoster(...)` | 3754 | Booking rows built like normal Best Match cards: `.rank-card` header button (date - slot, summary, View/Hide pill) expanding to `.rank-actions` and a `.roster-inline` (name + booking tag, organiser remove x). Your own bookings get `.bk-card-mine`. |
-| `renderBookings()` | 3866 | Bookings card: "N of M booked", organiser **Close bookings**, then Booked rows (`buildBookedRow`: Add / Download on your own, Share when names are visible (`bookingShareButton()`), Cancel on your own, roster) or Free rows (`buildFreeRow`: Free / "N of M left", Share, Book, roster). Pills use the same `.btn-pill` classes and sizes as Best Match. Respects the 2 / 10 / All limit. |
+| `renderBookings()` | 3866 | Bookings card: "N of M booked", organiser **Close bookings**, then Booked or Mine rows (`buildBookedRow`; Mine = only your own slots, including unsaved: Add / Download / Share (`bookingShareButton()`) / Cancel on your own bookings only, roster) or Free rows (`buildFreeRow`: Free / "N of M left", Book, roster; no Share). Pills use the same `.btn-pill` classes and sizes as Best Match. Respects the 2 / 10 / All limit. |
 | `updateBookingClosedBanner()` / `setBookingsClosed(closed)` | 3918 | "Bookings closed" banner with organiser Reopen; POST `set_bookings_closed`. |
 | `startBookingRefresh()` / `refreshBookings()` | 3968 | Every 30 s and on tab focus: re-reads `bookings_closed` from `calendar_meta` and reloads availability (skipped while saving). |
 

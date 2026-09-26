@@ -125,6 +125,7 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
  min-width: 100px;
  background-color:#fff;
 }
+#titleInput{ font-weight: 400; }
 .field input[type="checkbox"]{
  width:20px;
  height:20px;
