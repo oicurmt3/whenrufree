@@ -39,7 +39,7 @@
     </style>
 
   <!-- Page styles -->
-  <link rel="stylesheet" href="index.css?v=20260926b">
+  <link rel="stylesheet" href="index.css?v=20260926c">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
 </head>
 <body>
@@ -190,13 +190,23 @@ celebration
           <button type="button" class="btn btn-secondary stepper-btn" data-step="1" aria-label="More bookings">+</button>
         </div>
         <p class="hint" id="perUserHint">Each person can book 1 slot in total.</p>
+
+        <!-- Booking label + colour (replaces the Options section while booking) -->
+        <div id="bookingPanel">
+          <label for="bookingLabel">Booking label</label>
+          <div class="booking-label-row">
+            <input type="color" id="bookingColor" class="color-pick" value="#357a38" title="Choose color" aria-label="Booking colour" />
+            <input type="text" id="bookingLabel" class="label-input" maxlength="20" value="Booked" />
+          </div>
+          <div id="bookingLabelErr" class="error"></div>
+        </div>
       </div>
     </div>
 
-    <!-- Status Options -->
-    <div class="section">
+    <!-- Status Options (hidden while booking) -->
+    <div class="section" id="optionsSection">
       <div class="flex-between">
-        <h2 id="optionsTitle">Options</h2>
+        <h2>Options</h2>
         <div class="chips" id="statusPresetBar"> <span style="font-size: 0.8em; color: #333; vertical-align: middle; margin-top:0.2em;">e.g. </span>
           <button class="btn-chip" type="button" data-preset="yes">Yes</button>
           <button class="btn-chip" type="button" data-preset="no">No</button>
@@ -208,16 +218,6 @@ celebration
           <button class="btn-chip" type="button" data-preset="attending_not_attending">Attending / Not Attending</button>
         </div>
       </div>
-      <!-- Booking panel (replaces the status options when People per slot is limited) -->
-      <div id="bookingPanel" class="hideme">
-        <p class="muted">Bookings use one choice.</p>
-        <div class="booking-label-row">
-          <input type="color" id="bookingColor" class="color-pick" value="#357a38" title="Choose color" aria-label="Booking colour" />
-          <input type="text" id="bookingLabel" class="label-input" maxlength="20" value="Booked" aria-label="Booking label" />
-        </div>
-        <div id="bookingLabelErr" class="error"></div>
-      </div>
-
       <div id="statusOptionsUI">
       <p class="muted">Add/edit (rename) <b>1</b> to <b id="statusMaxHint">5</b> Options. These are the choices people toggle in the calendar.</p>
       
@@ -454,6 +454,6 @@ celebration
 
   <!-- Page script -->
   <script src="emoji.js?v=20260926b" defer></script>
-  <script src="index.js?v=20260926g" defer></script>
+  <script src="index.js?v=20260926h" defer></script>
 </body>
 </html>

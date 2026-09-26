@@ -577,7 +577,7 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 .booking-label-row .color-pick::-webkit-color-swatch-wrapper{ padding: 2px; }
 .booking-label-row .color-pick::-webkit-color-swatch{ border-radius: 2px; border: none; }
 .booking-label-row .color-pick::-moz-color-swatch{ border-radius: 2px; border: none; }
-#bookingPanel .field{ margin-top: 12px; }
+#bookingPanel{ margin-top: 14px; }
 
 /* Save panel modal (post-create) */
 .btn-secondary{background:#fff;color:#222;border:1px solid var(--border);}

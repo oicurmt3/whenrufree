@@ -1530,7 +1530,6 @@ const BOOKING_PRIVACY_HINTS = {
   open: 'Everyone sees who booked each slot.',
   hidden: 'Only you see names. Others just see Booked.'
 };
-const bookingPanelEl = document.getElementById('bookingPanel');
 const bookingLabelEl = document.getElementById('bookingLabel');
 const bookingColorEl = document.getElementById('bookingColor');
 const bookingLabelErrEl = document.getElementById('bookingLabelErr');
@@ -1619,14 +1618,11 @@ function initBookingField(features) {
   document.getElementById('capacityField').classList.remove('hideme');
 }
 
-/** Shows Bookings per person, swaps Options for the Booking panel and hides Blind privacy while booking. */
+/** Shows Bookings per person (with the booking label), hides Options and Blind privacy while booking. */
 function applyBookingMode() {
   const booking = isBookingMode();
   document.getElementById('perUserField').classList.toggle('hideme', !booking);
-  bookingPanelEl.classList.toggle('hideme', !booking);
-  document.getElementById('statusOptionsUI').classList.toggle('hideme', booking);
-  document.getElementById('statusPresetBar').classList.toggle('hideme', booking);
-  document.getElementById('optionsTitle').textContent = booking ? 'Booking' : 'Options';
+  document.getElementById('optionsSection').classList.toggle('hideme', booking);
   const blindBtn = document.querySelector('#privacyToggle .priv-btn[data-mode="blind"]');
   if (blindBtn) blindBtn.classList.toggle('hideme', booking);
   if (booking && privacyMode === 'blind') setPrivacyMode('hidden');

@@ -325,10 +325,10 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 |----------|------|-------------|
 | `updatePrivacyHint()` / `setPrivacyMode(mode)` | 1464 | Privacy hint (booking wording when a limit is set) and programmatic mode change. |
 | `makeLimitControl({...})` | 1542 | No limit / 1 / 2 / More segmented control with a 3-20 stepper for More. Used for **People per slot** (`capacityControl`) and **Bookings per person** (`perUserControl`, whole-calendar total, default 1). |
-| `isBookingMode()` | 1609 | True when People per slot has a limit. |
-| `initBookingField(features)` | 1616 | Shows People per slot when `get_site_config` reports `features.booking`. |
-| `applyBookingMode()` | 1623 | Shows Bookings per person (`#perUserField`, Slots section), swaps Options for the Booking panel (label + colour), hides Blind (switches to Hidden if needed), revalidates. |
-| `validateBookingLabel()` | 1637 | Booking label check (same rules as status labels). |
+| `isBookingMode()` | 1608 | True when People per slot has a limit. |
+| `initBookingField(features)` | 1615 | Shows People per slot when `get_site_config` reports `features.booking`. |
+| `applyBookingMode()` | 1622 | Shows Bookings per person (`#perUserField`, Slots section, which also holds the booking label + colour in `#bookingPanel`), hides the Options section (`#optionsSection`) and Blind (switches to Hidden if needed), revalidates. |
+| `validateBookingLabel()` | 1634 | Booking label check (same rules as status labels). |
 
 `getValidStatuses()` returns the single booking status (weight 1) in booking mode; `createCalendar()` adds `slot_capacity` / `max_per_user` and passes `booking` to the save panel, where `calendarSaveKit` uses "book a slot" wording in the share text, email, poster tagline and `.txt`.
 
