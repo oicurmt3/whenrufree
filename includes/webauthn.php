@@ -38,7 +38,7 @@ function webauthnTablesReady(PDO $pdo): bool {
 
 function webauthnRequireTables(PDO $pdo): void {
     if (!webauthnTablesReady($pdo)) {
-        webauthnFail('Fingerprint / face unlock is not available yet.', 503, 'PASSKEYS_UNAVAILABLE');
+        webauthnFail('Passkeys are not available yet.', 503, 'PASSKEYS_UNAVAILABLE');
     }
 }
 
@@ -142,7 +142,7 @@ function webauthnCredentialDescriptors(PDO $pdo, array $subject): array {
 function webauthnRegisterOptions(PDO $pdo, array $config, array $subject): array {
     $existing = webauthnCredentialDescriptors($pdo, $subject);
     if (count($existing) >= WEBAUTHN_MAX_PER_SUBJECT) {
-        webauthnFail('Too many devices set up for this name. Turn one off first.', 409, 'PASSKEY_LIMIT');
+        webauthnFail('Too many passkeys for this name. Remove one first.', 409, 'PASSKEY_LIMIT');
     }
 
     $label = (string)$subject['name'];
@@ -177,7 +177,7 @@ function webauthnRegisterOptions(PDO $pdo, array $config, array $subject): array
 function webauthnLoginOptions(PDO $pdo, array $config, array $subject): array {
     $allow = webauthnCredentialDescriptors($pdo, $subject);
     if (!$allow) {
-        webauthnFail('Fingerprint / face unlock is not set up for this name. Use your PIN.', 404, 'NO_PASSKEY');
+        webauthnFail('A passkey is not set up for this name. Use your PIN.', 404, 'NO_PASSKEY');
     }
     return [
         'challenge' => webauthnChallengeStore('login', $subject),
@@ -209,7 +209,7 @@ function webauthnCheckFlags(array $parsed, array $config): void {
         webauthnFail('Passkey site mismatch');
     }
     if (($parsed['flags'] & 0x01) === 0 || ($parsed['flags'] & 0x04) === 0) {
-        webauthnFail('Fingerprint, face or device screen lock is required.');
+        webauthnFail('Passkey needs your fingerprint, face or screen lock.');
     }
 }
 
@@ -279,7 +279,7 @@ function webauthnRegisterFinish(PDO $pdo, array $config, array $subject, array $
         )->execute($params);
     } catch (PDOException $e) {
         if ((string)$e->getCode() === '23000') {
-            webauthnFail('This device is already set up.', 409, 'PASSKEY_EXISTS');
+            webauthnFail('A passkey is already set up on this device.', 409, 'PASSKEY_EXISTS');
         }
         throw $e;
     }
@@ -300,7 +300,7 @@ function webauthnLoginFinish(PDO $pdo, array $config, array $subject, array $cre
     $stmt->execute([':cred' => $rawId, ':sid' => (int)$subject['id']]);
     $row = $stmt->fetch();
     if (!$row) {
-        webauthnFail('This device is not set up for this name. Use your PIN.', 404, 'NO_PASSKEY');
+        webauthnFail('This passkey is not set up for this name. Use your PIN.', 404, 'NO_PASSKEY');
     }
 
     $clientDataJSON = webauthnCheckClientData($cred, 'webauthn.get', $expected, $config);

@@ -39,7 +39,8 @@
     </style>
 
   <!-- Page styles -->
-  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="index.css?v=20260926b">
+  <link rel="stylesheet" href="emoji.css?v=20260926b">
 </head>
 <body>
   <div class="card">
@@ -156,12 +157,46 @@ celebration
         <button id="addSlotBtn" class="btn btn-ghost btn-small" type="button">+ Add Slot</button>
       </div>
       <div id="slotsError" class="error"></div>
+
+      <!-- Booking: people per slot (shown once migrations/004 has run) -->
+      <div class="field hideme" id="capacityField">
+        <label id="capacityLabel">People per slot</label>
+        <div class="privacy-toggle limit-toggle" id="capacityToggle" role="group" aria-labelledby="capacityLabel">
+          <button type="button" class="priv-btn active" data-limit="0">No limit</button>
+          <button type="button" class="priv-btn" data-limit="1">1</button>
+          <button type="button" class="priv-btn" data-limit="2">2</button>
+          <button type="button" class="priv-btn" data-limit="more">More</button>
+        </div>
+        <div class="limit-stepper hideme" id="capacityStepper">
+          <button type="button" class="btn btn-secondary stepper-btn" data-step="-1" aria-label="Fewer people">&minus;</button>
+          <output class="stepper-value" id="capacityValue" aria-live="polite">3</output>
+          <button type="button" class="btn btn-secondary stepper-btn" data-step="1" aria-label="More people">+</button>
+        </div>
+        <p class="hint" id="capacityHint">Everyone can pick every slot.</p>
+      </div>
+
+      <!-- Booking: total bookings per person (shown while People per slot is limited) -->
+      <div class="field hideme" id="perUserField">
+        <label id="perUserLabel">Bookings per person</label>
+        <div class="privacy-toggle limit-toggle" id="perUserToggle" role="group" aria-labelledby="perUserLabel">
+          <button type="button" class="priv-btn" data-limit="0">No limit</button>
+          <button type="button" class="priv-btn active" data-limit="1">1</button>
+          <button type="button" class="priv-btn" data-limit="2">2</button>
+          <button type="button" class="priv-btn" data-limit="more">More</button>
+        </div>
+        <div class="limit-stepper hideme" id="perUserStepper">
+          <button type="button" class="btn btn-secondary stepper-btn" data-step="-1" aria-label="Fewer bookings">&minus;</button>
+          <output class="stepper-value" id="perUserValue" aria-live="polite">3</output>
+          <button type="button" class="btn btn-secondary stepper-btn" data-step="1" aria-label="More bookings">+</button>
+        </div>
+        <p class="hint" id="perUserHint">Each person can book 1 slot in total.</p>
+      </div>
     </div>
 
     <!-- Status Options -->
     <div class="section">
       <div class="flex-between">
-        <h2>Options</h2>
+        <h2 id="optionsTitle">Options</h2>
         <div class="chips" id="statusPresetBar"> <span style="font-size: 0.8em; color: #333; vertical-align: middle; margin-top:0.2em;">e.g. </span>
           <button class="btn-chip" type="button" data-preset="yes">Yes</button>
           <button class="btn-chip" type="button" data-preset="no">No</button>
@@ -173,6 +208,17 @@ celebration
           <button class="btn-chip" type="button" data-preset="attending_not_attending">Attending / Not Attending</button>
         </div>
       </div>
+      <!-- Booking panel (replaces the status options when People per slot is limited) -->
+      <div id="bookingPanel" class="hideme">
+        <p class="muted">Bookings use one choice.</p>
+        <div class="booking-label-row">
+          <input type="color" id="bookingColor" class="color-pick" value="#357a38" title="Choose color" aria-label="Booking colour" />
+          <input type="text" id="bookingLabel" class="label-input" maxlength="20" value="Booked" aria-label="Booking label" />
+        </div>
+        <div id="bookingLabelErr" class="error"></div>
+      </div>
+
+      <div id="statusOptionsUI">
       <p class="muted">Add/edit (rename) <b>1</b> to <b id="statusMaxHint">5</b> Options. These are the choices people toggle in the calendar.</p>
       
       <!-- Ranking Mode Toggle -->
@@ -190,6 +236,7 @@ celebration
         <button id="addStatusBtn" class="btn btn-ghost btn-small" type="button">+ Add status</button>
       </div>
       <div id="statusError" class="error"></div>
+      </div>
     </div>
 
     <!-- Date range -->
@@ -298,6 +345,11 @@ celebration
         <div id="adminPin2Err" class="error"></div>
       </div>
 
+      <!-- Access emoji (optional; shown once migrations/003 has run) -->
+      <div class="field hideme" id="accessEmojiWrap" style="max-width:420px;">
+        <div id="accessEmojiField"></div>
+      </div>
+
       <!-- Privacy Mode Toggle -->
       <div class="field">
         <label>Privacy Mode</label>
@@ -358,12 +410,12 @@ celebration
       <h2 id="savePanelTitle">Save your calendar link now</h2>
 
       <div class="warn-strong">
-        <strong>Important — read before continuing</strong>
+        <strong>Important &mdash; read before continuing</strong>
         <ul>
           <li>This is your only chance to get this link from us automatically.</li>
           <li>If you lose the calendar link, <strong>it cannot be recovered</strong>.</li>
           <li>Bookmark it, download the text file, or email it to yourself now.</li>
-          <li>Your organiser PIN is <strong>not</strong> included in the download — remember it separately.</li>
+          <li>Your organiser PIN is <strong>not</strong> included in the download &mdash; remember it separately.</li>
         </ul>
       </div>
 
@@ -371,8 +423,14 @@ celebration
       <p class="code-line"><strong>Calendar code:</strong> <span id="saveCalCode"></span></p>
       <div id="saveCalUrl" class="save-url-display"></div>
 
+      <div id="saveCalEmojiWrap" class="save-emoji hideme">
+        <p><strong>Calendar emoji:</strong> <span id="saveCalEmojiName"></span></p>
+        <div id="saveCalEmoji" class="ae-big" aria-hidden="true"></div>
+        <p class="hint">Use this emoji to access the calendar.</p>
+      </div>
+
       <div id="clipboardFailMsg" class="clipboard-fail hideme">
-        Auto-copy may have failed — please use <strong>Copy calendar link</strong> below.
+        Auto-copy may have failed &mdash; please use <strong>Copy calendar link</strong> below.
       </div>
 
       <div class="btn-row">
@@ -395,6 +453,7 @@ celebration
   <div id="toast"></div>
 
   <!-- Page script -->
-  <script src="index.js" defer></script>
+  <script src="emoji.js?v=20260926b" defer></script>
+  <script src="index.js?v=20260926g" defer></script>
 </body>
 </html>

@@ -49,14 +49,14 @@
     <h2><span class="material-symbols-outlined">hub</span> Calendar Hubs</h2>
 
     <p>
-      A <b>Hub</b> gives your group one link to find all related calendars — useful for clubs, teams, or committees running multiple polls.
+      A <b>Hub</b> gives your group one link to find all related calendars &mdash; useful for clubs, teams, or committees running multiple polls.
     </p>
 
     <ol>
-      <li><b>Create a Hub</b> — set a name and organiser PIN (<a href="hub.html?create=1">Create a Hub</a>)</li>
-      <li><b>Save the Hub link</b> when prompted — it cannot be recovered if lost</li>
-      <li><b>Add calendars</b> — anyone with the Hub link can create a new calendar in the Hub; calendar organisers can attach existing calendars via <b>Add to Hub</b> on the calendar page</li>
-      <li><b>Share once</b> — participants pick which calendar to open from the Hub list</li>
+      <li><b>Create a Hub</b> &mdash; set a name and organiser PIN (<a href="hub.html?create=1">Create a Hub</a>)</li>
+      <li><b>Save the Hub link</b> when prompted &mdash; it cannot be recovered if lost</li>
+      <li><b>Add calendars</b> &mdash; anyone with the Hub link can create a new calendar in the Hub; calendar organisers can attach existing calendars via <b>Add to Hub</b> on the calendar page</li>
+      <li><b>Share once</b> &mdash; participants pick which calendar to open from the Hub list</li>
     </ol>
 
     <div class="faq-item">
@@ -81,7 +81,7 @@
 
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        I lost my Hub link — can you recover it?
+        I lost my Hub link &mdash; can you recover it?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
@@ -213,21 +213,61 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>For security, accounts are temporarily locked after several incorrect PIN attempts. 
-        Wait a few minutes and try again with the correct PIN.</p>
+        <p>For security, 5 wrong PINs in a row lock that name (or the Hub organiser) for 5 minutes.
+        If it keeps happening, each lock is longer: 15 minutes, then 2 hours, then 2 days.
+        The message tells you how long to wait.</p>
+        <p>Entering the correct PIN resets this. If you set up a passkey on your device, it still works while
+        you are locked out and also resets it. The site admin can unlock you too.</p>
       </div>
     </div>
 
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Can I use my fingerprint or face instead of my PIN?
+        Can I use a passkey (fingerprint or face) instead of my PIN?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Yes, on phones and computers with a fingerprint reader, face unlock, Windows Hello or a screen lock. After you log in with your PIN, tap <b>Turn on</b> when asked.
-        Next time, pick your name and your device prompts straight away. Your PIN always still works.</p>
-        <p>It is set up per device and per calendar. To see or remove devices (for example a lost phone), open the name list and tap the fingerprint icon next to your name.
-        Hub organisers use the <b>Fingerprint</b> button on the Hub page. Your fingerprint or face never leaves your device.</p>
+        <p>Yes, on phones and computers with a fingerprint reader, face unlock, Windows Hello or a screen lock. After you log in with your PIN, tap <b>Set up passkey</b> when asked.
+        Next time, pick your name and tap <b>Use Passkey</b> (fingerprint, face or screen lock). Your PIN always still works.</p>
+        <p>It is set up per device and per calendar. To see or remove your passkeys (for example on a lost phone), open the name list and tap the fingerprint icon next to your name.
+        Hub organisers use the <b>Passkey</b> button on the Hub page. Your fingerprint or face never leaves your device.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Can I use it as a booking form (one person per slot)?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Yes. When creating the calendar, set <b>People per slot</b> (under Slots) to 1, 2 or More (up to 20), and choose <b>Bookings per person</b> - how many slots each person can book in total across the whole calendar.
+        People tap a free slot and it is booked straight away, first come, first served. Full slots are greyed out, and if two people tap the last place at the same moment only the first gets it.</p>
+        <p>The organiser can remove anyone's booking and use <b>Close bookings</b> to stop changes. Booking settings cannot be changed after the calendar is created, and Blind privacy is not available for booking calendars.</p>
+        <p>There are no accounts, so the per-person limit is a fairness rule: someone could add a second name to book more. The organiser sees every name and can remove extra bookings.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What is the access emoji?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>An optional extra lock on top of the secret link. The organiser picks one of 35 emoji, and anyone opening the calendar or Hub must pick the same one first.
+        The emoji is written next to the link when the organiser copies, shares, emails or prints it. Your browser remembers it for 30 days.</p>
+        <p>Organisers turn it on when creating the calendar (above Privacy Mode) or Hub (below the PIN), or later with the <b>Settings</b> (gear) button.
+        A calendar in a Hub uses the Hub's emoji unless it has its own. Three wrong picks lock that device out for 5 minutes, then longer.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        I don't know or forgot the emoji. What now?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Ask the organiser - it is usually in the message or poster with the link. Organisers can see and change it in <b>Settings</b> on any device that has already opened the calendar or Hub.
+        If the organiser forgot it too, the site admin can remove it.</p>
       </div>
     </div>
     

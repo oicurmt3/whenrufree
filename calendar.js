@@ -328,6 +328,7 @@ function shouldShowOrganiserDots(){
   if (!state.currentUserId) return false;
   const auth = state.auth.get(state.currentUserId);
   if (!auth || !auth.token) return false;
+  if (isBookingMode()) return false;
   
   return state.privacyMode !== 'blind';
 }
@@ -404,6 +405,7 @@ function applyStatusOptions(rawOptions){
 
 function renderLegend(){
   if(!els.legendWrap) return;
+  if(isBookingMode()){ renderBookingLegend(); return; }
   els.legendWrap.innerHTML='';
   const opts = Array.isArray(STATUS_OPTIONS) ? STATUS_OPTIONS : [];
   for(let i=0;i<opts.length;i++){
@@ -506,6 +508,7 @@ function clearPersistedPending(userId){
   try{ localStorage.removeItem(pendingKey(userId)); }catch(e){}
 }
 function restorePendingForUser(userId){
+  if(isBookingMode()) return {};
   try{
     const raw = localStorage.getItem(pendingKey(userId));
     if(!raw) return {};
@@ -628,6 +631,11 @@ const els = {
   submitBtn: qs('#submitBtn'),
   submitBtnIcon: qs('#submitBtnIcon'),
   shareBtn: qs('#shareBtn'),
+  settingsBtn: qs('#settingsBtn'),
+  settingsModal: qs('#settingsModal'),
+  settingsAccessField: qs('#settingsAccessField'),
+  settingsError: qs('#settingsError'),
+  settingsClose: qs('#settingsClose'),
   // Reset buttons (resetMineBtn for all users, resetAllBtn for admin only)
   resetMineBtn: qs('#resetMineBtn'),
   resetAllBtn: qs('#resetAllBtn'),
@@ -672,15 +680,14 @@ const els = {
   pinConfirm: qs('#pinConfirm'),
   pinPasskeyWrap: qs('#pinPasskeyWrap'),
   pinPasskeyBtn: qs('#pinPasskeyBtn'),
-  passkeyOfferModal: qs('#passkeyOfferModal'),
-  passkeyOfferError: qs('#passkeyOfferError'),
-  passkeyOfferYes: qs('#passkeyOfferYes'),
-  passkeyOfferNo: qs('#passkeyOfferNo'),
-  passkeyManageModal: qs('#passkeyManageModal'),
+  passkeyModal: qs('#passkeyModal'),
+  passkeySetup: qs('#passkeySetup'),
+  passkeyManageHead: qs('#passkeyManageHead'),
+  passkeyOthersTitle: qs('#passkeyOthersTitle'),
   passkeyList: qs('#passkeyList'),
-  passkeyManageError: qs('#passkeyManageError'),
-  passkeyManageAdd: qs('#passkeyManageAdd'),
-  passkeyManageClose: qs('#passkeyManageClose'),
+  passkeyError: qs('#passkeyError'),
+  passkeyAdd: qs('#passkeyAdd'),
+  passkeyClose: qs('#passkeyClose'),
   infoModal: qs('#infoModal'),
   infoModalCancel:qs('#infoModalCancel'),
   infoModalAdd: qs('#infoModalAdd')
@@ -716,10 +723,16 @@ const state = {
   chosenDate:null, // YYYY-MM-DD if organiser has locked in a slot (null = open)
   chosenSlot:null, // Slot ID if organiser has locked in a slot (null = open)
   hubGroup:null, // { token, title } when calendar belongs to a Hub
+  booking:null, // { capacity, perUser, closed } for booking calendars (null = availability poll)
+  bookingView:null, // 'booked' or 'free' once chosen; null = default for the role
   expandedRanks:new Set(),
   auth:new Map(), // user_id -> {token, role, exp}
   _pendingAuthUserId:null, // Tracks user ID during PIN authentication flow
   _pendingAuthUserObj:null, // Tracks user object during PIN authentication flow
+  accessAvailable:false, // Server has the access emoji tables (calendar_meta.access.available)
+  accessEmoji:null, // This calendar's own emoji position (organiser only, for Share)
+  accessHubEmoji:false, // Calendar uses its Hub's emoji (organiser only, for Share)
+  accessEmojiLoaded:false,
   passkeysEnabled:false, // Server has fingerprint / face unlock tables (calendar_meta.passkeys)
   platformPasskey:false, // This device has a built-in fingerprint / face / screen-lock authenticator
   hidePastDates:true // Whether past date columns are currently hidden
@@ -749,19 +762,79 @@ async function ensureCsrfToken(){
   return csrfToken;
 }
 function tz(){ return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
+
+/*** Access emoji: grants go with every request; the emoji popup opens when the server asks */
+let accessGatePromise = null;
+
+function accessHubToken(){
+  const g = new URL(window.location.href).searchParams.get('g');
+  if(g && /^[A-Za-z0-9_\-]{8,64}$/.test(g)) return g;
+  return state.hubGroup?.token || null;
+}
+
+function accessGrantKeys(extraHubToken=null){
+  const keys = ['c_' + state.token];
+  const hub = accessHubToken();
+  if(hub) keys.push('g_' + hub);
+  if(extraHubToken && extraHubToken !== hub) keys.push('g_' + extraHubToken);
+  return keys;
+}
+
+/** Shows the emoji popup once, however many requests are waiting on it. */
+function requireAccess(info){
+  if(!accessGatePromise){
+    const isHub = info && info.kind === 'hub';
+    accessGatePromise = AccessEmoji.gate({
+      title: isHub ? "Pick this Hub's emoji" : "Pick this calendar's emoji",
+      hint: "Ask the organiser if you don't know it.",
+      submit: async (emoji) => {
+        const url = new URL('api.php', window.location.href);
+        url.searchParams.set('action', 'access_check');
+        url.searchParams.set('c', state.token);
+        const headers = {'Content-Type':'application/json'};
+        const csrf = await ensureCsrfToken();
+        if(csrf) headers['X-CSRF-Token'] = csrf;
+        const resp = await fetch(url.toString(), {
+          method:'POST', headers, credentials:'same-origin', body: JSON.stringify({ emoji })
+        });
+        const data = await resp.json();
+        if(data.status !== 'success') return { ok:false, message:data.message };
+        if(data.access_grant) AccessEmoji.saveGrant('c_' + state.token, data.access_grant, data.expires_at);
+        return { ok:true };
+      }
+    }).finally(() => { accessGatePromise = null; });
+  }
+  return accessGatePromise;
+}
+
+/** fetch() with X-Access-Grant; after the emoji popup succeeds the request is sent again. */
+async function accessFetch(url, opts={}, extraHubToken=null){
+  for(let tries = 0; ; tries++){
+    const headers = { ...(opts.headers || {}) };
+    const grants = window.AccessEmoji ? AccessEmoji.grantHeader(accessGrantKeys(extraHubToken)) : '';
+    if(grants) headers['X-Access-Grant'] = grants;
+    const resp = await fetch(url, { ...opts, headers });
+    if(resp.status !== 403 || tries >= 2 || !window.AccessEmoji) return resp;
+    let data = null;
+    try{ data = await resp.clone().json(); }catch(e){ data = null; }
+    if(!data || data.code !== 'ACCESS_REQUIRED') return resp;
+    await requireAccess(data.access || {});
+  }
+}
+
 async function apiGet(action, params={}){
   const url=new URL('api.php', window.location.href);
   url.searchParams.set('action', action);
   url.searchParams.set('c', state.token);
   for(const [k,v] of Object.entries(params)) url.searchParams.set(k, v);
   const headers = {};
-  if (action === 'availability') {
+  if (action === 'availability' || action === 'access_settings') {
     const auth = state.currentUserId
       ? (state.auth.get(state.currentUserId) || getCachedAuth(state.currentUserId))
       : null;
     if (auth?.token) headers['X-Auth-Token'] = auth.token;
   }
-  const resp = await fetch(url.toString(), {
+  const resp = await accessFetch(url.toString(), {
     credentials:'same-origin',
     headers
   });
@@ -773,9 +846,10 @@ async function apiGet(action, params={}){
  * @param {string} action
  * @param {Object} body
  * @param {string|null} authToken
+ * @param {string|null} extraHubToken Also send this Hub's access grant (adding to a Hub)
  * @returns {Promise<Object>} Parsed JSON response
  */
-async function apiPost(action, body={}, authToken=null){
+async function apiPost(action, body={}, authToken=null, extraHubToken=null){
   const url=new URL('api.php', window.location.href);
   url.searchParams.set('action', action);
   url.searchParams.set('c', state.token);
@@ -783,12 +857,12 @@ async function apiPost(action, body={}, authToken=null){
   if(authToken) headers['X-Auth-Token']=authToken;
   const csrf = await ensureCsrfToken();
   if(csrf) headers['X-CSRF-Token']=csrf;
-  const resp = await fetch(url.toString(), {
+  const resp = await accessFetch(url.toString(), {
     method:'POST',
     headers,
     body: JSON.stringify(body),
     credentials:'same-origin' // Ensure session cookie is sent for CSRF validation
-  });
+  }, extraHubToken);
   return resp.json();
 }
 
@@ -807,6 +881,7 @@ async function loadCalendarMeta(){
     const cat=meta.calendar.category ?? 'groups';
     state.calendarTitle=t;
     state.calendarCategories=parseCategories(cat);
+    state.accessAvailable = meta.calendar.access?.available === true;
     state.passkeysEnabled = meta.calendar.passkeys === true;
     if(state.passkeysEnabled && window.Passkey){
       Passkey.platformAvailable().then(v => { state.platformPasskey = v; });
@@ -814,6 +889,14 @@ async function loadCalendarMeta(){
     setCalendarHeading(t, cat);
     const slots = Array.isArray(meta.calendar.slots) ? meta.calendar.slots : null;
     if(slots && slots.length){ TIME_SLOTS = slots.map(s=>({id:s, label:s})); }
+
+    // Booking mode must be known before the legend is drawn
+    const cap = parseInt(meta.calendar.slot_capacity, 10);
+    const per = parseInt(meta.calendar.max_per_user, 10);
+    state.booking = cap >= 1
+      ? { capacity: cap, perUser: per >= 1 ? per : null, closed: meta.calendar.bookings_closed === true }
+      : null;
+    if(state.booking) applyBookingChrome();
 
     // Custom status options (1..5). Falls back to defaults if absent/invalid.
     applyStatusOptions(meta.calendar.statuses ?? null);
@@ -986,12 +1069,12 @@ function populateUserSelectModal(){
       const pkBtn = document.createElement('button');
       pkBtn.className = 'user-select-passkey' + (pkOn ? ' on' : '');
       pkBtn.type = 'button';
-      pkBtn.title = pkOn ? 'Fingerprint / face unlock is on for this device - manage devices' : 'Fingerprint / face unlock';
+      pkBtn.title = pkOn ? 'Passkey is on for this device - manage passkeys' : 'Passkeys';
       pkBtn.setAttribute('aria-label', pkBtn.title);
       pkBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">fingerprint</span>';
       pkBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // prevent selecting this user
-        openPasskeyManager(u.id);
+        openPasskeyWindow(u.id);
       });
       item.appendChild(pkBtn);
     }
@@ -1243,13 +1326,16 @@ function updateUserUI(){
   // Submit/Save button: only visible when authenticated and calendar is not frozen
   // Remove init-hidden class now that we know the correct state (prevents initial flash)
   els.submitBtn.classList.remove('init-hidden');
-  const showSubmit = isAuthenticated && !isCalendarFrozen();
+  const showSubmit = isAuthenticated && !isCalendarFrozen() && !isBookingMode();
   els.submitBtn.style.display = showSubmit ? 'inline-flex' : 'none';
   
   // Edit name and Share are admin-only
   els.renameBtn.style.display = isAdmin ? 'inline-flex' : 'none';
   els.renameBtn.disabled = !isAdmin;
   els.shareBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  els.settingsBtn.style.display = (isAdmin && state.accessAvailable && window.AccessEmoji) ? 'inline-flex' : 'none';
+  if(isAdmin && state.accessAvailable && !state.accessEmojiLoaded) loadAccessEmoji();
+  if(!isAdmin) state.accessEmojiLoaded = false;
   
   // Reset Mine: visible for ALL authenticated users
   els.resetMineBtn.style.display = isAuthenticated ? 'inline-flex' : 'none';
@@ -1263,6 +1349,9 @@ function updateUserUI(){
   // Refresh organiser message (edit vs read-only) based on role
   updateOrganiserMessageUI();
   updateHubBarUI();
+
+  // Decided banner: Reopen appears/disappears as the organiser logs in or out
+  updateChosenBanner();
 }
 
 /**
@@ -1341,7 +1430,7 @@ async function confirmAddToHub(){
     document.getElementById('hubModalError').textContent = 'Enter a valid Hub code or link';
     return;
   }
-  const res = await apiPost('add_calendar_to_group', { group_token: groupToken }, auth.token);
+  const res = await apiPost('add_calendar_to_group', { group_token: groupToken }, auth.token, groupToken);
   if(res.status !== 'success'){
     document.getElementById('hubModalError').textContent = res.message || 'Failed to add to Hub';
     return;
@@ -1367,6 +1456,76 @@ async function removeFromHub(){
   state.hubGroup = null;
   updateHubBarUI();
   showToast('Removed from Hub');
+}
+
+/*** Calendar settings (organiser): access emoji */
+function applyAccessSettings(data){
+  state.accessEmoji = (window.AccessEmoji && AccessEmoji.valid(data.emoji)) ? data.emoji : null;
+  state.accessHubEmoji = data.hub_emoji === true;
+  state.accessEmojiLoaded = true;
+}
+
+/** Loads the emoji for the organiser's Share button. */
+async function loadAccessEmoji(){
+  state.accessEmojiLoaded = true;
+  try{
+    const data = await apiGet('access_settings');
+    if(data.status === 'success' && data.available) applyAccessSettings(data);
+  }catch(e){ /* Share falls back to the link only */ }
+}
+
+async function openSettingsModal(){
+  const auth = state.auth.get(state.currentUserId || -1);
+  if(!auth || auth.role !== 'admin' || !window.AccessEmoji){
+    showToast('Organiser auth required');
+    return;
+  }
+  els.settingsError.textContent = '';
+  els.settingsAccessField.innerHTML = '<p class="ae-note">Loading...</p>';
+  els.settingsModal.classList.add('active');
+
+  const data = await apiGet('access_settings');
+  if(data.status !== 'success' || !data.available){
+    els.settingsAccessField.innerHTML = '';
+    els.settingsError.textContent = data.message || 'Settings are not available yet.';
+    return;
+  }
+
+  applyAccessSettings(data);
+  let saved = state.accessEmoji;
+  AccessEmoji.field(els.settingsAccessField, {
+    label: 'Access emoji',
+    pickerTitle: 'Choose calendar emoji',
+    pickerHint: 'Use this emoji to access the calendar.',
+    onHint: 'Use this emoji to access the calendar.',
+    offHint: data.hub_emoji
+      ? "Uses the Hub's emoji. Switch on to give this calendar its own."
+      : 'Optional emoji access security.',
+    value: saved,
+    onChange: async (next) => {
+      els.settingsError.textContent = '';
+      if(next === null){
+        const after = data.hub_emoji ? "People will need the Hub's emoji instead." : 'Anyone with the link will be able to open this calendar.';
+        if(!confirm(`Remove the emoji? ${after}`)) return false;
+      } else if(saved !== null && !confirm('Change the emoji? Everyone will need to pick the new one.')){
+        return false;
+      }
+      const res = await apiPost('set_access_emoji', { emoji: next }, auth.token);
+      if(res.status !== 'success'){
+        els.settingsError.textContent = res.message || 'Could not save the emoji.';
+        return false;
+      }
+      if(res.access_grant) AccessEmoji.saveGrant('c_' + state.token, res.access_grant, res.expires_at);
+      saved = next;
+      state.accessEmoji = next;
+      showToast(next === null ? 'Emoji removed' : `Emoji set: ${AccessEmoji.name(next)}`);
+      return true;
+    }
+  });
+}
+
+function hideSettingsModal(){
+  els.settingsModal.classList.remove('active');
 }
 
 /*** Status getters/setters */
@@ -1610,7 +1769,20 @@ function renderDateRangeSkeleton(){
     hdr.appendChild(num); hdr.appendChild(dowEl); col.appendChild(hdr);
     const slotMap=new Map();
     for(const slot of TIME_SLOTS){
-      const slotEl=document.createElement('div'); slotEl.className='time-slot'; slotEl.textContent=slot.label;
+      const slotEl=document.createElement('div'); slotEl.className='time-slot';
+      if(isBookingMode()){
+        slotEl.classList.add('bk-cell');
+        slotEl.setAttribute('role', 'button');
+        slotEl.tabIndex = 0;
+        const lbl=document.createElement('span'); lbl.className='bk-label'; lbl.textContent=slot.label;
+        const sub=document.createElement('span'); sub.className='bk-sub';
+        slotEl.appendChild(lbl); slotEl.appendChild(sub);
+        slotEl.addEventListener('keydown', (e)=>{
+          if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); onSlotClick(dateStr, slot.id); }
+        });
+      } else {
+        slotEl.textContent=slot.label;
+      }
       slotEl.dataset.date = dateStr;
       slotEl.dataset.slot = slot.id;
       slotEl.addEventListener('click', ()=> onSlotClick(dateStr, slot.id));
@@ -1640,6 +1812,9 @@ function renderDateRangeSkeleton(){
   updateDateFilterIndicators();
   // Show/hide past dates according to current preference
   applyPastDateFilter();
+  // New cells start blank: paint current values and the decided state
+  refreshCalendarValues();
+  applyFrozenState();
 }
 
 /**
@@ -1673,6 +1848,7 @@ function applyPastDateFilter(){
  * Updates slot colours and organiser dots.
  */
 function refreshCalendarValues(){
+  if(isBookingMode()){ refreshBookingCells(); return; }
   for(const [dateStr, slotMap] of state.slotEls.entries()){
     for(const slot of TIME_SLOTS){
       const el=slotMap.get(slot.id);
@@ -1743,6 +1919,7 @@ function closeInfoModal(){
   els.infoModal.classList.remove('active');
 }
 function onSlotClick(dateStr, slotId){
+  if(isBookingMode()){ onBookingSlotClick(dateStr, slotId); return; }
   // Block slot changes if the calendar has been finalised
   if(isCalendarFrozen()){
     showToast('Calendar finalised - no changes allowed.');
@@ -1953,12 +2130,8 @@ function openPinModal(userId, userObj){
   const hasPasskey = passkeysUsable() && !!Passkey.deviceCredential(passkeyId(userId));
   els.pinPasskeyWrap.hidden = !hasPasskey;
   els.pinPasskeyBtn.onclick = () => unlockWithPasskey(userId);
-  if(hasPasskey){
-    // Go straight to the fingerprint / face prompt; the PIN field stays as the backup.
-    unlockWithPasskey(userId);
-  } else {
-    setTimeout(() => els.pinInput.focus(), 50);
-  }
+  // The device prompt only opens when the button is pressed (Enter works: the button gets focus).
+  setTimeout(() => (hasPasskey ? els.pinPasskeyBtn : els.pinInput).focus(), 50);
 
   els.pinConfirm.onclick = async ()=>{
     const pin=(els.pinInput.value??'').trim();
@@ -2022,13 +2195,13 @@ async function unlockWithPasskey(userId){
     const begin = await apiPost('passkey_login_begin', {user_id: userId});
     if(begin.status !== 'success'){
       if(begin.code === 'NO_PASSKEY'){ Passkey.forgetDevice(id); els.pinPasskeyWrap.hidden = true; }
-      throw new Error(begin.message || 'Fingerprint unlock failed. Use your PIN.');
+      throw new Error(begin.message || 'Passkey sign-in failed. Use your PIN.');
     }
     const credential = await Passkey.get(begin.publicKey);
     const res = await apiPost('passkey_login_finish', {user_id: userId, credential});
     if(res.status !== 'success'){
       if(res.code === 'NO_PASSKEY'){ Passkey.forgetDevice(id); els.pinPasskeyWrap.hidden = true; }
-      throw new Error(res.message || 'Fingerprint unlock failed. Use your PIN.');
+      throw new Error(res.message || 'Passkey sign-in failed. Use your PIN.');
     }
     Passkey.rememberDevice(id, credential.rawId);
     await finishUnlock(userId, res);
@@ -2037,7 +2210,7 @@ async function unlockWithPasskey(userId){
       els.pinInput.focus();
       return;
     }
-    els.pinModalError.textContent = e.message || 'Fingerprint unlock failed. Use your PIN.';
+    els.pinModalError.textContent = e.message || 'Passkey sign-in failed. Use your PIN.';
     els.pinModalError.style.display='block';
   }finally{
     els.pinPasskeyBtn.disabled = false;
@@ -2050,18 +2223,7 @@ async function maybeOfferPasskey(userId){
   const id = passkeyId(userId);
   if(Passkey.deviceCredential(id) || Passkey.wasDismissed(id)) return;
   if(!(await Passkey.platformAvailable())) return;
-
-  els.passkeyOfferError.style.display='none';
-  els.passkeyOfferModal.classList.add('active');
-  els.passkeyOfferNo.onclick = () => {
-    Passkey.dismiss(id);
-    els.passkeyOfferModal.classList.remove('active');
-  };
-  els.passkeyOfferYes.onclick = async () => {
-    if(await enrolPasskey(userId, els.passkeyOfferError, els.passkeyOfferYes)){
-      els.passkeyOfferModal.classList.remove('active');
-    }
-  };
+  openPasskeyWindow(userId, true);
 }
 
 /** Registers this device for a logged-in user. Returns true when fingerprint unlock is on. */
@@ -2079,51 +2241,71 @@ async function enrolPasskey(userId, errorEl, btn){
   try{
     const begin = await apiPost('passkey_register_begin', {}, auth.token);
     if(begin.status !== 'success'){
-      fail(begin.message || 'Could not turn on fingerprint unlock.');
+      fail(begin.message || 'Could not add a passkey.');
       return false;
     }
     const credential = await Passkey.create(begin.publicKey);
     const res = await apiPost('passkey_register_finish', {credential, device_label: Passkey.deviceLabel()}, auth.token);
     if(res.status !== 'success' && res.code !== 'PASSKEY_EXISTS'){
-      fail(res.message || 'Could not turn on fingerprint unlock.');
+      fail(res.message || 'Could not add a passkey.');
       return false;
     }
     Passkey.rememberDevice(id, res.credential_id || credential.rawId);
-    showToast('Fingerprint / face unlock is on');
+    showToast('Passkey added on this device');
     return true;
   }catch(e){
     if(Passkey.isDuplicate(e)){
       Passkey.rememberDevice(id, null);
-      showToast('Fingerprint / face unlock is on');
+      showToast('Passkey added on this device');
       return true;
     }
-    if(!Passkey.isCancel(e)) fail('Could not turn on fingerprint unlock.');
+    if(!Passkey.isCancel(e)) fail('Could not add a passkey.');
     return false;
   }finally{
     if(btn) btn.disabled = false;
   }
 }
 
-/** Lists this name's fingerprint / face unlock devices; any can be removed (e.g. a lost phone). */
-async function openPasskeyManager(userId){
+/**
+ * The Passkeys window for a logged-in name. On a device without a passkey it shows the
+ * setup prompt, plus any passkeys on other devices so a lost phone can still be removed.
+ * Once this device has one, it lists every device.
+ * silent: opened automatically after a PIN login, so list errors are not shown.
+ */
+async function openPasskeyWindow(userId, silent = false){
   const auth = state.auth.get(userId) || getCachedAuth(userId);
   if(!auth?.token) return;
   const id = passkeyId(userId);
+  let credentials = [];
+  let loaded = false;
+
   const showError = (msg) => {
-    els.passkeyManageError.textContent = msg;
-    els.passkeyManageError.style.display = msg ? 'block' : 'none';
+    els.passkeyError.textContent = msg;
+    els.passkeyError.style.display = msg ? 'block' : 'none';
   };
 
-  const render = (credentials) => {
-    const mine = Passkey.syncDevice(id, credentials);
-    Passkey.renderList(els.passkeyList, credentials, mine, removeDevice);
-    els.passkeyManageAdd.hidden = !!mine;
+  const render = () => {
+    const mine = loaded ? Passkey.syncDevice(id, credentials) : Passkey.deviceCredential(id);
+    const setup = !mine;
+    els.passkeyModal.classList.toggle('is-setup', setup);
+    els.passkeySetup.hidden = !setup;
+    els.passkeyManageHead.hidden = setup;
+    els.passkeyOthersTitle.hidden = !(loaded && setup && credentials.length);
+    els.passkeyList.hidden = !loaded || (setup && !credentials.length);
+    if(loaded) Passkey.renderList(els.passkeyList, credentials, mine, removeDevice);
+    els.passkeyAdd.hidden = !setup;
+    els.passkeyClose.textContent = setup ? 'Not now' : 'Close';
+  };
+
+  const close = () => {
+    if(!Passkey.deviceCredential(id)) Passkey.dismiss(id);
+    els.passkeyModal.classList.remove('active');
   };
 
   const removeDevice = async (cred, btn) => {
     const isThis = cred.credential_id === Passkey.deviceCredential(id);
     const what = isThis ? 'this device' : (cred.device_label || 'this device');
-    if(!confirm(`Remove fingerprint / face unlock from ${what}? The PIN still works.`)) return;
+    if(!confirm(`Remove the passkey from ${what}? The PIN still works.`)) return;
     btn.disabled = true;
     showError('');
     const res = await apiPost('passkey_remove', {credential_id: cred.credential_id}, auth.token);
@@ -2134,20 +2316,19 @@ async function openPasskeyManager(userId){
     }
     if(isThis) Passkey.forgetDevice(id);
     Passkey.signalRemoved(cred.credential_id);
-    render(res.credentials);
+    credentials = Array.isArray(res.credentials) ? res.credentials : [];
+    render();
     populateUserSelectModal();
-    showToast('Device removed');
+    showToast('Passkey removed');
   };
 
   showError('');
-  els.passkeyList.textContent = '';
-  els.passkeyManageAdd.hidden = true;
-  els.passkeyManageModal.classList.add('active');
-  els.passkeyManageClose.onclick = () => els.passkeyManageModal.classList.remove('active');
-  els.passkeyManageAdd.onclick = async () => {
-    if(await enrolPasskey(userId, els.passkeyManageError, els.passkeyManageAdd)){
-      const again = await apiPost('passkey_list', {}, auth.token);
-      if(again.status === 'success') render(again.credentials);
+  render();
+  els.passkeyModal.classList.add('active');
+  els.passkeyClose.onclick = close;
+  els.passkeyAdd.onclick = async () => {
+    if(await enrolPasskey(userId, els.passkeyError, els.passkeyAdd)){
+      els.passkeyModal.classList.remove('active');
       populateUserSelectModal();
     }
   };
@@ -2155,12 +2336,14 @@ async function openPasskeyManager(userId){
   try{
     const res = await apiPost('passkey_list', {}, auth.token);
     if(res.status !== 'success'){
-      showError(res.message || 'Could not load devices.');
+      if(!silent) showError(res.message || 'Could not load devices.');
       return;
     }
-    render(res.credentials);
+    credentials = Array.isArray(res.credentials) ? res.credentials : [];
+    loaded = true;
+    render();
   }catch(e){
-    showError('Could not load devices. Check your connection.');
+    if(!silent) showError('Could not load devices. Check your connection.');
   }
 }
 
@@ -2258,7 +2441,7 @@ async function savePending(isAutosave = false){
     if(authToken) headers['X-Auth-Token']=authToken;
     const csrf = await ensureCsrfToken();
     if(csrf) headers['X-CSRF-Token']=csrf;
-    const resp = await fetch(url.toString(), {
+    const resp = await accessFetch(url.toString(), {
       method:'POST',
       headers,
       body: JSON.stringify({user_id: uid, changes: toSave}),
@@ -2375,6 +2558,8 @@ async function resetMyAvailability(){
     return;
   }
   
+  if(isBookingMode()){ await cancelMyBookings(auth); return; }
+
   const currentUser = state.users.find(u => u.id === state.currentUserId);
   const userName = currentUser ? currentUser.display_name : 'your';
   
@@ -2440,7 +2625,10 @@ async function resetAllUsers(){
   }
   
   // First confirmation
-  if(!confirm('[!] WARNING: This will permanently delete ALL availability data for ALL users in this calendar.\n\nThis action cannot be undone.\n\nAre you sure you want to continue?')) {
+  const allWarning = isBookingMode()
+    ? '[!] WARNING: This will cancel ALL bookings for ALL users in this calendar.\n\nThis action cannot be undone.\n\nAre you sure you want to continue?'
+    : '[!] WARNING: This will permanently delete ALL availability data for ALL users in this calendar.\n\nThis action cannot be undone.\n\nAre you sure you want to continue?';
+  if(!confirm(allWarning)) {
     return;
   }
   
@@ -2464,9 +2652,15 @@ async function resetAllUsers(){
       return;
     }
     
+    state.pending = {};
+    if(isBookingMode()){
+      await reloadAvailability();
+      showToast('All bookings cancelled');
+      return;
+    }
+
     // Clear all stored availability from local state
     state.store.clear();
-    state.pending = {};
     state.loadedRanges.clear();
     
     // Reload availability data and refresh UI
@@ -2680,6 +2874,17 @@ function buildRankScores(){
 function updateSortToggleUI(){
   if(!els.sortToggle) return;
 
+  // Booking calendars: Booked / Free list toggle for everyone
+  if(isBookingMode()){
+    els.sortToggle.style.display = 'flex';
+    if(els.analysisTitleText) els.analysisTitleText.style.display = 'none';
+    const view = currentBookingView();
+    els.sortToggle.querySelectorAll('.sort-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === view);
+    });
+    return;
+  }
+
   // Determine if current user is authenticated
   const auth = state.auth.get(state.currentUserId || -1);
   const isAuthenticated = !!auth;
@@ -2864,7 +3069,12 @@ function isCalendarFrozen(){
  * Renders or removes the "Decided" banner at the top of the analysis section.
  * Shows the chosen date+slot to all users. Organiser sees a Reopen button.
  */
+function canReopenCalendar(){
+  return isCurrentUserOrganiser() && !!state.auth.get(state.currentUserId || -1)?.token;
+}
+
 function updateChosenBanner(){
+  if(isBookingMode()){ updateBookingClosedBanner(); return; }
   const existing = document.getElementById('chosenBanner');
   if(!isCalendarFrozen()){
     if(existing) existing.remove();
@@ -2880,7 +3090,7 @@ function updateChosenBanner(){
       + ' Decided: <strong>' + escapeHTML(friendlyDate) + ' - ' + escapeHTML(slotLabel) + '</strong>';
     // Toggle reopen button visibility
     const reopenBtn = existing.querySelector('.chosen-reopen-btn');
-    if(reopenBtn) reopenBtn.style.display = isCurrentUserOrganiser() ? 'inline-flex' : 'none';
+    if(reopenBtn) reopenBtn.style.display = canReopenCalendar() ? 'inline-flex' : 'none';
     return;
   }
 
@@ -2893,7 +3103,7 @@ function updateChosenBanner(){
     + '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;vertical-align:middle;">check_circle</span> '
     + ' Decided: <strong>' + escapeHTML(friendlyDate) + ' - ' + escapeHTML(slotLabel) + '</strong>'
     + '</span>'
-    + '<button type="button" class="btn btn-sm chosen-reopen-btn" style="display:' + (isCurrentUserOrganiser() ? 'inline-flex' : 'none') + ';">'
+    + '<button type="button" class="btn btn-sm chosen-reopen-btn" style="display:' + (canReopenCalendar() ? 'inline-flex' : 'none') + ';">'
     + '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px;">lock_open</span> Reopen'
     + '</button>';
 
@@ -3033,6 +3243,7 @@ function toggleRankExpand(key){
   renderRankings();
 }
 function renderRankings(){
+  if(isBookingMode()){ renderBookings(); return; }
   const scores=buildRankScores();
   els.rankWrap.innerHTML='';
   els.rankEmpty.style.display = scores.length ? 'none' : 'block';
@@ -3198,29 +3409,493 @@ function renderRankings(){
 }
 const debouncedRank = debounce(renderRankings, 250);
 
+/* ============================================
+   BOOKING MODE
+   Each slot can be taken by up to state.booking.capacity people.
+   Taps save straight away; the server locks the calendar row and
+   returns any bookings it refused (slot full / per-person limit).
+   ============================================ */
+const BOOKING_REFRESH_MS = 30000;
+
+function isBookingMode(){ return !!state.booking; }
+function isBookingClosed(){ return !!(state.booking && state.booking.closed); }
+
+function bookingLabel(){
+  return (Array.isArray(STATUS_OPTIONS) && STATUS_OPTIONS[0]?.label) || 'Booked';
+}
+
+function isAuthedOrganiser(){
+  const auth = state.auth.get(state.currentUserId || -1);
+  return !!(auth && auth.role === 'admin');
+}
+
+/** Booked list by default for the organiser, Free list for everyone else. */
+function currentBookingView(){
+  return state.bookingView || (isAuthedOrganiser() ? 'booked' : 'free');
+}
+
+function bookingUserName(uid){
+  if(uid === state.currentUserId) return 'You';
+  const u = state.users.find(x => x.id === uid);
+  return u ? u.display_name : 'Someone';
+}
+
+/** Page wording and toggle labels for booking calendars. */
+function applyBookingChrome(){
+  document.title = state.calendarTitle ? `${state.calendarTitle} - book a slot` : 'When RU Free';
+  const views = [['booked', 'check_circle', 'Booked'], ['free', 'event_available', 'Free']];
+  const btns = els.sortToggle ? els.sortToggle.querySelectorAll('.sort-btn') : [];
+  btns.forEach((btn, i) => {
+    const v = views[i];
+    if(!v) return;
+    btn.dataset.mode = v[0];
+    btn.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${v[1]}</span><span>${v[2]}</span>`;
+  });
+  if(els.analysisTitleText) els.analysisTitleText.textContent = 'Bookings';
+  state.rankLimit = 10;
+  const bannerText = els.nameBanner ? els.nameBanner.querySelector('p') : null;
+  if(bannerText) bannerText.textContent = 'Add your name, then tap a free slot to book it.';
+  for(const [el, label] of [[els.resetMineBtn, 'Cancel my bookings'], [els.resetAllBtn, 'Cancel ALL bookings (admin)']]){
+    if(!el) continue;
+    el.title = label;
+    el.setAttribute('aria-label', label);
+  }
+}
+
+function renderBookingLegend(){
+  els.legendWrap.innerHTML = '';
+  const cap = state.booking.capacity;
+  const items = [['free', 'Free'], ['mine', 'Yours']];
+  if(cap >= 2) items.push(['partial', cap === 2 ? '1 left' : 'Places left']);
+  items.push(['full', 'Full']);
+  for(const [kind, text] of items){
+    const item = document.createElement('div'); item.className = 'legend-item';
+    const dot = document.createElement('div'); dot.className = `dot bk-dot bk-dot-${kind}`;
+    item.appendChild(dot);
+    item.appendChild(document.createTextNode(' ' + text));
+    els.legendWrap.appendChild(item);
+  }
+}
+
+/**
+ * Who has booked a slot. With full rows (Open, or Hidden organiser) ids lists everyone;
+ * otherwise only your own row is known and count comes from the anonymous summary.
+ */
+function bookingInfo(dateStr, slotId){
+  const ids = [];
+  for(const u of state.users){
+    if((state.store.get(`${u.id}\n${dateStr}\n${slotId}`) || 0) >= 1) ids.push(u.id);
+  }
+  const mine = !!state.currentUserId && ids.includes(state.currentUserId);
+  const count = Math.max(ids.length, getSummaryCount(dateStr, slotId, 1));
+  const cap = state.booking.capacity;
+  return { ids, mine, count, left: Math.max(0, cap - count), full: count >= cap };
+}
+
+function bookingCellText(info){
+  const roster = shouldShowRoster();
+  const others = info.ids.filter(id => id !== state.currentUserId).map(bookingUserName);
+  if(info.mine) return (roster && others.length) ? `You, ${others.join(', ')}` : 'You';
+  if(info.count === 0) return 'Free';
+  if(roster && others.length){
+    return info.full ? others.join(', ') : `${others.join(', ')} - ${info.left} left`;
+  }
+  if(info.full) return state.booking.capacity === 1 ? bookingLabel() : 'Full';
+  return `${info.left} left`;
+}
+
+function renderBookingCell(el, dateStr, slot){
+  const info = bookingInfo(dateStr, slot.id);
+  setSlotClass(el, info.mine ? 1 : STATUS_NULL);
+  el.classList.toggle('bk-mine', info.mine);
+  el.classList.toggle('bk-full', !info.mine && info.full);
+  el.classList.toggle('bk-partial', !info.mine && !info.full && info.count > 0);
+  const text = bookingCellText(info);
+  const sub = el.querySelector('.bk-sub');
+  if(sub) sub.textContent = text;
+  el.title = `${slot.label}: ${text}`;
+  el.setAttribute('aria-label', `${formatFriendlyDate(dateStr)}, ${slot.label}: ${text}`);
+}
+
+function refreshBookingCells(){
+  els.calendarGrid.classList.toggle('bookings-closed', isBookingClosed());
+  for(const [dateStr, slotMap] of state.slotEls.entries()){
+    for(const slot of TIME_SLOTS){
+      const el = slotMap.get(slot.id);
+      if(el) renderBookingCell(el, dateStr, slot);
+    }
+  }
+}
+
+function myBookingCount(){
+  if(!state.currentUserId) return 0;
+  const prefix = `${state.currentUserId}\n`;
+  let n = 0;
+  for(const [k, v] of state.store.entries()){
+    if(v >= 1 && k.startsWith(prefix)) n++;
+  }
+  return n;
+}
+
+function bookingLimitMessage(){
+  const n = state.booking.perUser;
+  return n === 1
+    ? 'You can book 1 slot in total - cancel it to pick another.'
+    : `You can book ${n} slots in total - cancel one to pick another.`;
+}
+
+function onBookingSlotClick(dateStr, slotId){
+  if(isBookingClosed()){ showToast('Bookings are closed.'); return; }
+  if(!state.currentUserId){ openUserSelectModal(); return; }
+  if(!state.auth.get(state.currentUserId)){
+    openPinModal(state.currentUserId, state.users.find(x => x.id === state.currentUserId));
+    return;
+  }
+  const info = bookingInfo(dateStr, slotId);
+  if(info.mine){
+    if(confirm('Cancel this booking?')) queueBooking(state.currentUserId, dateStr, slotId, 0);
+    return;
+  }
+  if(info.full){ showToast('This slot is taken'); return; }
+  if(!isAuthedOrganiser() && state.booking.perUser !== null && myBookingCount() >= state.booking.perUser){
+    showToast(bookingLimitMessage());
+    return;
+  }
+  queueBooking(state.currentUserId, dateStr, slotId, 1);
+}
+
+/** Booking saves run one at a time, in tap order. */
+let bookingChain = Promise.resolve();
+let bookingInFlight = 0;
+
+function queueBooking(userId, dateStr, slotId, status){
+  const el = state.slotEls.get(dateStr)?.get(slotId);
+  if(el) el.classList.add('bk-busy');
+  bookingInFlight++;
+  bookingChain = bookingChain
+    .then(() => sendBooking(userId, dateStr, slotId, status))
+    .catch(e => console.error('Booking save failed:', e))
+    .finally(() => {
+      bookingInFlight--;
+      const cur = state.slotEls.get(dateStr)?.get(slotId);
+      if(cur) cur.classList.remove('bk-busy');
+    });
+  return bookingChain;
+}
+
+function handleExpiredSession(){
+  const uid = state.currentUserId;
+  state.auth.delete(uid);
+  try{ localStorage.removeItem(cacheKey(uid)); }catch(e){}
+  updateUserUI();
+  openPinModal(uid, state.users.find(x => x.id === uid));
+}
+
+async function sendBooking(userId, dateStr, slotId, status){
+  const auth = state.auth.get(state.currentUserId || -1);
+  if(!auth){ showToast('Please unlock your name first.'); return; }
+  let res;
+  try{
+    res = await apiPost('save', { user_id: userId, changes: { [dateStr]: { [slotId]: status } } }, auth.token);
+  }catch(e){
+    showToast('Could not save - check your connection.');
+    return;
+  }
+  if(res && res.status === 'success'){
+    const rejected = Array.isArray(res.rejected) ? res.rejected : [];
+    if(rejected.some(r => r.reason === 'full')) showToast('Just taken by someone else');
+    else if(rejected.some(r => r.reason === 'limit')) showToast(bookingLimitMessage());
+    else if(status === 0) showToast(userId === state.currentUserId ? 'Booking cancelled' : 'Booking removed');
+    else showToast('Booked!');
+  } else if(res && res.code === 'BOOKINGS_CLOSED'){
+    state.booking.closed = true;
+    updateBookingClosedBanner();
+    showToast('Bookings are closed.');
+  } else if(res && /session|auth required/i.test(res.message || '')){
+    handleExpiredSession();
+    return;
+  } else {
+    showToast((res && res.message) || 'Save failed');
+  }
+  await reloadAvailability();
+}
+
+async function cancelMyBookings(auth){
+  const n = myBookingCount();
+  if(!n){ showToast('You have no bookings.'); return; }
+  if(isBookingClosed() && !isAuthedOrganiser()){ showToast('Bookings are closed.'); return; }
+  if(!confirm(n === 1 ? 'Cancel your booking?' : `Cancel all ${n} of your bookings?`)) return;
+  try{
+    const res = await apiPost('reset_user', { user_id: state.currentUserId }, auth.token);
+    if(res.status !== 'success'){ showToast(res.message || 'Cancel failed'); return; }
+    await reloadAvailability();
+    showToast(n === 1 ? 'Booking cancelled' : 'Bookings cancelled');
+  }catch(e){
+    console.error('Cancel bookings failed:', e);
+    showToast('Cancel failed. Please try again.');
+  }
+}
+
+/** Visible dates in order (past dates follow the Show/Hide past dates button). */
+function bookingDates(){
+  const out = [];
+  if(!state.startDate || !state.endDate) return out;
+  const today = todayStr();
+  const end = new Date(state.endDate + 'T00:00:00');
+  for(let d = new Date(state.startDate + 'T00:00:00'); d <= end; d.setDate(d.getDate() + 1)){
+    const dow = d.getDay();
+    if(state.excludeWeekends && (dow === 0 || dow === 6)) continue;
+    const dateStr = fmtDate(d);
+    if(!isDateVisible(dateStr)) continue;
+    if(state.hidePastDates && dateStr < today) continue;
+    out.push(dateStr);
+  }
+  return out;
+}
+
+function bookingRowShell(dateStr, slot, extraClass){
+  const card = document.createElement('div');
+  card.className = 'rank-card bk-card' + (extraClass ? ` ${extraClass}` : '');
+  const row = document.createElement('div'); row.className = 'bk-row';
+  const main = document.createElement('div'); main.className = 'rank-main';
+  const line1 = document.createElement('div'); line1.className = 'rank-line1';
+  line1.textContent = `${formatFriendlyDate(dateStr)} - ${slot.label}`;
+  const line2 = document.createElement('div'); line2.className = 'rank-line2';
+  main.appendChild(line1); main.appendChild(line2);
+  const actions = document.createElement('div'); actions.className = 'bk-actions';
+  row.appendChild(main); row.appendChild(actions);
+  card.appendChild(row);
+  return { card, line2, actions };
+}
+
+function buildBookedRow({ dateStr, slot, info }, { cap, closed, isOrg, roster }){
+  const { card, line2, actions } = bookingRowShell(dateStr, slot, info.mine ? 'bk-card-mine' : '');
+  if(roster){
+    const me = state.currentUserId;
+    const ids = info.ids.slice().sort((a, b) =>
+      ((b === me) - (a === me)) || bookingUserName(a).localeCompare(bookingUserName(b)));
+    for(const uid of ids){
+      const name = bookingUserName(uid);
+      const chip = document.createElement('span'); chip.className = 'bk-person';
+      chip.appendChild(document.createTextNode(name));
+      if(isOrg && uid !== me){
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'bk-remove';
+        rm.title = `Remove ${name}`;
+        rm.setAttribute('aria-label', `Remove ${name}'s booking`);
+        rm.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">close</span>';
+        rm.addEventListener('click', () => {
+          if(!confirm(`Remove ${name}'s booking for ${formatFriendlyDate(dateStr)} - ${slot.label}?`)) return;
+          queueBooking(uid, dateStr, slot.id, 0);
+        });
+        chip.appendChild(rm);
+      }
+      line2.appendChild(chip);
+    }
+    if(cap > 1 && !info.full){
+      const left = document.createElement('span'); left.className = 'bk-left';
+      left.textContent = `${info.left} left`;
+      line2.appendChild(left);
+    }
+  } else {
+    line2.textContent = info.mine
+      ? (info.count > 1 ? `You + ${info.count - 1} more` : 'You')
+      : (cap === 1 ? bookingLabel() : `${info.count} of ${cap} booked`);
+  }
+  if(info.mine){
+    if(!closed || isOrg){
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'btn-pill bk-cancel-btn';
+      cancel.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">event_busy</span> Cancel';
+      cancel.addEventListener('click', () => {
+        if(confirm('Cancel this booking?')) queueBooking(state.currentUserId, dateStr, slot.id, 0);
+      });
+      actions.appendChild(cancel);
+    }
+    const links = buildCalendarLinks({ dateStr, slotLabel: slot.label });
+    URL.revokeObjectURL(links.icsBlobUrl);
+    const add = document.createElement('a');
+    add.href = links.gcalURL; add.target = '_blank'; add.rel = 'noopener';
+    add.className = 'btn-pill btn-cal';
+    add.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">event</span> Add';
+    actions.appendChild(add);
+  }
+  return card;
+}
+
+function buildFreeRow({ dateStr, slot, info }, { closed }){
+  const { card, line2, actions } = bookingRowShell(dateStr, slot, '');
+  line2.textContent = info.count === 0 ? 'Free' : `${info.left} left`;
+  if(!closed){
+    const book = document.createElement('button');
+    book.type = 'button';
+    book.className = 'btn-pill btn-choose';
+    book.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">event_available</span> Book';
+    book.addEventListener('click', () => onBookingSlotClick(dateStr, slot.id));
+    actions.appendChild(book);
+  }
+  return card;
+}
+
+/** Bookings card: "N of M booked", then the Booked or Free list in date order. */
+function renderBookings(){
+  updateSortToggleUI();
+  updateLimitToggleUI();
+  els.rankWrap.innerHTML = '';
+  const cap = state.booking.capacity;
+  const view = currentBookingView();
+  const closed = isBookingClosed();
+  const isOrg = isAuthedOrganiser();
+  const roster = shouldShowRoster();
+  const rows = [];
+  let taken = 0;
+  let places = 0;
+  for(const dateStr of bookingDates()){
+    for(const slot of TIME_SLOTS){
+      const info = bookingInfo(dateStr, slot.id);
+      taken += Math.min(info.count, cap);
+      places += cap;
+      const include = view === 'booked' ? info.count > 0 : (!info.full && !info.mine);
+      if(include) rows.push({ dateStr, slot, info });
+    }
+  }
+
+  const head = document.createElement('div');
+  head.className = 'bk-summary';
+  const count = document.createElement('span');
+  count.className = 'bk-summary-text';
+  count.textContent = cap === 1 ? `${taken} of ${places} booked` : `${taken} of ${places} places booked`;
+  head.appendChild(count);
+  if(isOrg && !closed){
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'btn-pill bk-close-btn';
+    closeBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">lock</span> Close bookings';
+    closeBtn.addEventListener('click', () => setBookingsClosed(true));
+    head.appendChild(closeBtn);
+  }
+  els.rankWrap.appendChild(head);
+
+  if(!rows.length){
+    els.rankEmpty.textContent = view === 'booked' ? 'No bookings yet.' : (closed ? 'Bookings are closed.' : 'No free slots.');
+    els.rankEmpty.style.display = 'block';
+    return;
+  }
+  els.rankEmpty.style.display = 'none';
+  const shown = state.rankLimit === 0 ? rows : rows.slice(0, state.rankLimit);
+  for(const row of shown){
+    els.rankWrap.appendChild(view === 'booked'
+      ? buildBookedRow(row, { cap, closed, isOrg, roster })
+      : buildFreeRow(row, { closed }));
+  }
+}
+
+function updateBookingClosedBanner(){
+  const closed = isBookingClosed();
+  els.calendarGrid.classList.toggle('bookings-closed', closed);
+  let banner = document.getElementById('bookingClosedBanner');
+  if(!closed){
+    if(banner) banner.remove();
+    return;
+  }
+  if(!banner){
+    banner = document.createElement('div');
+    banner.id = 'bookingClosedBanner';
+    banner.className = 'chosen-banner bk-closed-banner';
+    banner.innerHTML =
+      '<span class="chosen-banner-text">'
+      + '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;vertical-align:middle;">lock</span> Bookings closed'
+      + '</span>'
+      + '<button type="button" class="btn btn-sm chosen-reopen-btn">'
+      + '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px;">lock_open</span> Reopen'
+      + '</button>';
+    banner.querySelector('.chosen-reopen-btn').addEventListener('click', () => setBookingsClosed(false));
+    const section = document.querySelector('.analysis-section');
+    if(section) section.insertBefore(banner, section.firstChild);
+  }
+  banner.querySelector('.chosen-reopen-btn').style.display = isAuthedOrganiser() ? 'inline-flex' : 'none';
+}
+
+async function setBookingsClosed(closed){
+  if(!isAuthedOrganiser()) return;
+  const auth = state.auth.get(state.currentUserId);
+  const msg = closed
+    ? 'Close bookings?\n\nNobody can book or cancel until you reopen. You can still remove bookings.'
+    : 'Reopen bookings?\n\nPeople will be able to book and cancel again.';
+  if(!confirm(msg)) return;
+  try{
+    const res = await apiPost('set_bookings_closed', { closed: closed ? 1 : 0 }, auth.token);
+    if(res.status !== 'success'){ showToast(res.message || 'Failed to update bookings'); return; }
+    state.booking.closed = res.bookings_closed === true;
+    updateBookingClosedBanner();
+    refreshBookingCells();
+    renderRankings();
+    showToast(state.booking.closed ? 'Bookings closed' : 'Bookings reopened');
+  }catch(e){
+    console.error('set_bookings_closed failed:', e);
+    showToast('Failed to update bookings');
+  }
+}
+
+/** Keeps the grid current while the page is open: on tab focus and every 30 seconds. */
+let bookingRefreshBusy = false;
+
+function startBookingRefresh(){
+  setInterval(() => { if(document.visibilityState === 'visible') refreshBookings(); }, BOOKING_REFRESH_MS);
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') refreshBookings();
+  });
+}
+
+async function refreshBookings(){
+  if(bookingRefreshBusy || bookingInFlight > 0) return;
+  bookingRefreshBusy = true;
+  try{
+    const meta = await apiGet('calendar_meta');
+    if(meta.status === 'success' && meta.calendar){
+      const closed = meta.calendar.bookings_closed === true;
+      if(closed !== state.booking.closed){
+        state.booking.closed = closed;
+        updateBookingClosedBanner();
+      }
+    }
+    await reloadAvailability();
+  }catch(e){
+    console.warn('Booking refresh failed:', e);
+  }finally{
+    bookingRefreshBusy = false;
+  }
+}
+
 /*** Events */
 els.togglePastDatesBtn.addEventListener('click', ()=>{
   state.hidePastDates = !state.hidePastDates;
   try { sessionStorage.setItem('hidePastDates', state.hidePastDates ? '1' : '0'); } catch(e){}
   applyPastDateFilter();
+  if(isBookingMode()) renderRankings();
 });
 
 els.shareBtn.addEventListener('click', async ()=>{
   const calendarName = state.calendarTitle || 'When RU Free';
   const url = `https://whenrufree.net/calendar.html?c=${encodeURIComponent(state.token)}`;
-  const title = `${calendarName} – When RU Free`;
+  const title = `${calendarName} \u2013 When RU Free`;
+  const emojiLine = window.AccessEmoji ? AccessEmoji.shareLine(state.accessEmoji, state.accessHubEmoji) : '';
+  const intro = (isBookingMode() ? `Book a slot for ${calendarName}` : `Join the ${calendarName} and add your availability`)
+    + (emojiLine ? ` (${emojiLine})` : '') + ':';
 
   try {
     if(navigator.share){
       // url is appended automatically by the OS share sheet, so keep it out of text
-      await navigator.share({ title, text: `Join the ${calendarName} and add your availability:`, url });
+      await navigator.share({ title, text: intro, url });
       return;
     }
   } catch(e){}
 
   // Fallback: copy full message + URL to clipboard
   try {
-    await navigator.clipboard.writeText(`Join the ${calendarName} and add your availability:\n${url}`);
+    await navigator.clipboard.writeText(`${intro}\n${url}`);
     showToast('Link copied!');
   } catch {
     showToast('Copy failed - copy from the address bar.');
@@ -3239,6 +3914,10 @@ els.sortToggle.addEventListener('click', (e)=>{
   const btn = e.target.closest('.sort-btn');
   if(!btn) return;
   const mode = btn.dataset.mode;
+  if(isBookingMode()){
+    if(mode === 'booked' || mode === 'free'){ state.bookingView = mode; renderRankings(); }
+    return;
+  }
   if(!mode || mode === state.rankSortOrder) return;
   // Require authentication to change sort order
   const auth = state.auth.get(state.currentUserId || -1);
@@ -3414,8 +4093,8 @@ async function init(){
       tryRestoreCachedSession();
     }
 
-    // Restore any unsaved pending changes for the selected user
-    if(state.currentUserId){
+    // Restore any unsaved pending changes for the selected user (bookings save instantly)
+    if(state.currentUserId && !isBookingMode()){
       state.pending = restorePendingForUser(state.currentUserId);
     }
     
@@ -3435,6 +4114,7 @@ async function init(){
     // Apply chosen/frozen state (banner + grid dimming)
     updateChosenBanner();
     applyFrozenState();
+    if(isBookingMode()) startBookingRefresh();
 
     // Warn before leaving when there are unsaved (pending) changes
     window.addEventListener('beforeunload', (e)=>{
@@ -3459,6 +4139,8 @@ document.getElementById('hubAddBtn')?.addEventListener('click', showHubModal);
 document.getElementById('hubRemoveBtn')?.addEventListener('click', removeFromHub);
 document.getElementById('hubModalCancel')?.addEventListener('click', hideHubModal);
 document.getElementById('hubModalConfirm')?.addEventListener('click', confirmAddToHub);
+els.settingsBtn.addEventListener('click', openSettingsModal);
+els.settingsClose.addEventListener('click', hideSettingsModal);
 document.addEventListener('DOMContentLoaded', init);
 
 /*** Ensure rankings reflect all dates after changes */

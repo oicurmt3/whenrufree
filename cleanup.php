@@ -19,6 +19,10 @@
  *  3) Delete expired user sessions
  *  4) Delete old API rate limit entries (auto-prune to prevent table bloat)
  *  5) Reset expired PIN lockouts (cleanup failed_attempts/locked_until)
+ *  6) Delete expired Hub sessions
+ *  7) Reset expired Hub organiser PIN lockouts
+ *  8) Reset PIN lockout escalation (lockout_level) after 30 days without a lockout
+ *  9) Access emoji: delete expired or orphaned grants, and wrong-pick rows after 30 quiet days
  *
  * Security Notes:
  *  - This script should NOT be web-accessible. Place outside webroot or protect via .htaccess.
@@ -171,6 +175,9 @@ $stats = [
     'sessions_deleted' => 0,
     'rate_limits_deleted' => 0,
     'lockouts_reset' => 0,
+    'lockout_levels_reset' => 0,
+    'access_grants_deleted' => 0,
+    'access_attempts_deleted' => 0,
     'errors' => [],
 ];
 
@@ -315,6 +322,78 @@ try {
     echo "[7] ERROR resetting hub lockouts: " . $e->getMessage() . "\n";
 }
 
+// 8. Forget PIN lockout escalation after a quiet period
+// -----------------------------------------------------------------------------
+// Steps 5 and 7 keep lockout_level so repeat offenders get longer locks. After
+// pin_lockout.reset_after_days (default 30) without a new lockout, start again at 5 minutes.
+$lockoutResetDays = max(1, (int)($config['pin_lockout']['reset_after_days'] ?? 30));
+foreach (['users' => 'users', 'groups' => '`groups`'] as $label => $table) {
+    try {
+        try {
+            $pdo->query("SELECT lockout_level FROM {$table} LIMIT 0");
+        } catch (PDOException $e) {
+            echo "[8] Lockout levels ({$label}): skipped - run migrations/002_escalating_lockout.sql\n";
+            continue;
+        }
+        $stmt = $pdo->prepare("
+            UPDATE {$table}
+            SET lockout_level = 0
+            WHERE lockout_level > 0
+              AND (locked_until IS NULL OR locked_until < NOW())
+              AND (last_locked_at IS NULL OR last_locked_at < DATE_SUB(NOW(), INTERVAL :days DAY))
+        ");
+        $stmt->execute([':days' => $lockoutResetDays]);
+        $stats['lockout_levels_reset'] += $stmt->rowCount();
+        echo "[8] Lockout levels reset ({$label}, >{$lockoutResetDays} days quiet): {$stmt->rowCount()}\n";
+    } catch (Throwable $e) {
+        $stats['errors'][] = "Lockout levels ({$label}): " . $e->getMessage();
+        echo "[8] ERROR resetting lockout levels ({$label}): " . $e->getMessage() . "\n";
+    }
+}
+
+// 9. Access emoji grants and wrong-pick counters
+// -----------------------------------------------------------------------------
+// Grants and lock times are written with PHP time by includes/access.php, so compare with PHP
+// time here too. Grants for deleted calendars/Hubs go straight away; wrong-pick rows (and their
+// escalation level) are forgotten after access_emoji.attempts_keep_days (default 30) without a
+// wrong pick, once any lock has ended.
+try {
+    $accessReady = true;
+    try {
+        $pdo->query("SELECT token_hash FROM access_grants LIMIT 0");
+        $pdo->query("SELECT lockout_level FROM access_attempts LIMIT 0");
+    } catch (PDOException $e) {
+        $accessReady = false;
+        echo "[9] Access emoji: skipped - run migrations/003_access_emoji.sql\n";
+    }
+    if ($accessReady) {
+        $now = date('Y-m-d H:i:s');
+        $stmt = $pdo->prepare("DELETE FROM access_grants WHERE expires_at < :now");
+        $stmt->execute([':now' => $now]);
+        $stats['access_grants_deleted'] = $stmt->rowCount();
+
+        $stats['access_grants_deleted'] += $pdo->exec("
+            DELETE FROM access_grants
+            WHERE (kind = 'calendar' AND NOT EXISTS (SELECT 1 FROM calendars c WHERE c.id = access_grants.subject_id))
+               OR (kind = 'group' AND NOT EXISTS (SELECT 1 FROM `groups` g WHERE g.id = access_grants.subject_id))
+        ");
+        echo "[9] Access grants deleted (expired or orphaned): {$stats['access_grants_deleted']}\n";
+
+        $attemptsKeepDays = max(1, (int)($config['access_emoji']['attempts_keep_days'] ?? 30));
+        $stmt = $pdo->prepare("
+            DELETE FROM access_attempts
+            WHERE (locked_until IS NULL OR locked_until < :now)
+              AND updated_at < :cutoff
+        ");
+        $stmt->execute([':now' => $now, ':cutoff' => date('Y-m-d H:i:s', time() - $attemptsKeepDays * 86400)]);
+        $stats['access_attempts_deleted'] = $stmt->rowCount();
+        echo "[9] Access wrong-pick rows deleted (>{$attemptsKeepDays} days quiet): {$stats['access_attempts_deleted']}\n";
+    }
+} catch (Throwable $e) {
+    $stats['errors'][] = "Access emoji: " . $e->getMessage();
+    echo "[9] ERROR cleaning access emoji data: " . $e->getMessage() . "\n";
+}
+
 // -------------------------------------------------------------------------
 // Summary
 // -------------------------------------------------------------------------
@@ -325,6 +404,9 @@ echo "Hubs deleted:          {$stats['hubs_deleted']}\n";
 echo "Sessions deleted:      {$stats['sessions_deleted']}\n";
 echo "Rate limits pruned:    {$stats['rate_limits_deleted']}\n";
 echo "Lockouts reset:        {$stats['lockouts_reset']}\n";
+echo "Lockout levels reset:  {$stats['lockout_levels_reset']}\n";
+echo "Access grants deleted: {$stats['access_grants_deleted']}\n";
+echo "Access picks deleted:  {$stats['access_attempts_deleted']}\n";
 
 if (!empty($stats['errors'])) {
     echo "\nErrors encountered:\n";

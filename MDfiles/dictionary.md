@@ -30,6 +30,10 @@ Core configuration for each scheduling calendar.
 | organiser_message | VARCHAR(250) | NULL | Short note from organiser. NULL if empty |
 | chosen_date | VARCHAR(10) | NULL | Locked-in date (YYYY-MM-DD) or NULL if open |
 | chosen_slot | VARCHAR(50) | NULL | Locked-in slot ID or NULL if open |
+| access_emoji | TINYINT UNSIGNED | NULL | Access emoji position 0-34 (list in `emoji.js`), NULL = none. Migration 003 |
+| slot_capacity | TINYINT UNSIGNED | NULL | Booking calendars: people per slot 1-20. NULL = normal availability poll. Migration 004 |
+| max_per_user | TINYINT UNSIGNED | NULL | Booking calendars: bookings each person can hold across the whole calendar 1-20, NULL = no limit. Migration 004 |
+| bookings_closed | TINYINT(1) | 0 | Booking calendars: 1 = organiser closed bookings. Migration 004 |
 
 **Indexes:**
 - PRIMARY KEY (`id`)
@@ -44,6 +48,9 @@ Core configuration for each scheduling calendar.
 - When both `chosen_date` and `chosen_slot` are non-NULL, the calendar is "frozen" -- availability saves are blocked server-side
 - `organiser_message` app limit is 250 chars (MESSAGE_MAX_LEN in api.php). Column is VARCHAR(250) to match. Column should always be wider than or equal to the app limit
 - Token collision on create retries up to 5 times
+- A calendar with `access_emoji` NULL inside a Hub with an emoji uses the Hub's emoji
+- Booking calendars (`slot_capacity` set) have exactly one status (1 = booked, weight 1), never Blind privacy (`is_private` 0 or 1), and store bookings as `availability` rows. `save` locks the calendar row and refuses bookings beyond `slot_capacity` per slot or `max_per_user` per person (the organiser booking for themselves is exempt from `max_per_user`). The booking columns are set only at creation
+- While `bookings_closed` = 1, participants cannot save or reset; the organiser still can
 
 ---
 
@@ -62,6 +69,8 @@ Participants within a calendar.
 | updated_at | DATETIME | NULL | Last update (currently unused) |
 | failed_attempts | TINYINT UNSIGNED | 0 | Consecutive failed PIN attempts |
 | locked_until | DATETIME | NULL | Account locked until this time. NULL = not locked |
+| lockout_level | TINYINT UNSIGNED | 0 | Lockouts so far (0-4); picks the next lock length. Migration 002 |
+| last_locked_at | DATETIME | NULL | When the last lockout started; used for the 30-day reset. Migration 002 |
 
 **Indexes:**
 - PRIMARY KEY (`id`)
@@ -74,7 +83,9 @@ Participants within a calendar.
 
 **Business rules:**
 - Each calendar has exactly one admin (the organiser, created with the calendar)
-- After 5 failed PIN attempts, `locked_until` is set to NOW() + 15 minutes
+- After 5 failed PIN attempts in a row the account locks for 5 minutes, then 15 minutes, then 2 hours, then 2 days (repeats); `lockout_level` goes up by one each time and `failed_attempts` restarts at 0
+- A correct PIN, passkey login or super admin Unlock sets `lockout_level` back to 0; so does `cleanup.php` after 30 days without a lockout
+- Without migration 002 the lock is a flat 15 minutes
 - Display names are unique per calendar (enforced by unique index)
 
 ---
@@ -141,7 +152,7 @@ Authentication tokens for logged-in users.
 
 ## Table: groups
 
-Hub (group calendar folder) — one private URL lists multiple calendars.
+Hub (group calendar folder) - one private URL lists multiple calendars.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -152,9 +163,12 @@ Hub (group calendar folder) — one private URL lists multiple calendars.
 | organiser_pin_hash | VARCHAR(255) | - | bcrypt hash of 4-digit PIN |
 | failed_attempts | TINYINT UNSIGNED | 0 | Failed PIN attempts |
 | locked_until | DATETIME | NULL | Hub organiser lockout expiry |
+| lockout_level | TINYINT UNSIGNED | 0 | Escalation level, same rules as `users.lockout_level`. Migration 002 |
+| last_locked_at | DATETIME | NULL | When the last organiser lockout started. Migration 002 |
 | created_at | DATETIME | CURRENT_TIMESTAMP | Creation timestamp |
 | last_activity | DATETIME | NULL | Last hub view or child calendar activity |
 | never_expires | TINYINT(1) | 0 | 1 = protected from cleanup.php Hub deletion |
+| access_emoji | TINYINT UNSIGNED | NULL | Hub access emoji position 0-34, NULL = none. Also guards every calendar in the Hub that has no emoji of its own. Migration 003 |
 
 **Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_groups_token` (`token`)
 
@@ -194,7 +208,7 @@ Fingerprint / face unlock (WebAuthn) credentials for calendar users. Created by 
 
 **Business rules:**
 - Max 10 devices per user (`WEBAUTHN_MAX_PER_SUBJECT`)
-- Deleting a calendar or user deletes its passkeys (FK cascade) — no cleanup.php changes needed
+- Deleting a calendar or user deletes its passkeys (FK cascade) - no cleanup.php changes needed
 - No biometric data is stored; the fingerprint / face check happens on the device
 
 ---
@@ -202,6 +216,51 @@ Fingerprint / face unlock (WebAuthn) credentials for calendar users. Created by 
 ## Table: group_passkeys
 
 Same as `user_passkeys`, but for Hub organisers. `group_id` (FK to groups.id, CASCADE DELETE) replaces `calendar_id` / `user_id`.
+
+---
+
+## Table: access_grants
+
+Proof that a browser picked the right access emoji. Created by `migrations/003_access_emoji.sql`.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
+| kind | ENUM('calendar','group') | - | What the grant opens |
+| subject_id | BIGINT UNSIGNED | - | calendars.id or groups.id (no FK; orphans removed by cleanup.php) |
+| token_hash | CHAR(64) | - | SHA-256 of the 64-hex grant sent in `X-Access-Grant`. The raw grant is never stored |
+| created_at | DATETIME | CURRENT_TIMESTAMP | Issued |
+| expires_at | DATETIME | - | Expiry (30 days, `access_emoji.grant_days`) |
+
+**Indexes:** PRIMARY KEY (`id`), UNIQUE (`token_hash`), INDEX (`kind`, `subject_id`), INDEX (`expires_at`)
+
+**Business rules:**
+- A `group` grant opens the Hub and every calendar in it
+- Changing or removing an emoji deletes all grants for that calendar/Hub
+- cleanup.php deletes expired and orphaned rows
+
+---
+
+## Table: access_attempts
+
+Wrong emoji picks per IP address and calendar/Hub. Created by `migrations/003_access_emoji.sql`.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| ip | VARCHAR(45) | - | Client IP |
+| kind | ENUM('calendar','group') | - | Calendar or Hub |
+| subject_id | BIGINT UNSIGNED | - | calendars.id or groups.id |
+| failed_attempts | TINYINT UNSIGNED | 0 | Wrong picks since the last lock |
+| locked_until | DATETIME | NULL | Lock expiry |
+| lockout_level | TINYINT UNSIGNED | 0 | Escalation: 5 min, 15 min, 2 h, 2 days (repeats) |
+| updated_at | DATETIME | - | Last wrong pick |
+
+**Indexes:** PRIMARY KEY (`ip`, `kind`, `subject_id`), INDEX (`updated_at`)
+
+**Business rules:**
+- 3 wrong picks (`access_emoji.max_attempts`) lock that IP out of that calendar/Hub
+- A right pick deletes the row; changing or removing the emoji deletes all rows for it
+- cleanup.php deletes unlocked rows with no wrong pick for 30 days (`access_emoji.attempts_keep_days`)
 
 ---
 
@@ -223,7 +282,9 @@ Per-IP request throttling.
 **Notes:**
 - Upsert pattern resets count when minute_key changes (new minute window)
 - General API limit uses `minute_key` as `YYYYMMDDHHmm`
-- Hub add limits use action keys such as `hub_add_{groupId}_{YYYYMMDDHH}` and `hub_add_global_{YYYYMMDDHH}` (see `enforceActionRateLimit` in api.php)
-- Passkey limits use `pkr{YYYYMMDDHHmm}` (enrolment) and `pkl{YYYYMMDDHHmm}` (login) — kept within the 16-char column
+- Hub add limits use `hg{YYYYMMDDHH}{groupId in base 36}` (per Hub) and `hi{YYYYMMDDHH}` (all Hubs) (see `enforceHubCalendarRateLimit` in api.php)
+- Every action key must fit the 16-char column: `enforceActionRateLimit` passes keys through `rateLimitKey()`, which replaces longer keys with `x` + 15 hex chars of their SHA-256. A too-long key would be truncated on insert and never match the count query, silently disabling the limit
+- Passkey limits use `pkr{YYYYMMDDHHmm}` (enrolment) and `pkl{YYYYMMDDHHmm}` (login) - kept within the 16-char column
+- Access emoji hourly caps use `aw{YYYYMMDDHH}` (wrong picks, default 20/hour) and `nf{YYYYMMDDHH}` (unknown calendar/Hub codes, default 30/hour)
 - Known race condition on concurrent upserts (acceptable at current scale)
 - Pruned by cleanup.php (default: entries older than 60 minutes)

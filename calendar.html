@@ -34,7 +34,8 @@
     }
   </style>
   <!-- App styles -->
-  <link rel="stylesheet" href="calendar.css?v=20260926b">
+  <link rel="stylesheet" href="calendar.css?v=20260926i">
+  <link rel="stylesheet" href="emoji.css?v=20260926b">
 </head>
 <body>
 <header>
@@ -57,6 +58,10 @@
     <!-- Share (admin only) -->
     <button id="shareBtn" class="btn btn-ghost icon-btn" type="button" title="Share" aria-label="Share" style="display:none;">
       <span class="material-symbols-outlined" aria-hidden="true">share</span>
+    </button>
+    <!-- Calendar settings (admin only) -->
+    <button id="settingsBtn" class="btn btn-ghost icon-btn" type="button" title="Calendar settings" aria-label="Calendar settings" aria-haspopup="dialog" style="display:none;">
+      <span class="material-symbols-outlined" aria-hidden="true">settings</span>
     </button>
     <!-- Submit/Save button - hidden initially to prevent flash -->
     <button id="submitBtn" class="btn btn-submit icon-btn is-saved init-hidden" type="button" disabled title="Saved" aria-label="Saved">
@@ -232,15 +237,15 @@
   <div class="modal">
     <h2 id="pinModalTitle">Enter PIN</h2>
     <div id="pinPasskeyWrap" hidden>
-      <button class="btn btn-passkey" id="pinPasskeyBtn" type="button">
+      <button class="btn btn-passkey" id="pinPasskeyBtn" type="button" aria-label="Use passkey: fingerprint, face or screen lock">
         <span class="passkey-icons" aria-hidden="true">
           <span class="material-symbols-outlined">fingerprint</span><span class="material-symbols-outlined">face</span><span class="material-symbols-outlined">pattern</span>
         </span>
-        Use fingerprint / face / screen lock
+        Use Passkey
       </button>
       <p class="passkey-or">or enter your PIN</p>
     </div>
-    <p id="pinModalText">Enter the 4-digit PIN for the selected user.</p>
+    <p id="pinModalText">Enter your 4-digit PIN.</p>
     <div class="pin-field">
       <input id="pinInput" placeholder="4-digit PIN" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" />
       <button type="button" id="toggleUnlockPin" class="pin-toggle" aria-label="Show PIN">
@@ -255,29 +260,27 @@
   </div>
 </div>
 
-<!-- Offer fingerprint / face unlock after a PIN login -->
-<div class="modal-overlay" id="passkeyOfferModal">
+<!-- Passkeys: set up on this device, or manage every device for the logged-in name -->
+<div class="modal-overlay" id="passkeyModal">
   <div class="modal">
-    <h2><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">fingerprint</span> Unlock faster next time?</h2>
-    <p>Use your fingerprint, face or device screen lock instead of your PIN on this device. Your PIN still works as a backup.</p>
-    <div class="error" id="passkeyOfferError"></div>
-    <div class="modal-actions">
-      <button class="btn btn-cancel" id="passkeyOfferNo" type="button">Not now</button>
-      <button class="btn btn-confirm" id="passkeyOfferYes" type="button">Turn on</button>
+    <div id="passkeySetup">
+      <h2>Set up a passkey?</h2>
+      <div class="passkey-offer-icons" aria-hidden="true">
+        <span class="material-symbols-outlined">fingerprint</span><span class="material-symbols-outlined">face</span><span class="material-symbols-outlined">pattern</span>
+      </div>
+      <p>Next time, unlock with your <strong>fingerprint</strong>, <strong>face</strong> or <strong>screen lock</strong> (for example Touch ID, Face ID, Windows Hello, or your phone's PIN or pattern) instead of typing your 4-digit PIN.</p>
+      <p class="passkey-offer-note">Only for this device. Your fingerprint or face never leaves it, and your PIN still works as a backup.</p>
     </div>
-  </div>
-</div>
-
-<!-- Manage fingerprint / face unlock devices for the logged-in name -->
-<div class="modal-overlay" id="passkeyManageModal">
-  <div class="modal">
-    <h2><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">fingerprint</span> Fingerprint / face unlock</h2>
-    <p id="passkeyManageText">Devices that can unlock this name without the PIN. Your PIN always works as a backup.</p>
-    <ul class="passkey-list" id="passkeyList"></ul>
-    <div class="error" id="passkeyManageError"></div>
+    <div id="passkeyManageHead" hidden>
+      <h2><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">fingerprint</span> Passkeys</h2>
+      <p>Devices that can unlock this name with your fingerprint, face or screen lock instead of the PIN. Your PIN always works as a backup.</p>
+    </div>
+    <p class="passkey-others-title" id="passkeyOthersTitle" hidden>Passkeys on other devices</p>
+    <ul class="passkey-list" id="passkeyList" hidden></ul>
+    <div class="error" id="passkeyError"></div>
     <div class="modal-actions">
-      <button class="btn btn-cancel" id="passkeyManageClose" type="button">Close</button>
-      <button class="btn btn-confirm" id="passkeyManageAdd" type="button">Turn on for this device</button>
+      <button class="btn btn-cancel" id="passkeyClose" type="button">Not now</button>
+      <button class="btn btn-confirm" id="passkeyAdd" type="button">Set up passkey</button>
     </div>
   </div>
 </div>
@@ -308,10 +311,23 @@
   </div>
 </div>
 
+<!-- Calendar settings (organiser only) -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2><span class="material-symbols-outlined settings-title-icon" aria-hidden="true">settings</span> Calendar settings</h2>
+    <div id="settingsAccessField"></div>
+    <div class="error" id="settingsError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="settingsClose" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast">Saved</div>
 
 <!-- App script -->
-<script src="passkey.js?v=20260926b"></script>
-<script src="calendar.js?v=20260926b"></script>
+<script src="passkey.js?v=20260926d"></script>
+<script src="emoji.js?v=20260926b"></script>
+<script src="calendar.js?v=20260926m"></script>
 </body>
 </html>

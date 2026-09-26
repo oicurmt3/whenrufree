@@ -529,6 +529,56 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
   }
 }
 
+/* Booking: People per slot / Bookings per person (privacy-toggle look + stepper for "More") */
+#capacityField{ margin-top: 14px; }
+.limit-toggle .priv-btn{ min-height: 44px; padding: 10px 8px; }
+.limit-stepper{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.limit-stepper .stepper-btn{
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  border-radius: 6px;
+}
+.limit-stepper .stepper-btn:disabled{ opacity: .4; cursor: default; }
+.limit-stepper .stepper-value{
+  min-width: 36px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.booking-label-row{display:flex; gap:8px; align-items:center; margin:8px 0; max-width:300px;}
+.booking-label-row .label-input{
+  flex: 1;
+  height: 44px;
+  padding: 0 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: solid 1px #aaa;
+  min-width: 100px;
+  background-color:#fff;
+}
+.booking-label-row .color-pick{
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.booking-label-row .color-pick::-webkit-color-swatch-wrapper{ padding: 2px; }
+.booking-label-row .color-pick::-webkit-color-swatch{ border-radius: 2px; border: none; }
+.booking-label-row .color-pick::-moz-color-swatch{ border-radius: 2px; border: none; }
+#bookingPanel .field{ margin-top: 12px; }
+
 /* Save panel modal (post-create) */
 .btn-secondary{background:#fff;color:#222;border:1px solid var(--border);}
 .btn-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
@@ -575,3 +625,6 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 @media (max-width:480px){
   .save-panel .btn-row .btn{flex:1 1 100%;}
 }
+/* Access emoji on the save panel */
+.save-emoji{margin:12px 0;padding:12px;background:#e8eaf6;border-radius:10px;text-align:center;}
+.save-emoji p{margin:4px 0;}

@@ -11,7 +11,7 @@
  *  - CSRF protection (session-based token)
  *  - Security headers
  *  - Basic per-IP rate limiting using api_rate_limit
- *  - PIN authentication with lockout (failed_attempts/locked_until)
+ *  - PIN authentication with escalating lockout (includes/lockout.php)
  *  - Calendar and availability CRUD endpoints
  */
 
@@ -23,7 +23,7 @@ declare(strict_types=1);
 // This app is designed for same-origin use. We reply to OPTIONS for dev tooling.
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Access-Control-Allow-Methods: GET,POST,OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token, X-CSRF-Token, X-Group-Auth-Token');
+    header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token, X-CSRF-Token, X-Group-Auth-Token, X-Access-Grant');
     header('Access-Control-Max-Age: 86400');
     http_response_code(204);
     exit;
@@ -347,10 +347,22 @@ function hubLimitsConfig(array $config): array {
     ];
 }
 
+const RATE_KEY_MAX_LEN = 16;
+
+/**
+ * Fit a rate-limit key into api_rate_limit.minute_key (CHAR(16)). Longer keys would be
+ * truncated on insert (non-strict SQL) and never match the SELECT, silently disabling the limit.
+ */
+function rateLimitKey(string $key): string {
+    if (strlen($key) <= RATE_KEY_MAX_LEN) return $key;
+    return 'x' . substr(hash('sha256', $key), 0, RATE_KEY_MAX_LEN - 1);
+}
+
 /**
  * Rate limit a specific action key stored in api_rate_limit.minute_key.
  */
 function enforceActionRateLimit(PDO $pdo, string $ip, string $actionKey, int $maxCount, string $message): void {
+    $actionKey = rateLimitKey($actionKey);
     $sql = "
         INSERT INTO api_rate_limit (ip, minute_key, count, updated_at)
         VALUES (:ip, :mk, 1, NOW())
@@ -388,14 +400,14 @@ function enforceHubCalendarRateLimit(PDO $pdo, int $groupId, array $limits): voi
     enforceActionRateLimit(
         $pdo,
         $ip,
-        "hub_cal_{$groupId}_{$hourKey}",
+        'hg' . $hourKey . base_convert((string)$groupId, 10, 36),
         $limits['per_ip_per_hub_per_hour'],
         'Too many calendars added to this Hub. Try again later.'
     );
     enforceActionRateLimit(
         $pdo,
         $ip,
-        "hub_cal_ip_{$hourKey}",
+        'hi' . $hourKey,
         $limits['per_ip_global_per_hour'],
         'Too many calendars added. Try again later.'
     );
@@ -461,6 +473,10 @@ function isSensitivePostAction(string $action): bool {
         'passkey_login_begin',
         'passkey_login_finish',
         'passkey_remove',
+        'access_check',
+        'set_access_emoji',
+        'set_group_access_emoji',
+        'set_bookings_closed',
     ];
     return in_array($action, $sensitive, true);
 }
@@ -563,45 +579,19 @@ function resetAdminLoginAttempts(PDO $pdo): void {
         ->execute([':ip' => $ip, ':mk' => ADMIN_LOGIN_RATE_KEY]);
 }
 
-/** Account lockout helpers */
+/** Account lockout helpers (escalating schedule in includes/lockout.php) */
 function checkAccountLockout(PDO $pdo, int $userId): void {
-    $stmt = $pdo->prepare("SELECT locked_until FROM users WHERE id = :uid");
-    $stmt->execute([':uid' => $userId]);
-    $user = $stmt->fetch();
-
-    if ($user && !empty($user['locked_until'])) {
-        $lockedUntil = strtotime((string)$user['locked_until']);
-        if ($lockedUntil !== false && $lockedUntil > time()) {
-            $remaining = (int)ceil(($lockedUntil - time()) / 60);
-            respond(429, [
-                'status' => 'error',
-                'code' => 'ACCOUNT_LOCKED',
-                'message' => "Account temporarily locked. Try again in {$remaining} minute(s).",
-            ]);
-        }
-
-        // Lock expired: reset
-        $pdo->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = :uid")
-            ->execute([':uid' => $userId]);
-    }
+    pinLockoutCheck($pdo, 'user', $userId, 'This name');
 }
 
-function recordFailedAttempt(PDO $pdo, int $userId, int $maxAttempts = 5, int $lockoutMinutes = 15): void {
-    $sql = "
-        UPDATE users
-        SET failed_attempts = failed_attempts + 1,
-            locked_until = CASE
-                WHEN failed_attempts + 1 >= :max THEN DATE_ADD(NOW(), INTERVAL :mins MINUTE)
-                ELSE locked_until
-            END
-        WHERE id = :uid
-    ";
-    $pdo->prepare($sql)->execute([':max' => $maxAttempts, ':mins' => $lockoutMinutes, ':uid' => $userId]);
+/** Returns the lock length in minutes when this wrong PIN started a lockout. */
+function recordFailedAttempt(PDO $pdo, int $userId): ?int {
+    global $config;
+    return pinLockoutRecordFailure($pdo, 'user', $userId, pinLockoutConfig($config ?? []));
 }
 
 function resetFailedAttempts(PDO $pdo, int $userId): void {
-    $pdo->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = :uid")
-        ->execute([':uid' => $userId]);
+    pinLockoutReset($pdo, 'user', $userId);
 }
 
 /** Issue a 24-hour calendar user session token (sent back via X-Auth-Token). */
@@ -646,7 +636,7 @@ function requireSession(PDO $pdo, int $calendarId): array {
 }
 
 /**
- * Optional session lookup — returns null when no valid token is present.
+ * Optional session lookup ??? returns null when no valid token is present.
  * @returns array{user_id:int, role:string, calendar_id:int}|null
  */
 function getOptionalSession(PDO $pdo, int $calendarId): ?array {
@@ -743,42 +733,17 @@ function touchGroupForCalendar(PDO $pdo, int $calendarId): void {
 }
 
 function checkGroupLockout(PDO $pdo, int $groupId): void {
-    $stmt = $pdo->prepare("SELECT locked_until FROM `groups` WHERE id = :gid");
-    $stmt->execute([':gid' => $groupId]);
-    $group = $stmt->fetch();
-
-    if ($group && !empty($group['locked_until'])) {
-        $lockedUntil = strtotime((string)$group['locked_until']);
-        if ($lockedUntil !== false && $lockedUntil > time()) {
-            $remaining = (int)ceil(($lockedUntil - time()) / 60);
-            respond(429, [
-                'status' => 'error',
-                'code' => 'ACCOUNT_LOCKED',
-                'message' => "Hub temporarily locked. Try again in {$remaining} minute(s).",
-            ]);
-        }
-
-        $pdo->prepare("UPDATE `groups` SET failed_attempts = 0, locked_until = NULL WHERE id = :gid")
-            ->execute([':gid' => $groupId]);
-    }
+    pinLockoutCheck($pdo, 'group', $groupId, 'This Hub');
 }
 
-function recordGroupFailedAttempt(PDO $pdo, int $groupId, int $maxAttempts = 5, int $lockoutMinutes = 15): void {
-    $sql = "
-        UPDATE `groups`
-        SET failed_attempts = failed_attempts + 1,
-            locked_until = CASE
-                WHEN failed_attempts + 1 >= :max THEN DATE_ADD(NOW(), INTERVAL :mins MINUTE)
-                ELSE locked_until
-            END
-        WHERE id = :gid
-    ";
-    $pdo->prepare($sql)->execute([':max' => $maxAttempts, ':mins' => $lockoutMinutes, ':gid' => $groupId]);
+/** Returns the lock length in minutes when this wrong PIN started a lockout. */
+function recordGroupFailedAttempt(PDO $pdo, int $groupId): ?int {
+    global $config;
+    return pinLockoutRecordFailure($pdo, 'group', $groupId, pinLockoutConfig($config ?? []));
 }
 
 function resetGroupFailedAttempts(PDO $pdo, int $groupId): void {
-    $pdo->prepare("UPDATE `groups` SET failed_attempts = 0, locked_until = NULL WHERE id = :gid")
-        ->execute([':gid' => $groupId]);
+    pinLockoutReset($pdo, 'group', $groupId);
 }
 
 /** Issue a 24-hour Hub organiser session token (sent back via X-Group-Auth-Token). */
@@ -834,6 +799,9 @@ function resolveGroupTokenFromPost(): ?string {
 // -------------------------
 
 require_once __DIR__ . '/includes/webauthn.php';
+require_once __DIR__ . '/includes/lockout.php';
+require_once __DIR__ . '/includes/access.php';
+require_once __DIR__ . '/includes/booking.php';
 
 /**
  * Resolve who a passkey request is for.
@@ -916,6 +884,9 @@ try {
     }
 }
 
+// Access emoji: calendars and Hubs with an emoji need a grant (includes/access.php)
+accessGate($pdo, $config, $action);
+
 // CSRF token endpoint
 if ($action === 'csrf_token' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     respond(200, ['status' => 'success', 'csrf_token' => generateCsrfToken()]);
@@ -936,6 +907,97 @@ if ($action === 'diag' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $pdo->query('SELECT 1');
     } catch (Throwable $e) {
         $payload['db_connect'] = 'FAILED';
+    }
+    respond(200, $payload);
+}
+
+// -------------------------
+// Access emoji
+// -------------------------
+
+// Check a picked emoji for ?c= or ?g= and issue a 30-day grant
+if ($action === 'access_check' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    accessHandleCheck($pdo, $config);
+}
+
+/**
+ * Organiser view of the emoji setting: the calendar organiser (?c=, X-Auth-Token) or the
+ * Hub organiser (?g=, X-Group-Auth-Token).
+ */
+if ($action === 'access_settings' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    if (!accessTablesReady($pdo)) {
+        respond(200, ['status' => 'success', 'available' => false, 'emoji' => null, 'hub_emoji' => false]);
+    }
+    if (isset($_GET['c'])) {
+        $row = accessCalendarRow($pdo, requireToken());
+        if (!$row) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+        $session = requireSession($pdo, (int)$row['id']);
+        if ($session['role'] !== 'admin') {
+            respond(403, ['status' => 'error', 'message' => 'Only the organiser can change settings']);
+        }
+        respond(200, [
+            'status' => 'success',
+            'available' => true,
+            'emoji' => $row['access_emoji'] !== null ? (int)$row['access_emoji'] : null,
+            'hub_emoji' => !empty($row['group_id']) && $row['group_emoji'] !== null,
+        ]);
+    }
+    $row = accessGroupRow($pdo, requireGroupTokenParam());
+    if (!$row) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
+    requireGroupOrganiserSession($pdo, (int)$row['id']);
+    respond(200, [
+        'status' => 'success',
+        'available' => true,
+        'emoji' => $row['access_emoji'] !== null ? (int)$row['access_emoji'] : null,
+        'hub_emoji' => false,
+    ]);
+}
+
+// Set or remove a calendar's emoji (calendar organiser). Existing grants stop working.
+if ($action === 'set_access_emoji' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!accessTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Access emoji is not available yet']);
+    $row = accessCalendarRow($pdo, requireToken());
+    if (!$row) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$row['id'];
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can change settings']);
+    }
+    $emoji = accessEmojiValue($_POST['emoji'] ?? null);
+    if ($emoji === false) respond(400, ['status' => 'error', 'message' => 'Invalid emoji']);
+
+    accessSetEmoji($pdo, 'calendar', $calId, $emoji);
+    logSecurityEvent('ACCESS_EMOJI_CHANGED', ['calendar_id' => $calId, 'enabled' => $emoji !== null]);
+
+    $row['access_emoji'] = $emoji;
+    $req = accessRequirementForCalendar($row);
+    $payload = ['status' => 'success', 'emoji' => $emoji, 'access' => accessPublicInfo($pdo, $req)];
+    if ($req !== null) {
+        $payload += accessGrantIssue($pdo, $req['kind'], $req['id'], accessConfig($config)['grant_days']);
+    }
+    respond(200, $payload);
+}
+
+// Set or remove a Hub's emoji (Hub organiser). Existing Hub grants stop working.
+if ($action === 'set_group_access_emoji' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!accessTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Access emoji is not available yet']);
+    $row = accessGroupRow($pdo, requireGroupTokenParam());
+    if (!$row) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
+    $groupId = (int)$row['id'];
+    requireGroupOrganiserSession($pdo, $groupId);
+    $emoji = accessEmojiValue($_POST['emoji'] ?? null);
+    if ($emoji === false) respond(400, ['status' => 'error', 'message' => 'Invalid emoji']);
+
+    accessSetEmoji($pdo, 'group', $groupId, $emoji);
+    touchGroupActivity($pdo, $groupId);
+    logSecurityEvent('ACCESS_EMOJI_CHANGED', ['group_id' => $groupId, 'enabled' => $emoji !== null]);
+
+    $payload = ['status' => 'success', 'emoji' => $emoji];
+    if ($emoji !== null) {
+        $payload += accessGrantIssue($pdo, 'group', $groupId, accessConfig($config)['grant_days']);
     }
     respond(200, $payload);
 }
@@ -993,6 +1055,29 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         respond(400, ['status' => 'error', 'message' => 'Organiser name or PIN invalid']);
     }
 
+    $accessEmoji = accessEmojiValue($_POST['access_emoji'] ?? null);
+    if ($accessEmoji === false) respond(400, ['status' => 'error', 'message' => 'Invalid emoji']);
+    if ($accessEmoji !== null && !accessTablesReady($pdo)) {
+        respond(400, ['status' => 'error', 'message' => 'Access emoji is not available yet']);
+    }
+
+    // Booking mode (includes/booking.php): one option, weight 1, no Blind privacy
+    $slotCapacity = bookingLimitValue($_POST['slot_capacity'] ?? null, BOOKING_MAX_PER_SLOT);
+    if ($slotCapacity === false) respond(400, ['status' => 'error', 'message' => 'Invalid people per slot']);
+    $maxPerUser = null;
+    if ($slotCapacity !== null) {
+        if (!bookingColumnsReady($pdo)) {
+            respond(400, ['status' => 'error', 'message' => 'Booking is not available yet']);
+        }
+        $maxPerUser = bookingLimitValue($_POST['max_per_user'] ?? null, BOOKING_MAX_PER_USER);
+        if ($maxPerUser === false) respond(400, ['status' => 'error', 'message' => 'Invalid bookings per person']);
+        if (count($statuses) !== 1) respond(400, ['status' => 'error', 'message' => 'Bookings use one choice']);
+        $statuses[0]['weight'] = 1;
+        if ($isPrivate === 2) {
+            respond(400, ['status' => 'error', 'message' => 'Blind privacy is not available for bookings']);
+        }
+    }
+
     $titleForDb = $title === null ? '' : $title;
     $slotsJson = json_encode($slots, JSON_UNESCAPED_UNICODE);
     $statusesJson = json_encode($statuses, JSON_UNESCAPED_UNICODE);
@@ -1043,11 +1128,28 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmtU->execute([':cid' => $calId, ':dn' => $adminName, ':ph' => $pinHash]);
 
+            if ($slotCapacity !== null) {
+                $pdo->prepare("UPDATE calendars SET slot_capacity = :cap, max_per_user = :per WHERE id = :id")
+                    ->execute([':cap' => $slotCapacity, ':per' => $maxPerUser, ':id' => $calId]);
+            }
+
             if ($groupId !== null) {
                 touchGroupActivity($pdo, $groupId);
             }
 
-            respond(200, ['status' => 'success', 'token' => $token]);
+            $payload = ['status' => 'success', 'token' => $token];
+            if (accessTablesReady($pdo)) {
+                if ($accessEmoji !== null) {
+                    $pdo->prepare("UPDATE calendars SET access_emoji = :e WHERE id = :id")
+                        ->execute([':e' => $accessEmoji, ':id' => $calId]);
+                }
+                // The creator gets a grant for whichever emoji now guards the calendar (own or Hub's).
+                $req = accessRequirementForCalendar(accessCalendarRow($pdo, $token) ?? []);
+                if ($req !== null) {
+                    $payload += accessGrantIssue($pdo, $req['kind'], $req['id'], accessConfig($config)['grant_days']);
+                }
+            }
+            respond(200, $payload);
         } catch (PDOException $e) {
             if ((string)$e->getCode() === '23000') {
                 // Token collision
@@ -1073,6 +1175,12 @@ if ($action === 'create_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         respond(400, ['status' => 'error', 'message' => 'Organiser name or PIN invalid']);
     }
 
+    $accessEmoji = accessEmojiValue($_POST['access_emoji'] ?? null);
+    if ($accessEmoji === false) respond(400, ['status' => 'error', 'message' => 'Invalid emoji']);
+    if ($accessEmoji !== null && !accessTablesReady($pdo)) {
+        respond(400, ['status' => 'error', 'message' => 'Access emoji is not available yet']);
+    }
+
     for ($i = 0; $i < 5; $i++) {
         $token = createToken(8);
         try {
@@ -1089,11 +1197,18 @@ if ($action === 'create_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':ph' => $pinHash,
             ]);
 
-            respond(200, [
+            $payload = [
                 'status' => 'success',
                 'token' => $token,
                 'title' => $titleForDb,
-            ]);
+            ];
+            if ($accessEmoji !== null) {
+                $groupId = (int)$pdo->lastInsertId();
+                $pdo->prepare("UPDATE `groups` SET access_emoji = :e WHERE id = :id")
+                    ->execute([':e' => $accessEmoji, ':id' => $groupId]);
+                $payload += accessGrantIssue($pdo, 'group', $groupId, accessConfig($config)['grant_days']);
+            }
+            respond(200, $payload);
         } catch (PDOException $e) {
             if ((string)$e->getCode() === '23000') {
                 continue;
@@ -1113,8 +1228,9 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
 
     $groupId = (int)$grp['id'];
 
+    $bookingCols = bookingColumnsReady($pdo) ? ', slot_capacity, max_per_user, bookings_closed' : '';
     $stmt = $pdo->prepare(
-        "SELECT token, title, start_date, end_date, chosen_date, chosen_slot, last_activity
+        "SELECT token, title, start_date, end_date, chosen_date, chosen_slot, last_activity{$bookingCols}
          FROM calendars
          WHERE group_id = :gid
          ORDER BY last_activity DESC, created_at DESC"
@@ -1124,12 +1240,14 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
 
     $calendars = [];
     foreach ($calRows as $row) {
+        $booking = bookingSettingsFromRow($row);
         $calendars[] = [
             'token' => (string)$row['token'],
             'title' => (string)($row['title'] ?? ''),
             'start_date' => $row['start_date'] ?? null,
             'end_date' => $row['end_date'] ?? null,
-            'is_frozen' => !empty($row['chosen_date']) && !empty($row['chosen_slot']),
+            'is_frozen' => (!empty($row['chosen_date']) && !empty($row['chosen_slot'])) || $booking['closed'],
+            'slot_capacity' => $booking['capacity'],
             'last_activity' => $row['last_activity'] ?? null,
         ];
     }
@@ -1141,6 +1259,7 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             'token' => (string)$grp['token'],
             'calendar_count' => count($calendars),
             'passkeys' => webauthnTablesReady($pdo),
+            'access' => accessPublicInfo($pdo, accessRequirementForGroup(accessGroupRow($pdo, $token) ?? [])),
         ],
         'calendars' => $calendars,
     ]);
@@ -1163,8 +1282,12 @@ if ($action === 'auth_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     checkGroupLockout($pdo, $groupId);
 
     if (!verifyPin($pin, (string)$grp['organiser_pin_hash'])) {
-        recordGroupFailedAttempt($pdo, $groupId);
+        $lockMins = recordGroupFailedAttempt($pdo, $groupId);
         logSecurityEvent('GROUP_AUTH_FAILED', ['group_id' => $groupId]);
+        if ($lockMins !== null) {
+            logSecurityEvent('GROUP_LOCKED', ['group_id' => $groupId, 'minutes' => $lockMins]);
+            pinLockoutRespondLocked('This Hub', $lockMins);
+        }
         respond(401, ['status' => 'error', 'message' => 'Invalid PIN']);
     }
 
@@ -1210,6 +1333,15 @@ if ($action === 'add_calendar_to_group' && $_SERVER['REQUEST_METHOD'] === 'POST'
     $grp = getGroupByToken($pdo, $groupTokenPost);
     if (!$grp) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
     $groupId = (int)$grp['id'];
+
+    $hubReq = accessTablesReady($pdo) ? accessRequirementForGroup(accessGroupRow($pdo, $groupTokenPost) ?? []) : null;
+    if ($hubReq !== null && !accessGrantValid($pdo, accessGrantTokensFromHeader(), [['group', $groupId]])) {
+        respond(403, [
+            'status' => 'error',
+            'code' => 'HUB_ACCESS_REQUIRED',
+            'message' => 'This Hub has an emoji. Open the Hub link and pick its emoji first, then try again.',
+        ]);
+    }
 
     prepareHubCalendarAdd($pdo, $groupId, $config);
 
@@ -1268,11 +1400,12 @@ if ($action === 'remove_calendar_from_group' && $_SERVER['REQUEST_METHOD'] === '
 // Calendar meta
 if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $token = requireToken();
+    $bookingCols = bookingColumnsReady($pdo) ? 'c.slot_capacity, c.max_per_user, c.bookings_closed,' : '';
     $stmt = $pdo->prepare(
         "SELECT c.id, c.token, c.group_id, c.title, c.category, c.slots_json, c.statuses_json,
                 c.start_date, c.end_date, c.exclude_weekends, c.date_filter_mode, c.date_filter_dates,
                 c.is_private, c.rank_sort_order, c.organiser_message, c.chosen_date, c.chosen_slot,
-                c.created_at, c.last_activity,
+                c.created_at, c.last_activity, {$bookingCols}
                 g.token AS group_token, g.title AS group_title
          FROM calendars c
          LEFT JOIN `groups` g ON g.id = c.group_id
@@ -1330,6 +1463,12 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $cal['chosen_date'] = $cal['chosen_date'] ?? null;
     $cal['chosen_slot'] = $cal['chosen_slot'] ?? null;
 
+    // Booking mode (null capacity = normal availability poll)
+    $booking = bookingSettingsFromRow($cal);
+    $cal['slot_capacity'] = $booking['capacity'];
+    $cal['max_per_user'] = $booking['per_user'];
+    $cal['bookings_closed'] = $booking['closed'];
+
     // Hub breadcrumb when calendar belongs to a group
     if (!empty($cal['group_id']) && !empty($cal['group_token'])) {
         $cal['group'] = [
@@ -1353,6 +1492,7 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     unset($cal['group_id'], $cal['group_token'], $cal['group_title']);
 
     $cal['passkeys'] = webauthnTablesReady($pdo);
+    $cal['access'] = accessPublicInfo($pdo, accessRequirementForCalendar(accessCalendarRow($pdo, $token) ?? []));
 
     respond(200, ['status' => 'success', 'calendar' => $cal]);
 }
@@ -1598,15 +1738,12 @@ if ($action === 'auth_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     checkAccountLockout($pdo, $userId);
 
     if (!verifyPin($pin, (string)$user['pin_hash'])) {
-        recordFailedAttempt($pdo, $userId);
+        $lockMins = recordFailedAttempt($pdo, $userId);
         logSecurityEvent('AUTH_FAILED', ['user_id' => $userId, 'calendar_id' => $calId]);
 
-        // If this attempt triggers a lockout, record it.
-        $stmtL = $pdo->prepare("SELECT locked_until, failed_attempts FROM users WHERE id = :uid");
-        $stmtL->execute([':uid' => $userId]);
-        $after = $stmtL->fetch();
-        if ($after && !empty($after['locked_until'])) {
-            logSecurityEvent('ACCOUNT_LOCKED', ['user_id' => $userId, 'calendar_id' => $calId]);
+        if ($lockMins !== null) {
+            logSecurityEvent('ACCOUNT_LOCKED', ['user_id' => $userId, 'calendar_id' => $calId, 'minutes' => $lockMins]);
+            pinLockoutRespondLocked('This name', $lockMins);
         }
 
         respond(401, ['status' => 'error', 'message' => 'Invalid PIN']);
@@ -1716,12 +1853,14 @@ if ($action === 'availability' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         respond(400, ['status' => 'error', 'message' => 'Invalid range']);
     }
 
-    $stmtC = $pdo->prepare("SELECT id, is_private FROM calendars WHERE token = :t");
+    $bookingCols = bookingColumnsReady($pdo) ? ', slot_capacity' : '';
+    $stmtC = $pdo->prepare("SELECT id, is_private{$bookingCols} FROM calendars WHERE token = :t");
     $stmtC->execute([':t' => $token]);
     $cal = $stmtC->fetch();
     if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
     $calId = (int)$cal['id'];
     $isPrivate = (int)($cal['is_private'] ?? 0);
+    $isBooking = bookingSettingsFromRow($cal)['capacity'] !== null;
 
     $session = getOptionalSession($pdo, $calId);
     $rows = [];
@@ -1737,9 +1876,9 @@ if ($action === 'availability' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $stmt->execute([':cid' => $calId, ':f' => $from, ':t' => $to]);
         $rows = $stmt->fetchAll();
     } elseif ($session === null) {
-        // Hidden/Blind without auth: no data
+        // Hidden/Blind without auth: no data, except booking counts so visitors can see free slots
         $rows = [];
-        $summary = [];
+        $summary = $isBooking ? buildAvailabilitySummary($pdo, $calId, $from, $to) : [];
     } elseif ($isPrivate === 1 && $session['role'] === 'admin') {
         // Hidden + organiser: full detail
         $stmt = $pdo->prepare(
@@ -1770,11 +1909,16 @@ if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = requireToken();
 
     // Need statuses_json to validate per-calendar status range (1..5 supported).
-    $stmtC = $pdo->prepare("SELECT id, statuses_json, chosen_date, chosen_slot FROM calendars WHERE token = :t");
+    $bookingCols = bookingColumnsReady($pdo) ? ', slot_capacity, max_per_user, bookings_closed' : '';
+    $stmtC = $pdo->prepare(
+        "SELECT id, statuses_json, slots_json, start_date, end_date, chosen_date, chosen_slot{$bookingCols}
+         FROM calendars WHERE token = :t"
+    );
     $stmtC->execute([':t' => $token]);
     $cal = $stmtC->fetch();
     if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
     $calId = (int)$cal['id'];
+    $isBooking = bookingSettingsFromRow($cal)['capacity'] !== null;
 
     // Block saves if the organiser has locked in a chosen slot (calendar is frozen)
     if (!empty($cal['chosen_date']) && !empty($cal['chosen_slot'])) {
@@ -1811,6 +1955,32 @@ if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtU = $pdo->prepare("SELECT id FROM users WHERE id = :uid AND calendar_id = :cid");
     $stmtU->execute([':uid' => $userId, ':cid' => $calId]);
     if (!$stmtU->fetch()) respond(404, ['status' => 'error', 'message' => 'User not found']);
+
+    if ($isBooking) {
+        $calSlots = json_decode((string)($cal['slots_json'] ?? ''), true);
+        $calSlots = is_array($calSlots) ? array_values(array_filter($calSlots, 'is_string')) : [];
+        $pdo->beginTransaction();
+        try {
+            // Row lock: concurrent bookings on this calendar are checked one at a time
+            $booking = bookingLockCalendar($pdo, $calId);
+            if ($booking['closed'] && $session['role'] !== 'admin') {
+                $pdo->rollBack();
+                respond(403, ['status' => 'error', 'message' => 'Bookings are closed.', 'code' => 'BOOKINGS_CLOSED']);
+            }
+            $exempt = $session['role'] === 'admin' && $session['user_id'] === $userId;
+            $rejected = bookingApplyChanges(
+                $pdo, $calId, $userId, $booking, $changes, $calSlots,
+                (string)$cal['start_date'], (string)$cal['end_date'], $exempt
+            );
+            $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
+            touchGroupForCalendar($pdo, $calId);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            respond(400, ['status' => 'error', 'message' => 'Failed to save changes']);
+        }
+        respond(200, ['status' => 'success', 'rejected' => $rejected]);
+    }
 
     // Transaction: apply changes
     $pdo->beginTransaction();
@@ -1881,6 +2051,14 @@ if ($action === 'reset_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Members can only reset themselves; admin can reset anyone
     if ($session['role'] !== 'admin' && $session['user_id'] !== $targetId) {
         respond(403, ['status' => 'error', 'message' => 'Not permitted']);
+    }
+
+    if ($session['role'] !== 'admin' && bookingColumnsReady($pdo)) {
+        $stmtB = $pdo->prepare("SELECT slot_capacity, max_per_user, bookings_closed FROM calendars WHERE id = :cid");
+        $stmtB->execute([':cid' => $calId]);
+        if (bookingSettingsFromRow($stmtB->fetch() ?: [])['closed']) {
+            respond(403, ['status' => 'error', 'message' => 'Bookings are closed.', 'code' => 'BOOKINGS_CLOSED']);
+        }
     }
 
     $stmt = $pdo->prepare("DELETE FROM availability WHERE calendar_id = :cid AND user_id = :uid");
@@ -2022,6 +2200,10 @@ function requireAdminSession(): void {
 if ($action === 'admin_calendars' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     requireAdminSession();
 
+    $emojiCols = accessTablesReady($pdo)
+        ? 'c.access_emoji, g.access_emoji AS group_access_emoji,'
+        : 'NULL AS access_emoji, NULL AS group_access_emoji,';
+    $bookingCol = bookingColumnsReady($pdo) ? 'c.slot_capacity,' : 'NULL AS slot_capacity,';
     $sql = "
         SELECT 
             c.id,
@@ -2031,6 +2213,8 @@ if ($action === 'admin_calendars' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             c.created_at,
             c.last_activity,
             c.never_expires,
+            {$emojiCols}
+            {$bookingCol}
             c.group_id,
             g.token AS group_token,
             g.title AS group_title,
@@ -2050,6 +2234,9 @@ if ($action === 'admin_calendars' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $cal['never_expires'] = (int)($cal['never_expires'] ?? 0);
         $cal['user_count'] = (int)($cal['user_count'] ?? 0);
         $cal['group_id'] = $cal['group_id'] !== null ? (int)$cal['group_id'] : null;
+        $cal['access_emoji'] = $cal['access_emoji'] !== null ? (int)$cal['access_emoji'] : null;
+        $cal['group_access_emoji'] = $cal['group_access_emoji'] !== null ? (int)$cal['group_access_emoji'] : null;
+        $cal['slot_capacity'] = $cal['slot_capacity'] !== null ? (int)$cal['slot_capacity'] : null;
     }
 
     respond(200, [
@@ -2132,9 +2319,10 @@ if ($action === 'admin_delete_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST'
 if ($action === 'admin_groups' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     requireAdminSession();
 
+    $emojiCol = accessTablesReady($pdo) ? 'g.access_emoji' : 'NULL AS access_emoji';
     $sql = "
         SELECT g.id, g.token, g.title, g.organiser_name,
-               g.created_at, g.last_activity, g.never_expires,
+               g.created_at, g.last_activity, g.never_expires, g.locked_until, {$emojiCol},
                COUNT(c.id) AS calendar_count
         FROM `groups` g
         LEFT JOIN calendars c ON c.group_id = g.id
@@ -2148,7 +2336,11 @@ if ($action === 'admin_groups' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     foreach ($groups as &$group) {
         $group['never_expires'] = (int)($group['never_expires'] ?? 0);
         $group['calendar_count'] = (int)($group['calendar_count'] ?? 0);
+        $group['locked_seconds'] = pinLockoutRemaining($group['locked_until'] ?? null);
+        $group['access_emoji'] = $group['access_emoji'] !== null ? (int)$group['access_emoji'] : null;
+        unset($group['locked_until']);
     }
+    unset($group);
 
     respond(200, [
         'status' => 'success',
@@ -2226,7 +2418,7 @@ if ($action === 'admin_set_group_permanent' && $_SERVER['REQUEST_METHOD'] === 'P
 }
 
 /**
- * Delete a Hub (group) — detaches child calendars, does not delete them
+ * Delete a Hub (group) ??? detaches child calendars, does not delete them
  */
 if ($action === 'admin_delete_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireAdminSession();
@@ -2277,12 +2469,98 @@ if ($action === 'admin_list_users' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     $stmtU = $pdo->prepare(
-        "SELECT id, display_name, role FROM users WHERE calendar_id = :cid ORDER BY role DESC, created_at ASC"
+        "SELECT id, display_name, role, locked_until FROM users WHERE calendar_id = :cid ORDER BY role DESC, created_at ASC"
     );
     $stmtU->execute([':cid' => $calendarId]);
     $users = $stmtU->fetchAll();
 
+    foreach ($users as &$u) {
+        $u['locked_seconds'] = pinLockoutRemaining($u['locked_until'] ?? null);
+        unset($u['locked_until']);
+    }
+    unset($u);
+
     respond(200, ['status' => 'success', 'users' => $users]);
+}
+
+/**
+ * Clear a calendar user's PIN lockout and escalation level (super admin only)
+ */
+if ($action === 'admin_unlock_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAdminSession();
+    requireCsrf();
+
+    $calendarId = (int)($_POST['calendar_id'] ?? 0);
+    $userId = (int)($_POST['user_id'] ?? 0);
+    if ($calendarId <= 0 || $userId <= 0) {
+        respond(400, ['status' => 'error', 'message' => 'Invalid calendar or user ID']);
+    }
+
+    $stmtU = $pdo->prepare("SELECT id FROM users WHERE id = :uid AND calendar_id = :cid");
+    $stmtU->execute([':uid' => $userId, ':cid' => $calendarId]);
+    if (!$stmtU->fetch()) {
+        respond(404, ['status' => 'error', 'message' => 'User not found in this calendar']);
+    }
+
+    resetFailedAttempts($pdo, $userId);
+    logSecurityEvent('ADMIN_UNLOCK_USER', ['calendar_id' => $calendarId, 'user_id' => $userId]);
+
+    respond(200, ['status' => 'success']);
+}
+
+/**
+ * Clear a Hub organiser's PIN lockout and escalation level (super admin only)
+ */
+if ($action === 'admin_unlock_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAdminSession();
+    requireCsrf();
+
+    $groupId = (int)($_POST['group_id'] ?? 0);
+    if ($groupId <= 0) {
+        respond(400, ['status' => 'error', 'message' => 'Invalid group ID']);
+    }
+
+    $stmt = $pdo->prepare("SELECT id FROM `groups` WHERE id = :id");
+    $stmt->execute([':id' => $groupId]);
+    if (!$stmt->fetch()) {
+        respond(404, ['status' => 'error', 'message' => 'Hub not found']);
+    }
+
+    resetGroupFailedAttempts($pdo, $groupId);
+    logSecurityEvent('ADMIN_UNLOCK_GROUP', ['group_id' => $groupId]);
+
+    respond(200, ['status' => 'success']);
+}
+
+/**
+ * Remove the access emoji from a calendar or Hub (super admin only), e.g. when the organiser
+ * has forgotten it. Existing grants are deleted.
+ */
+if ($action === 'admin_set_access_emoji' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAdminSession();
+    requireCsrf();
+    if (!accessTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Access emoji is not available yet']);
+
+    $kind = (string)($_POST['kind'] ?? '');
+    $id = (int)($_POST['id'] ?? 0);
+    if (!in_array($kind, ['calendar', 'group'], true) || $id <= 0) {
+        respond(400, ['status' => 'error', 'message' => 'Invalid request']);
+    }
+    if (($_POST['emoji'] ?? null) !== null) {
+        respond(400, ['status' => 'error', 'message' => 'Admins can only remove an emoji']);
+    }
+
+    $table = $kind === 'calendar' ? 'calendars' : '`groups`';
+    $stmt = $pdo->prepare("SELECT id FROM {$table} WHERE id = :id");
+    $stmt->execute([':id' => $id]);
+    if (!$stmt->fetch()) {
+        respond(404, ['status' => 'error', 'message' => $kind === 'calendar' ? 'Calendar not found' : 'Hub not found']);
+    }
+
+    accessSetEmoji($pdo, $kind, $id, null);
+    logSecurityEvent('ADMIN_ACCESS_EMOJI_CLEARED', ['kind' => $kind, 'id' => $id]);
+
+    respond(200, ['status' => 'success']);
 }
 
 /**
@@ -2397,6 +2675,13 @@ if ($action === 'choose_slot' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($session['role'] !== 'admin') {
         respond(403, ['status' => 'error', 'message' => 'Only the organiser can finalise a slot']);
     }
+    if (bookingColumnsReady($pdo)) {
+        $stmtB = $pdo->prepare("SELECT slot_capacity FROM calendars WHERE id = :cid");
+        $stmtB->execute([':cid' => $calId]);
+        if ($stmtB->fetchColumn() !== null) {
+            respond(400, ['status' => 'error', 'message' => 'Booking calendars use Close bookings instead']);
+        }
+    }
 
     // Validate chosen_date (YYYY-MM-DD) and chosen_slot (non-empty string, max 50)
     $chosenDate = (string)($_POST['chosen_date'] ?? '');
@@ -2456,6 +2741,38 @@ if ($action === 'unchoose_slot' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     respond(200, ['status' => 'success']);
 }
 
+/**
+ * Close or reopen bookings on a booking calendar (organiser only).
+ * Closed: nobody can book or cancel; the organiser can still remove bookings and reset.
+ */
+if ($action === 'set_bookings_closed' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $token = requireToken();
+    if (!bookingColumnsReady($pdo)) respond(400, ['status' => 'error', 'message' => 'Booking is not available yet']);
+
+    $stmtC = $pdo->prepare("SELECT id, slot_capacity FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => $token]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+    if ($cal['slot_capacity'] === null) respond(400, ['status' => 'error', 'message' => 'Not a booking calendar']);
+
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can close bookings']);
+    }
+
+    $closed = !empty($_POST['closed']) ? 1 : 0;
+    $pdo->prepare("UPDATE calendars SET bookings_closed = :c, last_activity = NOW() WHERE id = :cid")
+        ->execute([':c' => $closed, ':cid' => $calId]);
+
+    logSecurityEvent($closed ? 'BOOKINGS_CLOSED' : 'BOOKINGS_REOPENED', [
+        'calendar_id' => $calId,
+        'actor_id' => $session['user_id'],
+    ]);
+
+    respond(200, ['status' => 'success', 'bookings_closed' => (bool)$closed]);
+}
 
 /**
  * Public endpoint: return site config from the DB so index.js can
@@ -2464,24 +2781,26 @@ if ($action === 'unchoose_slot' && $_SERVER['REQUEST_METHOD'] === 'POST') {
  * Falls back gracefully (returns empty object) if the table does not exist yet.
  */
 if ($action === 'get_site_config' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    // Optional features whose migrations have been applied
+    $features = ['access_emoji' => accessTablesReady($pdo), 'booking' => bookingColumnsReady($pdo)];
     try {
         $stmt = $pdo->query("SELECT config_json FROM site_config WHERE id = 1 LIMIT 1");
         $row  = $stmt->fetch();
     } catch (Throwable $e) {
         // Table may not exist yet - silently return empty so index.js uses hardcoded defaults
-        respond(200, ['status' => 'success', 'config' => new stdClass()]);
+        respond(200, ['status' => 'success', 'config' => new stdClass(), 'features' => $features]);
     }
 
     if (!$row || empty($row['config_json'])) {
-        respond(200, ['status' => 'success', 'config' => new stdClass()]);
+        respond(200, ['status' => 'success', 'config' => new stdClass(), 'features' => $features]);
     }
 
     $cfg = json_decode((string)$row['config_json'], true);
     if (!is_array($cfg)) {
-        respond(200, ['status' => 'success', 'config' => new stdClass()]);
+        respond(200, ['status' => 'success', 'config' => new stdClass(), 'features' => $features]);
     }
 
-    respond(200, ['status' => 'success', 'config' => $cfg]);
+    respond(200, ['status' => 'success', 'config' => $cfg, 'features' => $features]);
 }
 
 /**

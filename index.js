@@ -39,10 +39,73 @@ catGrid.addEventListener('click', (e) => {
 let csrfToken = null;
 
 /** Hub context when creating calendar inside a Hub (?g=TOKEN) */
-let hubContext = { token: null, title: null };
+let hubContext = { token: null, title: null, accessEnabled: false };
 
 function getHubTokenFromUrl() {
   return new URL(window.location.href).searchParams.get('g');
+}
+
+/************** ACCESS EMOJI **************/
+let accessField = null;       // Organiser "Access emoji" switch (AccessEmoji.field)
+let accessGatePromise = null;
+
+/** Hub emoji popup (creating a calendar inside a Hub that has an emoji). */
+function requireHubAccess() {
+  if (!accessGatePromise) {
+    accessGatePromise = AccessEmoji.gate({
+      title: "Pick this Hub's emoji",
+      hint: "Ask the Hub organiser if you don't know it.",
+      submit: async (emoji) => {
+        const csrf = await ensureCsrfToken();
+        const resp = await fetch(`api.php?action=access_check&g=${encodeURIComponent(hubContext.token)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf || '' },
+          body: JSON.stringify({ emoji })
+        });
+        const data = await resp.json();
+        if (data.status !== 'success') return { ok: false, message: data.message };
+        if (data.access_grant) AccessEmoji.saveGrant(`g_${hubContext.token}`, data.access_grant, data.expires_at);
+        return { ok: true };
+      }
+    }).finally(() => { accessGatePromise = null; });
+  }
+  return accessGatePromise;
+}
+
+/** fetch() with the Hub's X-Access-Grant; after the emoji popup succeeds the request is sent again. */
+async function accessFetch(url, opts = {}) {
+  for (let tries = 0; ; tries++) {
+    const headers = { ...(opts.headers || {}) };
+    const grants = (window.AccessEmoji && hubContext.token) ? AccessEmoji.grantHeader([`g_${hubContext.token}`]) : '';
+    if (grants) headers['X-Access-Grant'] = grants;
+    const resp = await fetch(url, { ...opts, headers });
+    if (resp.status !== 403 || tries >= 2 || !window.AccessEmoji || !hubContext.token) return resp;
+    let data = null;
+    try { data = await resp.clone().json(); } catch (e) { data = null; }
+    if (!data || data.code !== 'ACCESS_REQUIRED') return resp;
+    await requireHubAccess();
+  }
+}
+
+/** Shows the organiser's emoji switch (above Privacy Mode) once the server supports it. */
+function initAccessField(features) {
+  if (!window.AccessEmoji || !features || features.access_emoji !== true || accessField) return;
+  accessField = AccessEmoji.field(document.getElementById('accessEmojiField'), {
+    label: 'Access emoji',
+    pickerTitle: 'Choose calendar emoji',
+    pickerHint: 'Use this emoji to access the calendar.',
+    offHint: 'Optional emoji access security.',
+    onHint: 'Use this emoji to access the calendar.'
+  });
+  updateAccessOffHint();
+  document.getElementById('accessEmojiWrap').classList.remove('hideme');
+}
+
+function updateAccessOffHint() {
+  if (!accessField) return;
+  accessField.setOffHint(hubContext.accessEnabled
+    ? "Uses the Hub's emoji. Switch on to give this calendar its own."
+    : 'Optional emoji access security.');
 }
 
 async function initHubContext() {
@@ -55,10 +118,12 @@ async function initHubContext() {
   if (!banner) return;
 
   try {
-    const resp = await fetch(`api.php?action=group_meta&g=${encodeURIComponent(g)}`);
+    const resp = await accessFetch(`api.php?action=group_meta&g=${encodeURIComponent(g)}`);
     const data = await resp.json();
     if (data.status === 'success' && data.group) {
       hubContext.title = data.group.title || 'Untitled Hub';
+      hubContext.accessEnabled = data.group.access?.enabled === true;
+      updateAccessOffHint();
       titleEl.textContent = hubContext.title;
       banner.classList.remove('hideme');
     }
@@ -111,10 +176,23 @@ const calendarSaveKit = {
     });
   },
 
+  /** "Emoji: ..." line when the calendar has its own emoji or uses its Hub's, else ''. */
+  emojiLine(meta) {
+    return window.AccessEmoji ? AccessEmoji.shareLine(meta.access_emoji, meta.access_hub === true) : '';
+  },
+
+  /** Link for the clipboard, with the emoji on the next line when there is one. */
+  buildCopyText(meta) {
+    const url = meta.url || this.buildCalendarUrl(meta.token);
+    const line = this.emojiLine(meta);
+    return line ? `${url}\n${line}` : url;
+  },
+
   buildCalendarDetailsText(meta) {
     const url = meta.url || this.buildCalendarUrl(meta.token);
     const goUrl = this.buildGoCalendarUrl(meta.token);
     const title = toPlainAscii(meta.title || 'When RU Free');
+    const emojiLine = this.emojiLine(meta);
     const lines = [
       'When RU Free - Calendar details',
       `Created: ${this.formatDateForFile()}`,
@@ -122,6 +200,7 @@ const calendarSaveKit = {
       `Calendar title:  ${title}`,
       `Calendar link:   ${url}`,
       `Calendar code:   ${meta.token}`,
+      ...(emojiLine ? [emojiLine, '(Pick this emoji before the calendar opens.)'] : []),
       ''
     ];
     if (meta.hub_title) {
@@ -133,10 +212,14 @@ const calendarSaveKit = {
       goUrl,
       '',
       'INSTRUCTIONS',
-      '- Share the calendar link with participants so they can add their name and mark availability.',
+      meta.booking
+        ? '- Share the calendar link with participants so they can add their name and book a slot.'
+        : '- Share the calendar link with participants so they can add their name and mark availability.',
       '- Bookmark this link - it cannot be recovered if lost.',
       '- Your organiser PIN is NOT stored here. Remember it separately.',
-      '- Anyone with the link can view and participate in this calendar.',
+      emojiLine
+        ? '- People need the link and the emoji to open this calendar.'
+        : '- Anyone with the link can view and participate in this calendar.',
       '',
       window.location.origin
     );
@@ -170,19 +253,25 @@ const calendarSaveKit = {
     const goUrl = this.buildGoCalendarUrl(meta.token);
     const title = toPlainAscii(meta.title || 'When RU Free');
     const subject = `When RU Free: ${title}`;
+    const emojiLine = this.emojiLine(meta);
     const body = [
-      'Save this calendar link for our group availability poll:',
+      meta.booking
+        ? 'Save this calendar link for our booking calendar:'
+        : 'Save this calendar link for our group availability poll:',
       '',
       url,
       '',
       `Calendar code: ${meta.token}`,
+      ...(emojiLine ? [emojiLine, '(Pick this emoji before the calendar opens.)'] : []),
       '',
       'If you lose the full link, enter the code on the Go page:',
       goUrl,
       '',
       'Remember your organiser PIN separately - it is not included here.',
       '',
-      'Share this link with participants so they can mark their availability.'
+      meta.booking
+        ? 'Share this link with participants so they can book a slot.'
+        : 'Share this link with participants so they can mark their availability.'
     ];
     return { subject, body };
   },
@@ -196,7 +285,11 @@ const calendarSaveKit = {
     const url = meta.url || this.buildCalendarUrl(meta.token);
     const title = toPlainAscii(meta.title || 'When RU Free');
     const shareTitle = `${title} - When RU Free`;
-    const shareText = `Use this link to mark your availability for ${title}: ${url}`;
+    const emojiLine = this.emojiLine(meta);
+    const shareText = (meta.booking
+      ? `Use this link to book a slot for ${title}: ${url}`
+      : `Use this link to mark your availability for ${title}: ${url}`)
+      + (emojiLine ? `\n${emojiLine}` : '');
     try {
       if (navigator.share) {
         await navigator.share({ title: shareTitle, text: shareText });
@@ -215,6 +308,12 @@ const calendarSaveKit = {
     const siteUrl = 'https://whenrufree.net';
     const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const created = this.formatDateForFile();
+    const hasOwnEmoji = !!window.AccessEmoji && AccessEmoji.valid(meta.access_emoji);
+    const emojiHtml = hasOwnEmoji
+      ? `<div class="emoji-block"><div class="code-label">Calendar emoji</div><div class="emoji-glyph">${esc(AccessEmoji.glyph(meta.access_emoji))}</div><div class="emoji-name">${esc(AccessEmoji.name(meta.access_emoji))}</div><p class="emoji-note">Pick this emoji when the calendar asks for it.</p></div>`
+      : (meta.access_hub === true
+        ? `<div class="emoji-block"><div class="code-label">Emoji</div><p class="emoji-note">Pick the Hub's emoji when the calendar asks for it.</p></div>`
+        : '');
 
     const toolbarHtml = showToolbar ? `
   <div class="toolbar no-print">
@@ -228,7 +327,7 @@ const calendarSaveKit = {
 
     const onloadScript = showToolbar ? `<script>
 (function(){
-  var calUrl=${JSON.stringify(url)};
+  var calUrl=${JSON.stringify(this.buildCopyText(meta))};
   var calCode=${JSON.stringify(token)};
   function copyText(t){
     if(navigator.clipboard&&navigator.clipboard.writeText){
@@ -282,6 +381,10 @@ const calendarSaveKit = {
   .code-label{font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#3f51b5;margin-bottom:14px;}
   .cal-code{font-family:Consolas,'Courier New',monospace;font-size:clamp(2.6rem,11vw,4.8rem);font-weight:800;letter-spacing:0.2em;color:#111;line-height:1.1;word-break:break-all;}
   .go-instruction{font-size:1.08rem;font-weight:600;color:#444;line-height:1.45;margin:0 auto 26px;max-width:520px;}
+  .emoji-block{border:2px dashed #9fa8da;border-radius:14px;padding:18px 16px;margin:0 auto 26px;background:#f5f6fc;}
+  .emoji-glyph{font-size:4rem;line-height:1.1;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;}
+  .emoji-name{font-size:1.2rem;font-weight:700;color:#222;margin-top:4px;}
+  .emoji-note{font-size:0.95rem;color:#555;margin-top:8px;}
   .link-section{text-align:left;margin-top:4px;}
   .link-section p{font-size:0.92rem;color:#555;line-height:1.55;margin-bottom:10px;}
   .link-box{font-family:Consolas,'Courier New',monospace;font-size:0.84rem;background:#e8eaf6;border:1px solid #c5cae9;border-radius:8px;padding:14px 16px;word-break:break-all;color:#283593;}
@@ -305,7 +408,7 @@ const calendarSaveKit = {
       <div class="brand-header">
         <div class="brand-badge">whenrufree.net</div>
         <div class="app-name">When RU Free?</div>
-        <div class="tagline">Group Availability Calendar</div>
+        <div class="tagline">${meta.booking ? 'Book a Slot' : 'Group Availability Calendar'}</div>
       </div>
       <div class="poster-body">
         <div class="cal-label">Your calendar</div>
@@ -316,6 +419,7 @@ const calendarSaveKit = {
           <div class="cal-code">${esc(token)}</div>
         </div>
         <p class="go-instruction">Go to whenrufree.net/go and enter this calendar code</p>
+        ${emojiHtml}
         <div class="link-section">
           <p><strong>Full link</strong> - share with your group:</p>
           <div class="link-box">${esc(url)}</div>
@@ -355,6 +459,14 @@ function showSaveCalendarPanel(meta) {
   document.getElementById('saveCalCode').textContent = meta.token;
   document.getElementById('saveCalUrl').textContent = url;
 
+  const hasOwnEmoji = !!window.AccessEmoji && AccessEmoji.valid(meta.access_emoji);
+  const showEmoji = hasOwnEmoji || meta.access_hub === true;
+  document.getElementById('saveCalEmojiWrap').classList.toggle('hideme', !showEmoji);
+  document.getElementById('saveCalEmoji').textContent = hasOwnEmoji ? AccessEmoji.glyph(meta.access_emoji) : '';
+  document.getElementById('saveCalEmojiName').textContent = hasOwnEmoji
+    ? AccessEmoji.name(meta.access_emoji)
+    : "the Hub's emoji";
+
   const ack = document.getElementById('saveAckCheckbox');
   const continueBtn = document.getElementById('saveContinueBtn');
   ack.checked = false;
@@ -363,15 +475,16 @@ function showSaveCalendarPanel(meta) {
   document.getElementById('clipboardFailMsg').classList.add('hideme');
   overlay.classList.remove('hideme');
 
+  const fullMeta = { ...meta, url };
+  const copyText = calendarSaveKit.buildCopyText(fullMeta);
+
   (async () => {
-    const copied = await calendarSaveKit.copyCalendarUrl(url);
+    const copied = await calendarSaveKit.copyCalendarUrl(copyText);
     if (!copied) document.getElementById('clipboardFailMsg').classList.remove('hideme');
-    calendarSaveKit.downloadCalendarDetailsTxt({ ...meta, url });
+    calendarSaveKit.downloadCalendarDetailsTxt(fullMeta);
   })();
 
-  const fullMeta = { ...meta, url };
-
-  document.getElementById('saveCopyBtn').onclick = () => calendarSaveKit.copyCalendarUrl(url);
+  document.getElementById('saveCopyBtn').onclick = () => calendarSaveKit.copyCalendarUrl(copyText);
   document.getElementById('saveDownloadBtn').onclick = () => {
     calendarSaveKit.downloadCalendarDetailsTxt(fullMeta);
     showToast('Download started');
@@ -525,6 +638,10 @@ async function fetchSiteConfig() {
     const resp = await fetch('api.php?action=get_site_config', { method: 'GET' });
     if (!resp.ok) return null;
     const data = await resp.json();
+    if (data && data.status === 'success') {
+      initAccessField(data.features);
+      initBookingField(data.features);
+    }
     if (data && data.status === 'success' && data.config && typeof data.config === 'object') {
       return data.config;
     }
@@ -1339,12 +1456,23 @@ if (privacyToggleEl) {
     document.querySelectorAll('#privacyToggle .priv-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     
-    // Update mode and hint
     privacyMode = btn.dataset.mode;
-    if (privacyHintEl) {
-      privacyHintEl.textContent = PRIVACY_HINTS[privacyMode] || PRIVACY_HINTS.open;
-    }
+    updatePrivacyHint();
   });
+}
+
+function updatePrivacyHint() {
+  if (!privacyHintEl) return;
+  const hints = isBookingMode() ? BOOKING_PRIVACY_HINTS : PRIVACY_HINTS;
+  privacyHintEl.textContent = hints[privacyMode] || hints.open;
+}
+
+function setPrivacyMode(mode) {
+  privacyMode = mode;
+  document.querySelectorAll('#privacyToggle .priv-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  updatePrivacyHint();
 }
 
 /**
@@ -1394,6 +1522,133 @@ function getDateFilterMode() {
   return dateFilterMode;
 }
 
+/************** BOOKING MODE **************/
+// People per slot (null = normal availability poll) and Bookings per person (whole-calendar total).
+// Shown once the server reports features.booking (migrations/004_booking.sql).
+const BOOKING_LIMIT_MAX = 20;
+const BOOKING_PRIVACY_HINTS = {
+  open: 'Everyone sees who booked each slot.',
+  hidden: 'Only you see names. Others just see Booked.'
+};
+const bookingPanelEl = document.getElementById('bookingPanel');
+const bookingLabelEl = document.getElementById('bookingLabel');
+const bookingColorEl = document.getElementById('bookingColor');
+const bookingLabelErrEl = document.getElementById('bookingLabelErr');
+
+/**
+ * Segmented No limit / 1 / 2 / More control; "More" shows a stepper (3..BOOKING_LIMIT_MAX).
+ * value is null for no limit, otherwise 1..BOOKING_LIMIT_MAX.
+ */
+function makeLimitControl({ toggleId, stepperId, valueId, hintId, initial, hint, onChange }) {
+  const toggle = document.getElementById(toggleId);
+  const stepper = document.getElementById(stepperId);
+  const valueEl = document.getElementById(valueId);
+  const hintEl = document.getElementById(hintId);
+  const minus = stepper.querySelector('[data-step="-1"]');
+  const plus = stepper.querySelector('[data-step="1"]');
+  let value = initial;
+  let moreValue = 3;
+
+  function render() {
+    const mode = value === null ? '0' : (value <= 2 ? String(value) : 'more');
+    toggle.querySelectorAll('.priv-btn').forEach(b => {
+      const on = b.dataset.limit === mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    stepper.classList.toggle('hideme', mode !== 'more');
+    valueEl.textContent = String(moreValue);
+    minus.disabled = moreValue <= 3;
+    plus.disabled = moreValue >= BOOKING_LIMIT_MAX;
+    hintEl.textContent = hint(value);
+  }
+
+  function set(v, silent = false) {
+    let n = (v === null || v === undefined) ? null : parseInt(v, 10);
+    if (!Number.isFinite(n) || n < 1) n = null;
+    else n = Math.min(BOOKING_LIMIT_MAX, n);
+    value = n;
+    if (n !== null && n >= 3) moreValue = n;
+    render();
+    if (!silent && onChange) onChange(value);
+  }
+
+  toggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('.priv-btn');
+    if (!btn) return;
+    const m = btn.dataset.limit;
+    set(m === '0' ? null : (m === 'more' ? moreValue : parseInt(m, 10)));
+  });
+  stepper.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-step]');
+    if (!btn || btn.disabled) return;
+    moreValue = Math.max(3, Math.min(BOOKING_LIMIT_MAX, moreValue + parseInt(btn.dataset.step, 10)));
+    set(moreValue);
+  });
+  render();
+  return { get value() { return value; }, set };
+}
+
+const capacityControl = makeLimitControl({
+  toggleId: 'capacityToggle', stepperId: 'capacityStepper', valueId: 'capacityValue', hintId: 'capacityHint',
+  initial: null,
+  hint: (v) => v === null ? 'Everyone can pick every slot.'
+    : v === 1 ? 'Booking: each slot can be taken by one person.'
+    : `Each slot can be taken by up to ${v} people.`,
+  onChange: () => applyBookingMode()
+});
+
+const perUserControl = makeLimitControl({
+  toggleId: 'perUserToggle', stepperId: 'perUserStepper', valueId: 'perUserValue', hintId: 'perUserHint',
+  initial: 1,
+  hint: (v) => v === null ? 'People can book as many slots as they like.'
+    : v === 1 ? 'Each person can book 1 slot in total.'
+    : `Each person can book up to ${v} slots in total.`
+});
+
+function isBookingMode() {
+  return capacityControl.value !== null;
+}
+
+let bookingSupported = false;
+
+/** Shows People per slot once the server supports booking. */
+function initBookingField(features) {
+  if (!features || features.booking !== true) return;
+  bookingSupported = true;
+  document.getElementById('capacityField').classList.remove('hideme');
+}
+
+/** Shows Bookings per person, swaps Options for the Booking panel and hides Blind privacy while booking. */
+function applyBookingMode() {
+  const booking = isBookingMode();
+  document.getElementById('perUserField').classList.toggle('hideme', !booking);
+  bookingPanelEl.classList.toggle('hideme', !booking);
+  document.getElementById('statusOptionsUI').classList.toggle('hideme', booking);
+  document.getElementById('statusPresetBar').classList.toggle('hideme', booking);
+  document.getElementById('optionsTitle').textContent = booking ? 'Booking' : 'Options';
+  const blindBtn = document.querySelector('#privacyToggle .priv-btn[data-mode="blind"]');
+  if (blindBtn) blindBtn.classList.toggle('hideme', booking);
+  if (booking && privacyMode === 'blind') setPrivacyMode('hidden');
+  else updatePrivacyHint();
+  validateBookingLabel();
+  validateAll();
+}
+
+function validateBookingLabel() {
+  const v = normaliseStatusLabel(bookingLabelEl.value);
+  let msg = '';
+  if (!v) msg = 'Required';
+  else if (!STATUS_REGEX.test(v)) msg = 'Use letters, numbers, spaces, apostrophes and hyphens only (max 20).';
+  bookingLabelErrEl.textContent = msg;
+  bookingLabelErrEl.style.display = msg ? 'block' : 'none';
+  return !msg;
+}
+
+bookingLabelEl.addEventListener('input', () => { validateBookingLabel(); validateAll(); });
+bookingColorEl.addEventListener('input', () => applyColorPreview(bookingColorEl, bookingLabelEl));
+applyColorPreview(bookingColorEl, bookingLabelEl);
+
 /************** CREATE CALENDAR **************/
 const createBtn   = document.getElementById('createBtn');
 const titleInput  = document.getElementById('titleInput');
@@ -1408,7 +1663,10 @@ function validateAll(){
   const statusRowHasError = sRows.some(r => r.querySelector('.inline-error').style.display !== 'none');
   const count = rows.length;
   const statusCount = sRows.length;
-  const enable = okSlots && okStatus && okRange && !rowHasError && !statusRowHasError && count>=1 && count<=MAX_SLOTS && statusCount>=1 && statusCount<=MAX_STATUSES && validateAdmin();
+  const okOptions = isBookingMode()
+    ? validateBookingLabel()
+    : okStatus && !statusRowHasError && statusCount>=1 && statusCount<=MAX_STATUSES;
+  const enable = okSlots && okRange && !rowHasError && okOptions && count>=1 && count<=MAX_SLOTS && validateAdmin();
   createBtn.disabled = !enable;
 }
 
@@ -1426,6 +1684,10 @@ function getValidSlots(){
 }
 
 function getValidStatuses(){
+  if (isBookingMode()) {
+    const label = normaliseStatusLabel(bookingLabelEl.value);
+    return STATUS_REGEX.test(label) ? [{ label, color: bookingColorEl.value, weight: 1 }] : [];
+  }
   const rows = Array.from(statusWrap.querySelectorAll('.status-row'));
   const out = [];
   const seen = new Set();
@@ -1484,14 +1746,22 @@ async function createCalendar(){
         admin_pin:  (adminPin.value??'').trim()
     };
     if (hubContext.token) body.group_token = hubContext.token;
+    const accessEmoji = accessField ? accessField.value : null;
+    if (accessEmoji !== null) body.access_emoji = accessEmoji;
+    const booking = isBookingMode();
+    if (booking) {
+      body.slot_capacity = capacityControl.value;
+      body.max_per_user = perUserControl.value;
+    }
 
-    const resp = await fetch('api.php?action=create_calendar', {
+    const resp = await accessFetch('api.php?action=create_calendar', {
       method:'POST',
       headers,
       body: JSON.stringify(body)
     });
     const data = await resp.json();
     if (data.status!=='success') throw new Error(data.message || 'Create failed');
+    if (data.access_grant) AccessEmoji.saveGrant(`c_${data.token}`, data.access_grant, data.expires_at);
 
     const adminNameVal = (adminName.value ?? '').trim().replace(/\s+/g, ' ');
     const adminPinVal = (adminPin.value ?? '').trim();
@@ -1501,7 +1771,10 @@ async function createCalendar(){
       title: title || 'When RU Free',
       admin_name: adminNameVal,
       admin_pin: adminPinVal,
-      hub_title: hubContext.title || null
+      hub_title: hubContext.title || null,
+      access_emoji: accessEmoji,
+      access_hub: accessEmoji === null && !!hubContext.token && hubContext.accessEnabled,
+      booking
     });
   }catch(e){
     alert(e.message || 'Failed to create calendar. Please fix errors and try again.');
@@ -1525,6 +1798,8 @@ async function createCalendar(){
  *   mode      - Scoring mode: "rank" or "weights"
  *   range     - Date range preset (1day, 1week, 2weeks, 1month, 2months, 3months)
  *   weekends  - Exclude weekends flag (1 = exclude)
+ *   cap       - Booking: people per slot (1-20); omit for a normal availability poll
+ *   per       - Booking: bookings per person in total (0 = no limit, 1-20; default 1)
  */
 function parseTemplateParams() {
   const params = new URLSearchParams(window.location.search);
@@ -1662,6 +1937,21 @@ function parseTemplateParams() {
       if (dateFilterHintEl) {
         dateFilterHintEl.textContent = DATE_FILTER_HINTS[df] || DATE_FILTER_HINTS.all;
       }
+      applied = true;
+    }
+  }
+
+  // Booking: cap = people per slot (1-20), per = bookings per person in total (0 = no limit, default 1).
+  // The first status label (if given) becomes the booking label.
+  if (params.has('cap') && bookingSupported) {
+    const cap = parseInt(params.get('cap'), 10);
+    if (cap >= 1 && cap <= BOOKING_LIMIT_MAX) {
+      if (params.has('per')) perUserControl.set(params.get('per'), true);
+      if (params.has('statuses')) {
+        const first = normaliseStatusLabel(decodeURIComponent(params.get('statuses')).split(',')[0] || '');
+        if (first) bookingLabelEl.value = first;
+      }
+      capacityControl.set(cap);
       applied = true;
     }
   }

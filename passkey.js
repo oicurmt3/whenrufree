@@ -153,7 +153,7 @@
       if (!list.length) {
         const li = document.createElement('li');
         li.className = 'passkey-empty';
-        li.textContent = 'No devices set up yet.';
+        li.textContent = 'No passkeys yet. Add one to unlock with your fingerprint, face or screen lock.';
         listEl.appendChild(li);
         return;
       }

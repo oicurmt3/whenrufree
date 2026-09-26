@@ -66,6 +66,8 @@ Config is loaded from a fixed path: `/home/perthrel/grape_private/config.php`.
 
 Passkey (WebAuthn) verification lives in `includes/webauthn.php`, required by api.php. See "Built: Fingerprint / Face Unlock" below.
 
+PIN lockout lives in `includes/lockout.php` (`pinLockoutCheck`, `pinLockoutRecordFailure`, `pinLockoutReset`), called through the `checkAccountLockout` / `recordFailedAttempt` / `resetFailedAttempts` wrappers (and the `Group` equivalents) in api.php. The schedule is 5 min, 15 min, 2 hours, 2 days (config `pin_lockout`); `lockout_level` stores how far a name or Hub has escalated. The optimistic `UPDATE ... WHERE lockout_level = :level` stops two simultaneous wrong PINs escalating twice. The admin panel shows an Unlock control on locked users and Hubs. The super admin password login keeps its own per-IP lockout (`admin.max_attempts` / `admin.lockout_minutes`).
+
 ### calendar.js (~3,000 lines)
 
 The largest and most complex file. Structure (top to bottom):
@@ -115,8 +117,11 @@ CLI-only cron script. Operations include:
 2. Delete Hubs inactive for M days (separate `hub_inactive_days`; default follows calendar setting). Respects Hub `never_expires`; detaches child calendars.
 3. Delete expired user sessions
 4. Prune old rate limit entries
-5. Reset expired PIN lockouts (users and Hub organisers)
+5. Reset expired PIN lockouts (calendar users); keeps `lockout_level`
 6. Delete expired Hub organiser sessions
+7. Reset expired Hub organiser PIN lockouts
+8. Reset `lockout_level` after `pin_lockout.reset_after_days` (default 30) without a lockout; skipped until migration 002 is applied
+9. Delete expired / orphaned `access_grants` and `access_attempts` rows unlocked and idle for `access_emoji.attempts_keep_days` (default 30); skipped until migration 003 is applied
 
 ## Common Tasks
 
@@ -149,7 +154,7 @@ See the "Adding a Category" Word document. Two files: `CATEGORY_META` in calenda
 
 3. **VARCHAR(150) vs 250**: The `organiser_message` column was originally VARCHAR(150) but `MESSAGE_MAX_LEN` is 250. A migration to VARCHAR(250) should be applied. The general rule: DB column width should always exceed the app-layer limit.
 
-4. **Rate limit race condition**: The upsert pattern for `api_rate_limit` has a known race condition under high concurrency. Acceptable for shared hosting scale. Would need Redis or similar for high-traffic deployments.
+4. **Rate limit race condition**: The upsert pattern for `api_rate_limit` has a known race condition under high concurrency. Acceptable for shared hosting scale. Would need Redis or similar for high-traffic deployments. Rate-limit keys must fit `minute_key` CHAR(16); `enforceActionRateLimit()` hashes longer keys via `rateLimitKey()`, but keep new prefixes short and readable (e.g. `pkr` + minute, `hg` + hour + id).
 
 5. **Session accumulation**: New sessions are created on each login without invalidating old ones. Cleanup.php handles expired sessions, but active users may accumulate rows. Not a problem at current scale.
 
@@ -187,10 +192,35 @@ See the "Adding a Category" Word document. Two files: `CATEGORY_META` in calenda
 - Tables `user_passkeys` / `group_passkeys` (`migrations/001_passkeys.sql`); FK cascades mean cleanup.php needs no changes.
 - Self-disabling: if the tables are missing, `calendar_meta` / `group_meta` return `passkeys: false` and the UI hides everything.
 - Challenges live in the PHP session (`$_SESSION['wruf_webauthn']`), 5-minute TTL, single-use, bound to the subject.
-- `residentKey: 'discouraged'` + `allowCredentials` per user, so the user picks their name first and the device prompts immediately. No usernameless login.
+- `residentKey: 'discouraged'` + `allowCredentials` per user, so the user picks their name first, then taps the fingerprint button (focused, so Enter works) to open the device prompt. The prompt is never opened automatically: on desktop it would pop up Windows Hello / Touch ID uninvited, and Safari can block WebAuthn calls not started by a user gesture. No usernameless login.
 - Passkeys are domain-bound: whenrufree.net and sandgroper.net passkeys are separate. Leave `webauthn.rp_id` unset unless you want to pin one domain.
 - Browser: `passkey.js` (`window.Passkey`). Enrolment state is remembered per device in localStorage; if the server no longer knows the credential (`NO_PASSKEY`), the client forgets it.
 - Local test: there is no automated test suite in the repo. Verification was done with a throwaway PHP script that emulates an authenticator. On Windows PHP, `openssl_pkey_new()` needs `OPENSSL_CONF` pointing at `extras/ssl/openssl.cnf`.
+
+## Built: Access Emoji
+
+- Optional second barrier on top of the secret link: the organiser picks 1 of 35 emoji for a calendar or Hub; visitors pick it before any data loads. Not a password replacement - 1 in 35 odds, backed by throttling.
+- Stored as a position 0-34 (`calendars.access_emoji`, `groups.access_emoji`). The glyphs and names live only in `emoji.js` (`AccessEmoji.LIST`, written as `\u{...}` escapes to keep files ASCII). **Never reorder or replace entries** - it would silently change every saved emoji. Only append, and bump `ACCESS_EMOJI_COUNT` in `includes/access.php` to match.
+- Effective emoji: the calendar's own, else its Hub's. A Hub grant opens every calendar in the Hub.
+- Server: `includes/access.php`. `accessGate()` runs in api.php before the action dispatch and resolves the target from `?c=`, then `?g=`, then the POSTed `group_token` on `create_calendar`. Exempt: `csrf_token`, `diag`, `access_check`, `remove_calendar_from_group` (PIN-protected; exempting it avoids a loop when a Hub organiser removes a calendar that has its own emoji) and `admin_*`.
+- Grants: random 64-hex, stored as SHA-256 in `access_grants`, 30 days. Browser keeps them in localStorage (`wruf_ag_c_{token}` / `wruf_ag_g_{token}`, in-memory fallback) and sends up to 3 in `X-Access-Grant` (calendar + Hub when relevant).
+- Throttling: per IP + subject in `access_attempts` (3 wrong picks, then 5/15/120/2880 minute locks); per IP per hour in `api_rate_limit` (`aw` wrong picks 20, `nf` unknown codes 30). `access_check`, `set_access_emoji` and `set_group_access_emoji` are sensitive POSTs (fail closed without the limiter).
+- Changing or removing an emoji revokes its grants and clears its attempt rows; the organiser gets a fresh grant in the response.
+- The emoji itself is only returned by organiser-only `access_settings`; `calendar_meta` / `group_meta` expose just `{available, enabled, inherited}`. `share.php` hides the title in link previews for guarded calendars.
+- Browser: `emoji.js` / `emoji.css` (`window.AccessEmoji`: grid, fullscreen picker, blocking gate popup, on/off field). `calendar.js`, `hub.js`, `index.js` wrap API calls in `accessFetch()`, which shows the gate on 403 `ACCESS_REQUIRED` and retries (max 3 tries).
+- Self-disabling: until `migrations/003_access_emoji.sql` runs, `accessTablesReady()` is false, the gate is skipped and the UI hides the switch.
+- Admin: badge + Remove emoji (`admin_set_access_emoji`, removal only) for organisers who forget it.
+
+## Built: Booking Mode
+
+- A calendar with `calendars.slot_capacity` set (1-20) is a booking form: each slot can be taken by that many people, first come, first served. `max_per_user` (1-20 or NULL) caps bookings per person; `bookings_closed` locks it. All three are set only in `create_calendar` - there is no endpoint to change them later.
+- Bookings are ordinary `availability` rows with status 1. The calendar has exactly one status (the booking label, default "Booked"); Blind privacy is rejected because nobody could see which slots are free.
+- Server rules live in `includes/booking.php`: `bookingColumnsReady()` (migration check), `bookingLimitValue()`, `bookingSettingsFromRow()`, `bookingLockCalendar()` (`SELECT ... FOR UPDATE` on the calendar row - this is what makes two simultaneous taps on the last place safe) and `bookingApplyChanges()` (cancellations first, then bookings with capacity / per-person checks; returns the refused ones). `save` uses them for booking calendars only; normal calendars keep the old upsert path.
+- The organiser booking for themselves skips `max_per_user` (so they can block slots); removing someone else's booking is a `save` for that user with status 0. When closed, participants get 403 `BOOKINGS_CLOSED` from `save` and `reset_user`; the organiser can still save.
+- Hidden booking calendars send the anonymous `summary` even without a session, so visitors see Free / Full. Names follow `shouldShowRoster()`.
+- Browser: `index.js` BOOKING MODE block (`makeLimitControl()`, `applyBookingMode()`), `calendar.js` BOOKING MODE block (`bookingInfo()`, `onBookingSlotClick()`, `queueBooking()` - saves one at a time, `renderBookings()`, `setBookingsClosed()`, `refreshBookings()` every 30 s and on tab focus). `renderRankings()`, `refreshCalendarValues()`, `onSlotClick()`, `renderLegend()` and `updateChosenBanner()` branch to the booking versions when `state.booking` is set.
+- Self-disabling: until `migrations/004_booking.sql` runs, `features.booking` is false and the create page hides People per slot.
+- Tests: `$env:TEMP\wruf_booking_test.php` (SQLite, not in the repo) covers `includes/booking.php`; there is no browser test.
 
 ## Contact and Access
 

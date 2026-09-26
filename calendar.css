@@ -1126,6 +1126,16 @@ main{
 .passkey-icons{display:inline-flex;gap:2px;flex-shrink:0;}
 .passkey-icons .material-symbols-outlined{font-size:20px;}
 
+#passkeySetup h2{text-align:center;}
+#passkeyModal .modal-actions{flex-wrap:wrap;}
+#passkeyModal.is-setup .modal-actions{justify-content:center;}
+#passkeyModal .modal-actions .btn{min-height:44px;}
+#passkeyModal .modal{max-height:90vh;overflow-y:auto;}
+.modal p.passkey-others-title{margin:14px 0 0;font-weight:600;font-size:.9rem;color:var(--text-muted);}
+.passkey-offer-icons{display:flex;justify-content:center;gap:14px;margin:4px 0 12px;color:var(--primary);}
+.passkey-offer-icons .material-symbols-outlined{font-size:36px;}
+.modal p.passkey-offer-note{font-size:.85rem;color:var(--text-muted);}
+
 .passkey-list{list-style:none;margin:0 0 8px;padding:0;}
 .passkey-item{
   display:flex;
@@ -1161,7 +1171,9 @@ main{
   color:#777 !important;
   margin:10px 0 4px !important;
 }
-.passkey-title-icon{vertical-align:-4px;font-size:26px;}
+.passkey-title-icon,.settings-title-icon{vertical-align:-4px;font-size:26px;}
+#settingsModal .modal{max-height:90vh;overflow-y:auto;}
+#settingsModal .error:not(:empty){display:block;}
 
 .user-select-empty{
   padding:24px;
@@ -1641,4 +1653,121 @@ main{
 .btn-choose:hover{
   background:#c8e6c9;
   border-color:#66bb6a;
+}
+
+/* ============================================
+   BOOKING MODE
+   Cells: Free (white) / Yours (status colour + check) / some left (tint) / Full (grey hatched)
+   ============================================ */
+.time-slot.bk-cell{
+  flex-direction:column;
+  gap:1px;
+  line-height:1.1;
+  padding:0 3px;
+  border-left:none;
+  background-color:#fff;
+  box-shadow:inset 0 0 0 1px #d7dbe0;
+  overflow:hidden;
+}
+.bk-cell .bk-label{
+  max-width:100%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.bk-cell .bk-sub{
+  max-width:100%;
+  font-size:.68rem;
+  font-weight:500;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  opacity:.85;
+}
+.time-slot.bk-cell.bk-mine{box-shadow:none;}
+.bk-cell.bk-mine .bk-sub{font-weight:700;opacity:1;}
+.bk-cell.bk-mine .bk-sub::before{content:'\2713  ';}
+.time-slot.bk-cell.bk-partial{
+  background-color:#eef6e6;
+  background-color:color-mix(in srgb, var(--status-1) 18%, #fff);
+}
+.time-slot.bk-cell.bk-full{
+  background-color:#e6e6e6;
+  background-image:repeating-linear-gradient(45deg, transparent 0 6px, rgba(0,0,0,.07) 6px 12px);
+  color:#777;
+  box-shadow:none;
+}
+.time-slot.bk-cell.bk-busy{opacity:.55;pointer-events:none;}
+.time-slot.bk-cell:focus-visible{outline:3px solid var(--primary);outline-offset:-2px;}
+.bookings-closed .time-slot.bk-cell{cursor:default;opacity:.8;}
+.bookings-closed .time-slot.bk-cell:hover{filter:none;}
+
+/* Legend dots */
+.bk-dot{border:1px solid #bbb;}
+.bk-dot-free{background:#fff;}
+.bk-dot-mine{background:var(--status-1);border-color:transparent;}
+.bk-dot-partial{background:#eef6e6;background:color-mix(in srgb, var(--status-1) 25%, #fff);}
+.bk-dot-full{background:#e6e6e6 repeating-linear-gradient(45deg, transparent 0 2px, rgba(0,0,0,.2) 2px 4px);}
+
+/* Bookings card */
+.bk-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:2px 2px 6px;
+}
+.bk-summary-text{font-weight:700;color:#333;font-size:.95rem;}
+.bk-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  flex-wrap:wrap;
+}
+.bk-row .rank-main{flex:1;min-width:0;}
+.bk-row .rank-line2{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+.bk-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.bk-actions .btn-pill,
+.bk-close-btn{min-height:44px;}
+.bk-card-mine{border-color:var(--status-1);}
+.bk-person{
+  display:inline-flex;
+  align-items:center;
+  gap:2px;
+  background:#f1f3f5;
+  border:1px solid #e0e3e7;
+  border-radius:999px;
+  padding:2px 10px;
+  color:#333;
+  font-weight:600;
+  min-height:32px;
+}
+.bk-person .bk-remove{margin-right:-8px;}
+.bk-remove{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:36px;
+  height:36px;
+  margin:-4px 0;
+  border:none;
+  border-radius:50%;
+  background:transparent;
+  color:#b00020;
+  cursor:pointer;
+}
+.bk-remove:hover{background:#fdecea;}
+.bk-remove .material-symbols-outlined{font-size:18px;}
+.bk-left{color:#666;font-weight:500;}
+.bk-cancel-btn{border-color:#b00020;color:#b00020;}
+.bk-cancel-btn:hover{background:#fdecea;}
+.bk-close-btn{border-color:#8a5300;color:#8a5300;}
+.bk-close-btn:hover{background:#fff4e5;}
+.bk-closed-banner{background:#fff4e5;border-color:#ffcc80;}
+.bk-closed-banner .chosen-banner-text{color:#8a5300;}
+.bk-closed-banner .chosen-reopen-btn{
+  min-height:44px;
 }

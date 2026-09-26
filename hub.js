@@ -56,10 +56,23 @@ const hubSaveKit = {
     });
   },
 
+  /** "Emoji: ..." line when the Hub has an emoji, else ''. */
+  emojiLine(meta) {
+    return window.AccessEmoji ? AccessEmoji.shareLine(meta.access_emoji) : '';
+  },
+
+  /** Link for the clipboard, with the emoji on the next line when there is one. */
+  buildCopyText(meta) {
+    const url = meta.url || this.buildHubUrl(meta.token);
+    const line = this.emojiLine(meta);
+    return line ? `${url}\n${line}` : url;
+  },
+
   buildHubDetailsText(meta) {
     const url = meta.url || this.buildHubUrl(meta.token);
     const goUrl = this.buildGoHubUrl(meta.token);
     const title = toPlainAscii(meta.title || 'Untitled Hub');
+    const emojiLine = this.emojiLine(meta);
     return [
       'When RU Free - Hub details',
       `Created: ${this.formatDateForFile()}`,
@@ -67,6 +80,7 @@ const hubSaveKit = {
       `Hub name:  ${title}`,
       `Hub link:  ${url}`,
       `Hub code:  ${meta.token}`,
+      ...(emojiLine ? [emojiLine, '(Pick this emoji before the Hub opens.)'] : []),
       '',
       'Go page (enter code if you lose the full link):',
       goUrl,
@@ -118,12 +132,14 @@ const hubSaveKit = {
     const goUrl = this.buildGoHubUrl(meta.token);
     const title = toPlainAscii(meta.title || 'Untitled Hub');
     const subject = `When RU Free Hub: ${title}`;
+    const emojiLine = this.emojiLine(meta);
     const body = [
       'Save this Hub link for our group calendars:',
       '',
       url,
       '',
       `Hub code: ${meta.token}`,
+      ...(emojiLine ? [emojiLine, '(Pick this emoji before the Hub opens.)'] : []),
       '',
       'If you lose the full link, enter the code on the Go page:',
       goUrl,
@@ -144,7 +160,9 @@ const hubSaveKit = {
     const url = meta.url || this.buildHubUrl(meta.token);
     const title = toPlainAscii(meta.title || 'Untitled Hub');
     const shareTitle = `${title} Calendar Hub`;
-    const shareText = `Use this link to find out ${title} Calendar Hub: ${url}`;
+    const emojiLine = this.emojiLine(meta);
+    const shareText = `Use this link to find out ${title} Calendar Hub: ${url}`
+      + (emojiLine ? `\n${emojiLine}` : '');
     try {
       if (navigator.share) {
         await navigator.share({
@@ -166,6 +184,10 @@ const hubSaveKit = {
     const siteUrl = 'https://whenrufree.net';
     const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const created = this.formatDateForFile();
+    const hasEmoji = !!window.AccessEmoji && AccessEmoji.valid(meta.access_emoji);
+    const emojiHtml = hasEmoji
+      ? `<div class="emoji-block"><div class="code-label">Hub emoji</div><div class="emoji-glyph">${esc(AccessEmoji.glyph(meta.access_emoji))}</div><div class="emoji-name">${esc(AccessEmoji.name(meta.access_emoji))}</div><p class="emoji-note">Pick this emoji when the Hub asks for it.</p></div>`
+      : '';
 
     const toolbarHtml = showToolbar ? `
   <div class="toolbar no-print">
@@ -179,7 +201,7 @@ const hubSaveKit = {
 
     const onloadScript = showToolbar ? `<script>
 (function(){
-  var hubUrl=${JSON.stringify(url)};
+  var hubUrl=${JSON.stringify(this.buildCopyText(meta))};
   var hubCode=${JSON.stringify(token)};
   function copyText(t){
     if(navigator.clipboard&&navigator.clipboard.writeText){
@@ -278,6 +300,10 @@ const hubSaveKit = {
     font-size:1.08rem;font-weight:600;color:#444;
     line-height:1.45;margin:0 auto 26px;max-width:520px;
   }
+  .emoji-block{border:2px dashed #9fa8da;border-radius:14px;padding:18px 16px;margin:0 auto 26px;background:#f5f6fc;}
+  .emoji-glyph{font-size:4rem;line-height:1.1;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;}
+  .emoji-name{font-size:1.2rem;font-weight:700;color:#222;margin-top:4px;}
+  .emoji-note{font-size:0.95rem;color:#555;margin-top:8px;}
   .link-section{text-align:left;margin-top:4px;}
   .link-section p{
     font-size:0.92rem;color:#555;line-height:1.55;margin-bottom:10px;
@@ -329,6 +355,7 @@ const hubSaveKit = {
           <div class="hub-code">${esc(token)}</div>
         </div>
         <p class="go-instruction">Go to whenrufree.net/go and enter this Hub Code</p>
+        ${emojiHtml}
         <div class="link-section">
           <p><strong>Full link</strong> - share with your group:</p>
           <div class="link-box">${esc(url)}</div>
@@ -380,11 +407,60 @@ async function ensureCsrfToken() {
   return csrfToken;
 }
 
-async function apiGet(action, params = {}) {
+// -------------------------
+// Access emoji: the Hub grant goes with every request; the emoji popup opens when asked
+// -------------------------
+
+let accessGatePromise = null;
+
+/** Shows the emoji popup once, however many requests are waiting on it. */
+function requireHubAccess() {
+  if (!accessGatePromise) {
+    accessGatePromise = AccessEmoji.gate({
+      title: "Pick this Hub's emoji",
+      hint: "Ask the organiser if you don't know it.",
+      submit: async (emoji) => {
+        const url = new URL('api.php', window.location.href);
+        url.searchParams.set('action', 'access_check');
+        url.searchParams.set('g', state.token);
+        const resp = await fetch(url.toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': (await ensureCsrfToken()) || '' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ emoji })
+        });
+        const data = await resp.json();
+        if (data.status !== 'success') return { ok: false, message: data.message };
+        if (data.access_grant) AccessEmoji.saveGrant(`g_${state.token}`, data.access_grant, data.expires_at);
+        return { ok: true };
+      }
+    }).finally(() => { accessGatePromise = null; });
+  }
+  return accessGatePromise;
+}
+
+/** fetch() with X-Access-Grant; after the emoji popup succeeds the request is sent again. */
+async function accessFetch(url, opts = {}) {
+  for (let tries = 0; ; tries++) {
+    const headers = { ...(opts.headers || {}) };
+    const grants = (window.AccessEmoji && state.token) ? AccessEmoji.grantHeader([`g_${state.token}`]) : '';
+    if (grants) headers['X-Access-Grant'] = grants;
+    const resp = await fetch(url, { ...opts, headers });
+    if (resp.status !== 403 || tries >= 2 || !window.AccessEmoji || !state.token) return resp;
+    let data = null;
+    try { data = await resp.clone().json(); } catch (e) { data = null; }
+    if (!data || data.code !== 'ACCESS_REQUIRED') return resp;
+    await requireHubAccess();
+  }
+}
+
+async function apiGet(action, params = {}, withAuth = false) {
   const url = new URL('api.php', window.location.href);
   url.searchParams.set('action', action);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const resp = await fetch(url.toString(), { credentials: 'same-origin' });
+  const headers = {};
+  if (withAuth && state.auth?.token) headers['X-Group-Auth-Token'] = state.auth.token;
+  const resp = await accessFetch(url.toString(), { credentials: 'same-origin', headers });
   return resp.json();
 }
 
@@ -398,7 +474,7 @@ async function hubPost(action, body = {}, withAuth = false) {
     'X-CSRF-Token': (await ensureCsrfToken()) || ''
   };
   if (withAuth && state.auth?.token) headers['X-Group-Auth-Token'] = state.auth.token;
-  const resp = await fetch(url.toString(), {
+  const resp = await accessFetch(url.toString(), {
     method: 'POST',
     headers,
     credentials: 'same-origin',
@@ -450,6 +526,9 @@ const state = {
   title: '',
   auth: null,
   calendars: [],
+  accessAvailable: false, // Server has the access emoji tables (group_meta.group.access.available)
+  accessField: null,      // Create form emoji switch (AccessEmoji.field)
+  hubEmoji: null,         // The Hub's emoji position, loaded for the logged-in organiser
   passkeysEnabled: false, // Server has fingerprint / face unlock tables (group_meta.group.passkeys)
   platformPasskey: false  // This device has a built-in fingerprint / face / screen-lock authenticator
 };
@@ -466,6 +545,11 @@ function showSaveHubPanel(meta) {
   qs('#saveHubCode').textContent = meta.token;
   qs('#saveHubUrl').textContent = url;
 
+  const hasEmoji = !!window.AccessEmoji && AccessEmoji.valid(meta.access_emoji);
+  qs('#saveHubEmojiWrap').classList.toggle('hideme', !hasEmoji);
+  qs('#saveHubEmoji').textContent = hasEmoji ? AccessEmoji.glyph(meta.access_emoji) : '';
+  qs('#saveHubEmojiName').textContent = hasEmoji ? AccessEmoji.name(meta.access_emoji) : '';
+
   const ack = qs('#saveAckCheckbox');
   const continueBtn = qs('#saveContinueBtn');
   ack.checked = false;
@@ -474,15 +558,16 @@ function showSaveHubPanel(meta) {
   qs('#clipboardFailMsg').classList.add('hideme');
   overlay.classList.remove('hideme');
 
+  const fullMeta = { ...meta, url };
+  const copyText = hubSaveKit.buildCopyText(fullMeta);
+
   (async () => {
-    const copied = await hubSaveKit.copyHubUrl(url);
+    const copied = await hubSaveKit.copyHubUrl(copyText);
     if (!copied) qs('#clipboardFailMsg').classList.remove('hideme');
-    hubSaveKit.downloadHubDetailsTxt({ ...meta, url });
+    hubSaveKit.downloadHubDetailsTxt(fullMeta);
   })();
 
-  const fullMeta = { ...meta, url };
-
-  qs('#saveCopyBtn').onclick = () => hubSaveKit.copyHubUrl(url);
+  qs('#saveCopyBtn').onclick = () => hubSaveKit.copyHubUrl(copyText);
   qs('#saveDownloadBtn').onclick = () => {
     hubSaveKit.downloadHubDetailsTxt(fullMeta);
     showToast('Download started');
@@ -526,6 +611,14 @@ async function createHub() {
       return;
     }
 
+    const accessEmoji = state.accessField ? state.accessField.value : null;
+    const body = {
+      title: title || null,
+      organiser_name: organiserName,
+      organiser_pin: organiserPin
+    };
+    if (accessEmoji !== null) body.access_emoji = accessEmoji;
+
     const csrf = await ensureCsrfToken();
     const resp = await fetch('api.php?action=create_group', {
       method: 'POST',
@@ -534,23 +627,21 @@ async function createHub() {
         'X-CSRF-Token': csrf || ''
       },
       credentials: 'same-origin',
-      body: JSON.stringify({
-        title: title || null,
-        organiser_name: organiserName,
-        organiser_pin: organiserPin
-      })
+      body: JSON.stringify(body)
     });
     const data = await resp.json();
 
     if (data.status !== 'success' || !data.token) {
       throw new Error(data.message || 'Create failed');
     }
+    if (data.access_grant) AccessEmoji.saveGrant(`g_${data.token}`, data.access_grant, data.expires_at);
 
     showSaveHubPanel({
       token: data.token,
       title: data.title || title || 'Untitled Hub',
       organiser_name: organiserName,
-      organiser_pin: organiserPin
+      organiser_pin: organiserPin,
+      access_emoji: accessEmoji
     });
   } catch (e) {
     alert('Failed to create Hub. Please try again.');
@@ -587,9 +678,11 @@ function renderCalendarGrid() {
     card.className = 'cal-card' + (cal.is_frozen ? ' frozen' : '');
 
     const title = cal.title || 'Untitled calendar';
-    const badge = cal.is_frozen
-      ? '<span class="badge badge-frozen">Decided</span>'
-      : '<span class="badge badge-open">Open</span>';
+    const isBooking = cal.slot_capacity !== null && cal.slot_capacity !== undefined;
+    const badge = (cal.is_frozen
+      ? `<span class="badge badge-frozen">${isBooking ? 'Closed' : 'Decided'}</span>`
+      : '<span class="badge badge-open">Open</span>')
+      + (isBooking ? '<span class="badge badge-booking">Booking</span>' : '');
 
     card.innerHTML = `
       <div class="cal-card-main">
@@ -609,12 +702,26 @@ function renderCalendarGrid() {
   });
 }
 
+/** access_emoji is only known after an organiser login (access_settings). */
 function getHubMeta() {
   return {
     token: state.token,
     title: state.title,
-    url: hubSaveKit.buildHubUrl(state.token)
+    url: hubSaveKit.buildHubUrl(state.token),
+    access_emoji: state.auth ? state.hubEmoji : null
   };
+}
+
+/** Loads the Hub's emoji for the organiser's copy / share / email / download buttons. */
+async function loadHubEmoji() {
+  state.hubEmoji = null;
+  if (!state.auth?.token || !state.accessAvailable) return;
+  try {
+    const data = await apiGet('access_settings', { g: state.token }, true);
+    if (data.status === 'success' && window.AccessEmoji && AccessEmoji.valid(data.emoji)) {
+      state.hubEmoji = data.emoji;
+    }
+  } catch (e) { /* buttons fall back to the link only */ }
 }
 
 function updateHubPublicUI() {
@@ -635,7 +742,7 @@ function updateHubPublicUI() {
 
   qs('#createCalInHubBtn').href = `index.html?g=${encodeURIComponent(state.token)}`;
 
-  qs('#barCopyBtn').onclick = () => hubSaveKit.copyHubUrl(meta.url);
+  qs('#barCopyBtn').onclick = () => hubSaveKit.copyHubUrl(hubSaveKit.buildCopyText(getHubMeta()));
   qs('#barCopyCodeBtn').onclick = () => hubSaveKit.copyHubCode(state.token);
   qs('#hubCodeCopyIcon').onclick = () => hubSaveKit.copyHubCode(state.token);
   qs('#hubLinkCopyIcon').onclick = () => hubSaveKit.copyHubUrl(meta.url);
@@ -654,10 +761,9 @@ function updateOrganiserUI() {
     badge.textContent = state.auth.organiser_name || 'Organiser';
     organiserBtns.forEach(btn => btn.classList.remove('hideme'));
 
-    const meta = getHubMeta();
-    qs('#barShareBtn').onclick = () => hubSaveKit.shareHubLink(meta);
-    qs('#barEmailBtn').onclick = () => hubSaveKit.emailHubLink(meta);
-    qs('#barDownloadBtn').onclick = () => hubSaveKit.downloadHubDetailsTxt(meta);
+    qs('#barShareBtn').onclick = () => hubSaveKit.shareHubLink(getHubMeta());
+    qs('#barEmailBtn').onclick = () => hubSaveKit.emailHubLink(getHubMeta());
+    qs('#barDownloadBtn').onclick = () => hubSaveKit.downloadHubDetailsTxt(getHubMeta());
   } else {
     loginBtn.classList.remove('hideme');
     logoutBtn.classList.add('hideme');
@@ -670,8 +776,60 @@ function updateOrganiserUI() {
   const showPk = !!state.auth && passkeysUsable();
   pkBtn.classList.toggle('hideme', !showPk);
   pkBtn.classList.toggle('on', pkOn);
-  pkBtn.title = pkOn ? 'Fingerprint / face unlock is on for this device - manage devices' : 'Fingerprint / face unlock';
+  pkBtn.title = pkOn ? 'Passkey is on for this device - manage passkeys' : 'Set up a passkey';
   pkBtn.setAttribute('aria-label', pkBtn.title);
+
+  const showSettings = !!state.auth && state.accessAvailable && !!window.AccessEmoji;
+  qs('#organiserSettingsBtn').classList.toggle('hideme', !showSettings);
+}
+
+// -------------------------
+// Hub settings (organiser): access emoji
+// -------------------------
+
+async function openHubSettings() {
+  if (!state.auth?.token || !window.AccessEmoji) return;
+  const modal = qs('#settingsModal');
+  const fieldEl = qs('#settingsAccessField');
+  const errEl = qs('#settingsError');
+  errEl.textContent = '';
+  fieldEl.innerHTML = '<p class="ae-note">Loading...</p>';
+  modal.classList.remove('hideme');
+
+  const data = await apiGet('access_settings', { g: state.token }, true);
+  if (data.status !== 'success' || !data.available) {
+    fieldEl.innerHTML = '';
+    errEl.textContent = data.message || 'Settings are not available yet.';
+    return;
+  }
+
+  let saved = AccessEmoji.valid(data.emoji) ? data.emoji : null;
+  AccessEmoji.field(fieldEl, {
+    label: 'Access emoji',
+    pickerTitle: 'Choose Hub emoji',
+    pickerHint: 'Use this emoji to access the Hub.',
+    offHint: 'Optional emoji access security.',
+    onHint: 'Use this emoji to access the Hub.',
+    value: saved,
+    onChange: async (next) => {
+      errEl.textContent = '';
+      if (next === null) {
+        if (!confirm('Remove the emoji? Anyone with the Hub link will be able to open this Hub.')) return false;
+      } else if (saved !== null && !confirm('Change the emoji? Everyone will need to pick the new one.')) {
+        return false;
+      }
+      const res = await hubPost('set_group_access_emoji', { emoji: next }, true);
+      if (res.status !== 'success') {
+        errEl.textContent = res.message || 'Could not save the emoji.';
+        return false;
+      }
+      if (res.access_grant) AccessEmoji.saveGrant(`g_${state.token}`, res.access_grant, res.expires_at);
+      saved = next;
+      state.hubEmoji = next;
+      showToast(next === null ? 'Emoji removed' : `Emoji set: ${AccessEmoji.name(next)}`);
+      return true;
+    }
+  });
 }
 
 async function loadHubView() {
@@ -684,6 +842,7 @@ async function loadHubView() {
 
   state.title = data.group?.title || 'Hub';
   state.calendars = data.calendars || [];
+  state.accessAvailable = data.group?.access?.available === true;
   state.passkeysEnabled = data.group?.passkeys === true;
   if (state.passkeysEnabled && window.Passkey && !state.platformPasskey) {
     state.platformPasskey = await Passkey.platformAvailable();
@@ -693,7 +852,7 @@ async function loadHubView() {
   qs('#hubTitleDisplay').innerHTML =
     `<span class="material-symbols-outlined">hub</span> ${escapeHtml(displayTitle)}`;
 
-  document.title = `${displayTitle} – When RU Free Hub`;
+  document.title = `${displayTitle} \u2013 When RU Free Hub`;
 
   renderCalendarGrid();
   updateHubPublicUI();
@@ -705,7 +864,7 @@ async function authGroup(pin) {
   url.searchParams.set('action', 'auth_group');
   url.searchParams.set('g', state.token);
 
-  const resp = await fetch(url.toString(), {
+  const resp = await accessFetch(url.toString(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -744,20 +903,24 @@ async function tryAutoAuthCreator() {
 function showPinModal() {
   qs('#pinModal').classList.remove('hideme');
   qs('#pinInput').value = '';
+  setPinVisible(false);
   qs('#pinError').textContent = '';
 
   const hasPasskey = passkeysUsable() && !!Passkey.deviceCredential(passkeyId());
   qs('#pinPasskeyWrap').classList.toggle('hideme', !hasPasskey);
-  if (hasPasskey) {
-    // Go straight to the fingerprint / face prompt; the PIN field stays as the backup.
-    unlockWithPasskey();
-  } else {
-    qs('#pinInput').focus();
-  }
+  // The device prompt only opens when the button is pressed (Enter works: the button gets focus).
+  qs(hasPasskey ? '#pinPasskeyBtn' : '#pinInput').focus();
 }
 
 function hidePinModal() {
   qs('#pinModal').classList.add('hideme');
+}
+
+function setPinVisible(show) {
+  const btn = qs('#togglePinVisibility');
+  qs('#pinInput').type = show ? 'text' : 'password';
+  btn.querySelector('.material-symbols-outlined').textContent = show ? 'visibility_off' : 'visibility';
+  btn.setAttribute('aria-label', show ? 'Hide PIN' : 'Show PIN');
 }
 
 async function confirmPinLogin() {
@@ -789,6 +952,7 @@ function finishOrganiserLogin(data) {
   updateOrganiserUI();
   renderCalendarGrid();
   showToast('Logged in as organiser');
+  loadHubEmoji();
 }
 
 // -------------------------
@@ -810,7 +974,7 @@ async function unlockWithPasskey() {
         Passkey.forgetDevice(passkeyId());
         qs('#pinPasskeyWrap').classList.add('hideme');
       }
-      throw new Error(begin.message || 'Fingerprint unlock failed. Use your PIN.');
+      throw new Error(begin.message || 'Passkey sign-in failed. Use your PIN.');
     }
     const credential = await Passkey.get(begin.publicKey);
     const data = await hubPost('passkey_login_finish', { credential });
@@ -819,7 +983,7 @@ async function unlockWithPasskey() {
         Passkey.forgetDevice(passkeyId());
         qs('#pinPasskeyWrap').classList.add('hideme');
       }
-      throw new Error(data.message || 'Fingerprint unlock failed. Use your PIN.');
+      throw new Error(data.message || 'Passkey sign-in failed. Use your PIN.');
     }
     Passkey.rememberDevice(passkeyId(), credential.rawId);
     finishOrganiserLogin(data);
@@ -828,7 +992,7 @@ async function unlockWithPasskey() {
       qs('#pinInput').focus();
       return;
     }
-    errEl.textContent = e.message || 'Fingerprint unlock failed. Use your PIN.';
+    errEl.textContent = e.message || 'Passkey sign-in failed. Use your PIN.';
   } finally {
     btn.disabled = false;
   }
@@ -839,8 +1003,7 @@ async function maybeOfferPasskey() {
   if (!passkeysUsable() || !state.platformPasskey) return;
   const id = passkeyId();
   if (Passkey.deviceCredential(id) || Passkey.wasDismissed(id)) return;
-  qs('#passkeyOfferError').textContent = '';
-  qs('#passkeyOfferModal').classList.remove('hideme');
+  openPasskeyWindow(true);
 }
 
 /** Registers this device for the logged-in organiser. Returns true when fingerprint unlock is on. */
@@ -854,51 +1017,65 @@ async function enrolPasskey(errEl, btn) {
   try {
     const begin = await hubPost('passkey_register_begin', {}, true);
     if (begin.status !== 'success') {
-      fail(begin.message || 'Could not turn on fingerprint unlock.');
+      fail(begin.message || 'Could not add a passkey.');
       return false;
     }
     const credential = await Passkey.create(begin.publicKey);
     const res = await hubPost('passkey_register_finish', { credential, device_label: Passkey.deviceLabel() }, true);
     if (res.status !== 'success' && res.code !== 'PASSKEY_EXISTS') {
-      fail(res.message || 'Could not turn on fingerprint unlock.');
+      fail(res.message || 'Could not add a passkey.');
       return false;
     }
     Passkey.rememberDevice(id, res.credential_id || credential.rawId);
-    showToast('Fingerprint / face unlock is on');
+    showToast('Passkey added on this device');
     return true;
   } catch (e) {
     if (Passkey.isDuplicate(e)) {
       Passkey.rememberDevice(id, null);
-      showToast('Fingerprint / face unlock is on');
+      showToast('Passkey added on this device');
       return true;
     }
-    if (!Passkey.isCancel(e)) fail('Could not turn on fingerprint unlock.');
+    if (!Passkey.isCancel(e)) fail('Could not add a passkey.');
     return false;
   } finally {
     if (btn) btn.disabled = false;
   }
 }
 
-/** Lists the organiser's fingerprint / face unlock devices; any can be removed (e.g. a lost phone). */
-async function openPasskeyManager() {
+/**
+ * The Passkeys window for the Hub organiser (toolbar Passkey button, or once after a PIN login).
+ * On a device without a passkey it shows the setup prompt, plus any passkeys on other devices
+ * so a lost phone can still be removed. Once this device has one, it lists every device.
+ * silent: opened automatically after a PIN login, so list errors are not shown.
+ */
+async function openPasskeyWindow(silent = false) {
   if (!state.auth?.token) return;
   const id = passkeyId();
-  const modal = qs('#passkeyManageModal');
+  const modal = qs('#passkeyModal');
   const listEl = qs('#passkeyList');
-  const errEl = qs('#passkeyManageError');
-  const addBtn = qs('#passkeyManageAdd');
+  const errEl = qs('#passkeyError');
+  const addBtn = qs('#passkeyAdd');
+  let credentials = [];
+  let loaded = false;
 
-  const render = (credentials) => {
-    const mine = Passkey.syncDevice(id, credentials);
-    Passkey.renderList(listEl, credentials, mine, removeDevice);
-    addBtn.classList.toggle('hideme', !!mine);
+  const render = () => {
+    const mine = loaded ? Passkey.syncDevice(id, credentials) : Passkey.deviceCredential(id);
+    const setup = !mine;
+    modal.classList.toggle('is-setup', setup);
+    qs('#passkeySetup').classList.toggle('hideme', !setup);
+    qs('#passkeyManageHead').classList.toggle('hideme', setup);
+    qs('#passkeyOthersTitle').classList.toggle('hideme', !(loaded && setup && credentials.length));
+    listEl.classList.toggle('hideme', !loaded || (setup && !credentials.length));
+    if (loaded) Passkey.renderList(listEl, credentials, mine, removeDevice);
+    addBtn.classList.toggle('hideme', !setup);
+    qs('#passkeyClose').textContent = setup ? 'Not now' : 'Close';
     updateOrganiserUI();
   };
 
   const removeDevice = async (cred, btn) => {
     const isThis = cred.credential_id === Passkey.deviceCredential(id);
     const what = isThis ? 'this device' : (cred.device_label || 'this device');
-    if (!confirm(`Remove fingerprint / face unlock from ${what}? The PIN still works.`)) return;
+    if (!confirm(`Remove the passkey from ${what}? The PIN still works.`)) return;
     btn.disabled = true;
     errEl.textContent = '';
     const res = await hubPost('passkey_remove', { credential_id: cred.credential_id }, true);
@@ -909,30 +1086,36 @@ async function openPasskeyManager() {
     }
     if (isThis) Passkey.forgetDevice(id);
     Passkey.signalRemoved(cred.credential_id);
-    render(res.credentials);
-    showToast('Device removed');
+    credentials = Array.isArray(res.credentials) ? res.credentials : [];
+    render();
+    showToast('Passkey removed');
   };
 
   errEl.textContent = '';
-  listEl.textContent = '';
-  addBtn.classList.add('hideme');
+  render();
   modal.classList.remove('hideme');
+  qs('#passkeyClose').onclick = () => {
+    if (!Passkey.deviceCredential(id)) Passkey.dismiss(id);
+    modal.classList.add('hideme');
+  };
   addBtn.onclick = async () => {
     if (await enrolPasskey(errEl, addBtn)) {
-      const again = await hubPost('passkey_list', {}, true);
-      if (again.status === 'success') render(again.credentials);
+      modal.classList.add('hideme');
+      updateOrganiserUI();
     }
   };
 
   try {
     const res = await hubPost('passkey_list', {}, true);
     if (res.status !== 'success') {
-      errEl.textContent = res.message || 'Could not load devices.';
+      if (!silent) errEl.textContent = res.message || 'Could not load devices.';
       return;
     }
-    render(res.credentials);
+    credentials = Array.isArray(res.credentials) ? res.credentials : [];
+    loaded = true;
+    render();
   } catch (e) {
-    errEl.textContent = 'Could not load devices. Check your connection.';
+    if (!silent) errEl.textContent = 'Could not load devices. Check your connection.';
   }
 }
 
@@ -946,7 +1129,7 @@ async function removeCalendarFromHub(calToken, btn) {
     url.searchParams.set('action', 'remove_calendar_from_group');
     url.searchParams.set('c', calToken);
 
-    const resp = await fetch(url.toString(), {
+    const resp = await accessFetch(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -996,6 +1179,7 @@ async function initViewMode() {
 
   const autoAuth = await tryAutoAuthCreator();
   if (!autoAuth) tryRestoreCachedAuth();
+  loadHubEmoji();
 
   updateHubPublicUI();
   updateOrganiserUI();
@@ -1011,19 +1195,11 @@ async function initViewMode() {
   });
   qs('#pinConfirmBtn').addEventListener('click', confirmPinLogin);
   qs('#pinCancelBtn').addEventListener('click', hidePinModal);
+  qs('#togglePinVisibility').addEventListener('click', () => setPinVisible(qs('#pinInput').type === 'password'));
   qs('#pinPasskeyBtn').addEventListener('click', unlockWithPasskey);
-  qs('#organiserPasskeyBtn').addEventListener('click', openPasskeyManager);
-  qs('#passkeyManageClose').addEventListener('click', () => qs('#passkeyManageModal').classList.add('hideme'));
-  qs('#passkeyOfferNo').addEventListener('click', () => {
-    Passkey.dismiss(passkeyId());
-    qs('#passkeyOfferModal').classList.add('hideme');
-  });
-  qs('#passkeyOfferYes').addEventListener('click', async () => {
-    if (await enrolPasskey(qs('#passkeyOfferError'), qs('#passkeyOfferYes'))) {
-      qs('#passkeyOfferModal').classList.add('hideme');
-      updateOrganiserUI();
-    }
-  });
+  qs('#organiserPasskeyBtn').addEventListener('click', () => openPasskeyWindow());
+  qs('#organiserSettingsBtn').addEventListener('click', openHubSettings);
+  qs('#settingsClose').addEventListener('click', () => qs('#settingsModal').classList.add('hideme'));
   qs('#pinInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') confirmPinLogin();
   });
@@ -1032,6 +1208,27 @@ async function initViewMode() {
 function initCreateMode() {
   qs('#createSection').classList.remove('hideme');
   qs('#createHubBtn').addEventListener('click', createHub);
+  initCreateAccessField();
+}
+
+/** Shows the optional emoji switch under the PIN once the server supports it. */
+async function initCreateAccessField() {
+  if (!window.AccessEmoji) return;
+  try {
+    const resp = await fetch('api.php?action=get_site_config', { credentials: 'same-origin' });
+    const data = await resp.json();
+    if (data?.features?.access_emoji !== true) return;
+  } catch (e) {
+    return;
+  }
+  state.accessField = AccessEmoji.field(qs('#hubAccessField'), {
+    label: 'Access emoji',
+    pickerTitle: 'Choose Hub emoji',
+    pickerHint: 'Use this emoji to access the Hub.',
+    offHint: 'Optional emoji access security.',
+    onHint: 'Use this emoji to access the Hub.'
+  });
+  qs('#hubAccessWrap').classList.remove('hideme');
 }
 
 async function init() {

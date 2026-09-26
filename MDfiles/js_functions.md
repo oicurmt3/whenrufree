@@ -147,7 +147,8 @@ Complete catalogue of JavaScript functions across the When RU Free frontend.
 | Function | Line | Description |
 |----------|------|-------------|
 | `isCalendarFrozen()` | 2453 | Returns true if organiser has locked in a chosen date+slot. |
-| `updateChosenBanner()` | 2461 | Renders/removes the green "Decided" banner. Organiser sees Reopen button. |
+| `canReopenCalendar()` | 2870 | True when the selected user is the organiser and has a valid session. |
+| `updateChosenBanner()` | 2874 | Renders/removes the green "Decided" banner; Reopen shown when `canReopenCalendar()`. Called from `updateUserUI()`, so it follows login / logout / name switches. |
 | `applyFrozenState()` | 2524 | Adds `chosen-slot`/`frozen-slot` classes to grid. Dims non-chosen slots. |
 | `chooseSlot(dateStr, slotId)` | 2556 | Sends `choose_slot` API call with confirmation dialog. Updates all UI. |
 | `unchooseSlot()` | 2596 | Sends `unchoose_slot` API call with confirmation dialog. Reopens calendar. |
@@ -192,7 +193,40 @@ Device memory key: `passkeyId(userId)` = `cal_{calendarToken}_{userId}` (see `pa
 | `unlockWithPasskey(userId)` | 2017 | `passkey_login_begin` -> device prompt -> `passkey_login_finish`. Falls back to PIN on cancel / error; forgets device on `NO_PASSKEY`. |
 | `maybeOfferPasskey(userId)` | 2048 | After PIN login or add-name, shows the "Turn on" offer once (skipped if enrolled, dismissed, or no platform authenticator). |
 | `enrolPasskey(userId, errorEl, btn)` | 2068 | `passkey_register_begin` -> device prompt -> `passkey_register_finish` (sends `device_label`); remembers the device. |
-| `openPasskeyManager(userId)` | 2108 | Opened from the fingerprint icon in the user list. `passkey_list` -> device list with Remove per device (`passkey_remove`) and "Turn on for this device". |
+| `openPasskeyWindow(userId, silent)` | - | The one **Passkeys** window (`#passkeyModal`), opened from the fingerprint icon in the user list or once after a PIN login (`maybeOfferPasskey`, `silent` = no list errors). No passkey on this device: "Set up a passkey?" (Not now / Set up passkey) plus "Passkeys on other devices" with Remove, if any. This device has one: full device list with Remove (`passkey_remove`) and Close. "Not now" records the dismissal. |
+
+### Access emoji (calendar page)
+
+| Function | Line | Description |
+|----------|------|-------------|
+| `accessHubToken()` | 764 | Hub token of this calendar (from meta), used to send the Hub grant too. |
+| `accessGrantKeys(extraHubToken)` | 770 | Grant storage keys to send: `c_{calendar}`, `g_{hub}` and an optional extra Hub (for `confirmAddToHub`). |
+| `requireAccess(info)` | 779 | Shows the blocking emoji popup (`AccessEmoji.gate`), posts `access_check` and saves the grant. Resolves false if the user leaves. |
+| `accessFetch(url, opts, extraHubToken)` | 806 | `fetch` wrapper used by `apiGet`, `apiPost` and `postSave`: adds `X-Access-Grant`; on 403 `ACCESS_REQUIRED` clears stale grants, shows the popup and retries (max 3 tries). |
+| `loadAccessEmoji()` / `applyAccessSettings(data)` | 1456 | Organiser only: GET `access_settings` into `accessAvailable`, `accessEmoji`, `accessHubEmoji`. |
+| `openSettingsModal()` / `hideSettingsModal()` | 1464 | Organiser **Settings** window (`#settingsModal`, gear `#settingsBtn`): emoji on/off/change via `AccessEmoji.field`, confirms, then POST `set_access_emoji` and stores the fresh grant. |
+
+The header Share button adds `AccessEmoji.shareLine()` under the link when an emoji is set.
+
+### Booking mode (calendar page)
+
+Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, perUser, closed}`). `renderRankings()`, `refreshCalendarValues()`, `onSlotClick()`, `renderLegend()`, `updateChosenBanner()` and `resetMyAvailability()` hand over to these; organiser dots and the Submit button are off, and pending changes are never restored.
+
+| Function | Line | Description |
+|----------|------|-------------|
+| `isBookingMode()` / `isBookingClosed()` | 3420 | Booking calendar? Bookings closed? |
+| `currentBookingView()` | 3433 | `'booked'` or `'free'` list: the user's toggle choice, else Booked for an authenticated organiser and Free for everyone else. |
+| `applyBookingChrome()` | 3444 | Page title, Booked / Free labels on `#sortToggle`, name banner text, "Cancel my bookings" titles; list limit 10. |
+| `renderBookingLegend()` | 3465 | Legend: Free / Yours / (1 left or Places left when capacity is 2+) / Full. |
+| `bookingInfo(dateStr, slotId)` | 3484 | `{ids, mine, count, left, full}` for a slot. `count` is the larger of the known rows and the anonymous summary, so it works in Hidden mode too. |
+| `bookingCellText(info)` / `renderBookingCell(el, dateStr, slot)` / `refreshBookingCells()` | 3495 | Cell sub-line (You / Free / names / "N left" / Full or the booking label) and classes `bk-mine`, `bk-partial`, `bk-full`. Names only when `shouldShowRoster()`. |
+| `onBookingSlotClick(dateStr, slotId)` | 3545 | Tap: closed / pick a name / unlock checks, then cancel your own (confirm), "This slot is taken", the per-person limit message, or book. |
+| `queueBooking(userId, dateStr, slotId, status)` / `sendBooking(...)` | 3569 | Saves one change at a time (promise chain, `bk-busy` on the cell), shows "Booked!" / "Just taken by someone else" / limit / closed messages, then reloads availability. An expired session reopens the PIN window (`handleExpiredSession()`). |
+| `cancelMyBookings(auth)` | 3621 | "Cancel my bookings": one confirm, then `reset_user`. |
+| `bookingDates()` | 3638 | Visible dates in order; past dates follow the Show/Hide past dates button. |
+| `renderBookings()` | 3741 | Bookings card: "N of M booked", organiser **Close bookings**, then Booked rows (`buildBookedRow`: names with organiser Remove, Cancel and Add on your own) or Free rows (`buildFreeRow`: Free / "N left", Book). Respects the 2 / 10 / All limit. |
+| `updateBookingClosedBanner()` / `setBookingsClosed(closed)` | 3793 | "Bookings closed" banner with organiser Reopen; POST `set_bookings_closed`. |
+| `startBookingRefresh()` / `refreshBookings()` | 3843 | Every 30 s and on tab focus: re-reads `bookings_closed` from `calendar_meta` and reloads availability (skipped while a save is in flight). |
 
 ### Hub membership (calendar page)
 
@@ -270,10 +304,33 @@ Device memory key: `passkeyId(userId)` = `cal_{calendarToken}_{userId}` (see `pa
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `parseTemplateParams()` | 917 | Reads URL params (title, category, slots, statuses, weights, mode, range, weekends, datefilter) and prefills the form. |
+| `parseTemplateParams()` | 917 | Reads URL params (title, category, slots, statuses, weights, mode, range, weekends, datefilter, and booking `cap` / `per`) and prefills the form. With `cap`, the first status label becomes the booking label. |
 | `showTemplateBanner()` | 1068 | Shows blue "Template loaded!" notification banner. |
 | `initHubContext()` | 48 | Reads `?g=` token, fetches `group_meta`, shows Hub banner; sets `hubContext` for `create_calendar`. |
 | `getHubTokenFromUrl()` | 44 | Returns Hub token from `?g=` query param. |
+
+### Access emoji (create page)
+
+| Function | Line | Description |
+|----------|------|-------------|
+| `requireHubAccess()` | 53 | Emoji popup for a guarded Hub when creating inside it (`?g=`); saves the Hub grant. |
+| `accessFetch(url, opts)` | 76 | Adds the Hub grant; on 403 `ACCESS_REQUIRED` shows the popup and retries (max 3 tries). Used for `group_meta` and `create_calendar`. |
+| `initAccessField(features)` | 91 | Shows the **Access emoji** switch above Privacy Mode when `get_site_config` reports `features.access_emoji`. |
+| `updateAccessOffHint()` | 103 | Off-state hint: "Uses the Hub's emoji" when the Hub has one. |
+| `calendarSaveKit.emojiLine(meta)` / `buildCopyText(meta)` | 179 | Emoji line added to the copied link, share, email, poster and `.txt`. |
+
+### Booking mode (create page)
+
+| Function | Line | Description |
+|----------|------|-------------|
+| `updatePrivacyHint()` / `setPrivacyMode(mode)` | 1464 | Privacy hint (booking wording when a limit is set) and programmatic mode change. |
+| `makeLimitControl({...})` | 1542 | No limit / 1 / 2 / More segmented control with a 3-20 stepper for More. Used for **People per slot** (`capacityControl`) and **Bookings per person** (`perUserControl`, whole-calendar total, default 1). |
+| `isBookingMode()` | 1609 | True when People per slot has a limit. |
+| `initBookingField(features)` | 1616 | Shows People per slot when `get_site_config` reports `features.booking`. |
+| `applyBookingMode()` | 1623 | Shows Bookings per person (`#perUserField`, Slots section), swaps Options for the Booking panel (label + colour), hides Blind (switches to Hidden if needed), revalidates. |
+| `validateBookingLabel()` | 1637 | Booking label check (same rules as status labels). |
+
+`getValidStatuses()` returns the single booking status (weight 1) in booking mode; `createCalendar()` adds `slot_capacity` / `max_per_user` and passes `booking` to the save panel, where `calendarSaveKit` uses "book a slot" wording in the share text, email, poster tagline and `.txt`.
 
 ---
 
@@ -300,6 +357,7 @@ Hub create/view page. Uses `hubSaveKit` object for copy, share, email, download,
 | `shareHubLink(meta)` | 125 | Web Share API or clipboard fallback. |
 | `emailHubLink(meta)` | 138 | Opens mailto with Hub details. |
 | `openHubPosterPopup(meta)` | 349 | Opens printable poster in new window (Blob URL). |
+| `emojiLine(meta)` / `buildCopyText(meta)` | 60 | Emoji line (`AccessEmoji.shareLine`) added to the copied link, share, email, poster and `.txt` when the Hub has an emoji. |
 
 ### Auth and API
 
@@ -323,7 +381,18 @@ Device memory key: `passkeyId()` = `hub_{hubToken}`.
 | `unlockWithPasskey()` | 801 | Passkey login for the Hub organiser; falls back to PIN. |
 | `maybeOfferPasskey()` | 838 | One-time "Turn on" offer after PIN login. |
 | `enrolPasskey(errEl, btn)` | 847 | Registers this device for the Hub organiser (sends `device_label`). |
-| `openPasskeyManager()` | 883 | Handler for the organiser toolbar **Fingerprint** button: device list, Remove per device, "Turn on for this device". |
+| `openPasskeyWindow(silent)` | - | Hub version of the one **Passkeys** window, opened from the organiser toolbar **Passkey** button or once after a PIN login. Same two states as the calendar: set up on this device (with passkeys on other devices listed for removal), or manage every device. |
+
+### Access emoji (Hub)
+
+| Function | Line | Description |
+|----------|------|-------------|
+| `requireHubAccess()` | 417 | Blocking emoji popup; posts `access_check` with `?g=` and saves the Hub grant. |
+| `accessFetch(url, opts)` | 443 | Adds `X-Access-Grant`; on 403 `ACCESS_REQUIRED` shows the popup and retries (max 3 tries). Used by `apiGet`, `hubPost`, `authGroup`, `removeCalendarFromHub`. |
+| `getHubMeta()` | 704 | Current Hub meta for the toolbar buttons (includes `access_emoji` when the organiser is logged in). |
+| `loadHubEmoji()` | 714 | GET `access_settings` after organiser login / auth restore. |
+| `openHubSettings()` | 788 | Organiser **Settings** window: emoji on/off/change, POST `set_group_access_emoji`. |
+| `initCreateAccessField()` | 1212 | Shows the emoji switch below the PIN on the create form when the feature is available. |
 
 ### UI
 
@@ -359,6 +428,24 @@ Shared browser helper loaded by `calendar.html` and `hub.html`. Exposes `window.
 
 ---
 
+## emoji.js (~420 lines)
+
+Shared access emoji helper loaded by `index.html`, `calendar.html`, `hub.html` and `admin.html`. Exposes `window.AccessEmoji`. The 35 emoji are `\u{...}` escapes (files stay ASCII); the saved value is the list position, so **never reorder the list**.
+
+| Member | Description |
+|--------|-------------|
+| `COUNT` / `list` | 35 entries `{e, n}` (glyph, name), 5 columns x 7 rows. |
+| `valid(i)` / `glyph(i)` / `name(i)` | Position checks and lookups. |
+| `shareLine(i, inherited)` | "Emoji: <glyph> <name>", "Emoji: use the Hub's emoji", or ''. Used in copy / share / email / poster / `.txt`. |
+| `renderGrid(container, {selected, onSelect})` | 5-column grid of 44px+ buttons with `aria-label` names. |
+| `openPicker({title, hint, confirmLabel, selected})` | Fullscreen picker; resolves with the position or null (Esc / Cancel). |
+| `gate({title, hint, submit})` | Blocking popup for visitors with Home and Open buttons; `submit(i)` returns `{ok, message}` (wrong pick / locked text). |
+| `field(container, {label, pickerTitle, pickerHint, offHint, onHint, value, onChange})` | On/off switch plus chosen emoji and Change button; returns `{value, set, setOffHint}`. `onChange` may be async and return false to reject. |
+| `saveGrant(key, grant, expiresAt)` / `getGrant(key)` / `clearGrant(key)` | Grant storage in localStorage (`wruf_ag_{key}`, e.g. `c_3PNpKJTs`, `g_ab12CD34`) with in-memory fallback. |
+| `grantHeader(keys)` | Comma-separated valid grants for `X-Access-Grant` (max 3). |
+
+---
+
 ## admin.js (~1,070 lines)
 
-Admin panel logic. Not documented in detail here as it is a separate internal tool. Key functions: `loadCalendars()`, `renderCalendarList()`, `deleteCalendar()`, `togglePermanent()`, `loadUsers()`, `deleteUser()`.
+Admin panel logic. Access emoji: `emojiBadge(emoji, inherited)` shows the emoji (or the Hub's, faded) next to calendars and Hubs; `clearAccessEmoji(kind, item, btn, rerender)` confirms and posts `admin_set_access_emoji` (key_off button). Not documented in detail here as it is a separate internal tool. Key functions: `loadCalendars()`, `renderCalendarList()`, `deleteCalendar()`, `togglePermanent()`, `loadUsers()`, `deleteUser()`. PIN lockouts: `renderUserPills()` adds an amber Unlock pill for users with `locked_seconds > 0` (`unlockUser()` -> `admin_unlock_user`); `renderHubTable()` adds a lock_open action on locked Hubs (`unlockHub()` -> `admin_unlock_group`); `formatWait(seconds)` matches the API's "5 minutes" / "2 hours" / "2 days" wording.

@@ -1,6 +1,6 @@
 <?php
 /**
- * share.php – Dynamic OG/social preview endpoint for shared calendar links.
+ * share.php - Dynamic OG/social preview endpoint for shared calendar links.
  *
  * Usage: https://whenrufree.net/share.php?c=TOKEN
  *
@@ -10,13 +10,13 @@
  * via both <meta http-equiv="refresh"> and a JS redirect, so they never notice
  * the detour.
  *
- * This file is intentionally minimal – it only reads the calendar title and
+ * This file is intentionally minimal - it only reads the calendar title and
  * category. No auth, no CSRF, no sensitive data is exposed.
  */
 
 declare(strict_types=1);
 
-// ── Token validation ──────────────────────────────────────────────────────────
+// -- Token validation ----------------------------------------------------------
 $token = preg_replace('/[^A-Za-z0-9_\-]/', '', (string)($_GET['c'] ?? ''));
 
 if ($token === '') {
@@ -27,11 +27,11 @@ if ($token === '') {
 $calUrl = 'https://whenrufree.net/calendar.html?c=' . urlencode($token);
 $ogUrl  = 'https://whenrufree.net/share.php?c='     . urlencode($token);
 
-// ── Defaults (used when DB lookup fails) ─────────────────────────────────────
-$ogTitle = 'When RU Free – Group Availability Calendar';
+// -- Defaults (used when DB lookup fails) -------------------------------------
+$ogTitle = 'When RU Free - Group Availability Calendar';
 $ogDesc  = 'Join this shared availability calendar. Mark when you\'re free and find the best time for your group. No sign-up required.';
 
-// ── DB lookup ─────────────────────────────────────────────────────────────────
+// -- DB lookup -----------------------------------------------------------------
 try {
     $configPath = '/home/perthrel/grape_private/config.php';
     if (is_file($configPath)) {
@@ -51,28 +51,38 @@ try {
                 [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                  PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
             );
-            $stmt = $pdo->prepare("SELECT title FROM calendars WHERE token = :t LIMIT 1");
-            $stmt->execute([':t' => $token]);
+            // Calendars guarded by an access emoji (own or Hub's) keep the generic preview.
+            try {
+                $stmt = $pdo->prepare(
+                    "SELECT c.title, (c.access_emoji IS NOT NULL OR g.access_emoji IS NOT NULL) AS is_protected
+                     FROM calendars c LEFT JOIN `groups` g ON g.id = c.group_id
+                     WHERE c.token = :t LIMIT 1"
+                );
+                $stmt->execute([':t' => $token]);
+            } catch (PDOException $e) {
+                $stmt = $pdo->prepare("SELECT title, 0 AS is_protected FROM calendars WHERE token = :t LIMIT 1");
+                $stmt->execute([':t' => $token]);
+            }
             $row  = $stmt->fetch();
 
-            if ($row && trim((string)($row['title'] ?? '')) !== '') {
+            if ($row && empty($row['is_protected']) && trim((string)($row['title'] ?? '')) !== '') {
                 $calTitle = trim((string)$row['title']);
-                $ogTitle  = $calTitle . ' – When RU Free';
+                $ogTitle  = $calTitle . ' - When RU Free';
                 $ogDesc   = 'Join the "' . $calTitle . '" availability calendar. Mark when you\'re free and find the best time for your group.';
             }
         }
     }
 } catch (Throwable $e) {
-    // Silently fall back to defaults – never expose DB errors
+    // Silently fall back to defaults - never expose DB errors
 }
 
-// ── Escape for HTML output ─────────────────────────────────────────────────────
+// -- Escape for HTML output -----------------------------------------------------
 $ogTitleHtml = htmlspecialchars($ogTitle, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $ogDescHtml  = htmlspecialchars($ogDesc,  ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $calUrlHtml  = htmlspecialchars($calUrl,  ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $ogUrlHtml   = htmlspecialchars($ogUrl,   ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-// ── Output ────────────────────────────────────────────────────────────────────
+// -- Output --------------------------------------------------------------------
 header('Content-Type: text/html; charset=utf-8');
 header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');

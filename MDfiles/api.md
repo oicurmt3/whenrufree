@@ -8,12 +8,17 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 - POST endpoints: JSON body, requires `X-CSRF-Token` header
 - Authenticated endpoints: add `X-Auth-Token` header (calendar session)
 - Hub organiser endpoints: add `X-Group-Auth-Token` header
+- Calendars / Hubs with an access emoji: add `X-Access-Grant` (grants from `access_check`, comma-separated, max 3); without it any `c` / `g` request returns 403 `ACCESS_REQUIRED`
 
 ## Endpoints
 
 | Action | Method | Auth | Role | Description |
 |--------|--------|------|------|-------------|
 | `csrf_token` | GET | - | - | Get CSRF token |
+| `access_check` | POST | CSRF | - | Check a picked emoji (`emoji` 0-34) for `c` or `g`; returns a 30-day `access_grant` |
+| `access_settings` | GET | Auth | calendar admin / Hub organiser | Current emoji (`c` or `g`) |
+| `set_access_emoji` | POST | Auth | calendar admin | Set or remove the calendar's emoji (`emoji` 0-34 or null) |
+| `set_group_access_emoji` | POST | Auth | Hub organiser | Set or remove the Hub's emoji |
 | `calendar_meta` | GET | - | - | Calendar config + metadata |
 | `group_meta` | GET | - | - | Hub listing (`g` param, not `c`) |
 | `create_group` | POST | CSRF | - | Create Hub + organiser PIN |
@@ -32,7 +37,7 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 | `passkey_list` | POST | Auth | self / Hub organiser | List devices with fingerprint / face unlock |
 | `passkey_remove` | POST | Auth | self / Hub organiser | Remove any one of the owner's devices (`credential_id`) |
 | `rename_user` | POST | Auth | self/admin | Rename user |
-| `save` | POST | Auth | self/admin | Save availability changes |
+| `save` | POST | Auth | self/admin | Save availability changes (booking calendars: capacity checks, returns `rejected`) |
 | `reset_user` | POST | Auth | self/admin | Delete user's availability |
 | `reset_all` | POST | Auth | admin | Delete ALL availability |
 | `delete_user` | POST | Auth | admin | Remove participant |
@@ -41,6 +46,7 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 | `save_organiser_message` | POST | Auth | admin | Update organiser note |
 | `choose_slot` | POST | Auth | admin | Lock in date+slot (freeze) |
 | `unchoose_slot` | POST | Auth | admin | Reopen frozen calendar |
+| `set_bookings_closed` | POST | Auth | admin | Close (`closed` 1) or reopen (0) bookings on a booking calendar |
 | `admin_login` | POST | CSRF | - | Super admin login |
 | `admin_calendars` | GET | Admin | super | List all calendars (includes optional Hub fields) |
 | `admin_set_permanent` | POST | Admin | super | Toggle never_expires |
@@ -51,6 +57,9 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 | `admin_delete_group` | POST | Admin | super | Delete Hub (detaches calendars) |
 | `admin_list_users` | GET | Admin | super | List users for calendar |
 | `admin_delete_user` | POST | Admin | super | Delete user from calendar |
+| `admin_unlock_user` | POST | Admin | super | Clear a user's PIN lockout and escalation |
+| `admin_unlock_group` | POST | Admin | super | Clear a Hub organiser's PIN lockout and escalation |
+| `admin_set_access_emoji` | POST | Admin | super | Remove a calendar's or Hub's emoji (`kind`, `id`) |
 
 ## Status Codes
 
@@ -59,10 +68,11 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 | 200 | Success |
 | 400 | Validation error |
 | 401 | Auth required or invalid session |
-| 403 | CSRF failure or insufficient role, or calendar frozen |
+| 401 | Also: wrong access emoji (`ACCESS_WRONG`, with `attempts_left`) |
+| 403 | CSRF failure or insufficient role, calendar frozen, bookings closed (`BOOKINGS_CLOSED`), or access emoji needed (`ACCESS_REQUIRED`, `HUB_ACCESS_REQUIRED`) |
 | 404 | Calendar/user/action not found, or no passkey set up (`NO_PASSKEY`) |
 | 409 | Passkey already set up (`PASSKEY_EXISTS`) or device limit reached (`PASSKEY_LIMIT`) |
-| 429 | Rate limited or account locked |
+| 429 | Rate limited, account locked, too many wrong emoji picks (`ACCESS_LOCKED`) or too many unknown codes |
 | 500 | Server misconfiguration |
 | 503 | Rate limiter unavailable on a sensitive POST, or passkey tables missing (`PASSKEYS_UNAVAILABLE`) |
 
@@ -76,3 +86,4 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`.
 - Roles: "admin" (organiser) or "member" (participant)
 - Privacy: 0=open, 1=hidden, 2=blind
 - Frozen calendar: `chosen_date` + `chosen_slot` both non-null blocks `save` endpoint
+- Booking calendar: `slot_capacity` 1-20 (people per slot), `max_per_user` 1-20 or null, `bookings_closed`; one status (1 = booked); no Blind privacy. Set only at creation (`create_calendar`)

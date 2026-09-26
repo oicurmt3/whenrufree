@@ -16,6 +16,7 @@ Create a MariaDB database and import the schema. The SQL dump is in `perthrel_gr
 ```sql
 -- See dictionary.md for full schema
 -- Tables: calendars, groups, group_sessions, users, availability, user_sessions, api_rate_limit
+-- (migrations add user_passkeys, group_passkeys, access_grants, access_attempts)
 ```
 
 After importing, run migrations in order:
@@ -28,9 +29,15 @@ ALTER TABLE calendars
   ADD COLUMN chosen_slot VARCHAR(50) DEFAULT NULL AFTER chosen_date;
 ```
 
-2. **Calendar Hubs** — run `migrations/add_groups.sql` (creates `groups`, `group_sessions`, adds `calendars.group_id`).
+2. **Calendar Hubs** - run `migrations/add_groups.sql` (creates `groups`, `group_sessions`, adds `calendars.group_id`).
 
-3. **Fingerprint / face unlock** — run `migrations/001_passkeys.sql` (creates `user_passkeys`, `group_passkeys`). Safe to re-run (`CREATE TABLE IF NOT EXISTS`). Until this runs, the feature is hidden automatically and the site works with PINs only.
+3. **Fingerprint / face unlock** - run `migrations/001_passkeys.sql` (creates `user_passkeys`, `group_passkeys`). Safe to re-run (`CREATE TABLE IF NOT EXISTS`). Until this runs, the feature is hidden automatically and the site works with PINs only.
+
+4. **Escalating PIN lockout** - run `migrations/002_escalating_lockout.sql` (adds `lockout_level`, `last_locked_at` to `users` and `groups`). Safe to re-run (`ADD COLUMN IF NOT EXISTS`, MariaDB). Until this runs, wrong PINs use the old flat 15-minute lock.
+
+5. **Access emoji** - run `migrations/003_access_emoji.sql` (adds `access_emoji` to `calendars` and `groups`; creates `access_grants`, `access_attempts`). Safe to re-run. Until this runs, the emoji switch is hidden and no calendar or Hub asks for an emoji.
+
+6. **Booking** - run `migrations/004_booking.sql` (adds `slot_capacity`, `max_per_user`, `bookings_closed` to `calendars`). Safe to re-run. Until this runs, **People per slot** is hidden on the create page and every calendar is a normal availability poll.
 
 And fix the known column width issue:
 
@@ -73,6 +80,25 @@ return [
         'max_attempts' => 5,
         'lockout_minutes' => 15,
     ],
+    // Optional. PIN lockout for calendar users and Hub organisers. Defaults shown:
+    // 5 wrong PINs lock for 5 min, then 15 min, 2 hours, 2 days (last step repeats);
+    // the escalation resets after 30 days without a lockout.
+    // 'pin_lockout' => [
+    //     'max_attempts' => 5,
+    //     'schedule_minutes' => [5, 15, 120, 2880],
+    //     'reset_after_days' => 30,
+    // ],
+    // Optional. Access emoji limits. Defaults shown: 3 wrong picks lock that IP out of
+    // that calendar/Hub for 5 min, then 15 min, 2 hours, 2 days; max 20 wrong picks and
+    // 30 unknown calendar/Hub codes per IP per hour; grants last 30 days.
+    // 'access_emoji' => [
+    //     'max_attempts' => 3,
+    //     'schedule_minutes' => [5, 15, 120, 2880],
+    //     'global_per_hour' => 20,
+    //     'not_found_per_hour' => 30,
+    //     'grant_days' => 30,
+    //     'attempts_keep_days' => 30,
+    // ],
     // Optional. Fingerprint / face unlock (passkeys). Leave out to use the request host,
     // which is best when the site answers on more than one domain.
     // 'webauthn' => [
@@ -102,7 +128,7 @@ Set up the cleanup script to run daily:
 0 3 * * * /usr/bin/php /home/perthrel/public_html/grape/cleanup.php >> /home/perthrel/grape_private/logs/cleanup.log 2>&1
 ```
 
-This handles: inactive calendar deletion, expired session cleanup, rate limit table pruning, and PIN lockout resets.
+This handles: inactive calendar deletion, expired session cleanup, rate limit table pruning, PIN lockout resets, resetting the PIN lockout escalation after 30 days without a lockout, and deleting expired access emoji grants and old wrong-pick counters.
 
 ## Security Checklist
 

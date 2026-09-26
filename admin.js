@@ -637,6 +637,8 @@
                     <span class="title-cell ${cal.title ? '' : 'no-title'}">
                         ${escapedTitle || '(untitled)'}
                     </span>
+                    ${emojiBadge(cal.access_emoji, cal.access_emoji === null && cal.group_access_emoji !== null)}
+                    ${cal.slot_capacity ? `<span class="booking-badge" title="Booking: up to ${Number(cal.slot_capacity)} per slot">Booking</span>` : ''}
                 </td>
                 <td class="col-hub">${hubCell}</td>
                 <td class="col-token">
@@ -664,6 +666,12 @@
                 </td>
                 <td class="col-actions">
                     <div class="action-buttons">
+                        ${cal.access_emoji !== null && cal.access_emoji !== undefined ? `<button type="button" class="btn btn-ghost btn-icon btn-unlock"
+                                data-action="clear-emoji"
+                                data-cal-id="${cal.id}"
+                                title="Remove the access emoji">
+                            <span class="material-symbols-outlined">key_off</span>
+                        </button>` : ''}
                         <button type="button" class="btn btn-ghost btn-icon" 
                                 data-action="view"
                                 data-cal-id="${cal.id}"
@@ -775,6 +783,9 @@
             if (cal) viewCalendar(cal.token);
         } else if (action === 'delete') {
             initiateDeleteCalendar(calId);
+        } else if (action === 'clear-emoji') {
+            const cal = calendars.find(c => parseInt(c.id, 10) === calId);
+            if (cal) clearAccessEmoji('calendar', cal, btn, renderTable);
         } else if (action === 'toggle-users') {
             toggleUsersExpand(calId);
         }
@@ -906,7 +917,50 @@
                     showDeleteUserModal(calendarId, u.id, u.display_name, u.role);
                 });
                 container.appendChild(btn);
+                if (u.locked_seconds > 0) {
+                    var unlock = document.createElement('button');
+                    unlock.type = 'button';
+                    unlock.className = 'user-pill is-locked';
+                    unlock.title = 'PIN locked for ' + formatWait(u.locked_seconds) + ' - click to unlock ' + u.display_name;
+                    var lockIcon = document.createElement('span');
+                    lockIcon.className = 'material-symbols-outlined pill-icon';
+                    lockIcon.textContent = 'lock_open';
+                    unlock.appendChild(lockIcon);
+                    unlock.appendChild(document.createTextNode(' Unlock ' + u.display_name));
+                    unlock.addEventListener('click', function() {
+                        unlockUser(calendarId, u, unlock);
+                    });
+                    container.appendChild(unlock);
+                }
             })(users[i]);
+        }
+    }
+
+    /** Human-readable wait, matching the API wording (e.g. "5 minutes", "2 days"). */
+    function formatWait(seconds) {
+        var s = Math.max(1, parseInt(seconds, 10) || 0);
+        var n, unit;
+        if (s <= 3600) { n = Math.ceil(s / 60); unit = 'minute'; }
+        else if (s < 86400) { n = Math.ceil(s / 3600); unit = 'hour'; }
+        else { n = Math.ceil(s / 86400); unit = 'day'; }
+        return n + ' ' + unit + (n === 1 ? '' : 's');
+    }
+
+    /** Clear a calendar user's PIN lockout (also resets the escalation level). */
+    async function unlockUser(calendarId, user, btn) {
+        if (!confirm('Unlock ' + user.display_name + '? Their next wrong PIN streak starts again at a 5-minute lock.')) return;
+        btn.disabled = true;
+        try {
+            var formData = new FormData();
+            formData.append('calendar_id', calendarId);
+            formData.append('user_id', user.id);
+            var data = await apiRequest('admin_unlock_user', 'POST', formData);
+            if (data.status !== 'success') throw new Error(data.message || 'Failed to unlock');
+            user.locked_seconds = 0;
+            renderUserPills(calendarId);
+        } catch (err) {
+            btn.disabled = false;
+            alert('Error: ' + err.message);
         }
     }
 
@@ -1250,6 +1304,7 @@
                     <span class="title-cell ${group.title ? '' : 'no-title'}">
                         ${escapedTitle || '(untitled)'}
                     </span>
+                    ${emojiBadge(group.access_emoji, false)}
                 </td>
                 <td class="col-token">
                     <span class="token-display" title="${group.token}">${truncateToken(group.token)}</span>
@@ -1277,6 +1332,18 @@
                 </td>
                 <td class="col-actions">
                     <div class="action-buttons">
+                        ${group.locked_seconds > 0 ? `<button type="button" class="btn btn-ghost btn-icon btn-unlock"
+                                data-action="unlock-hub"
+                                data-group-id="${group.id}"
+                                title="Organiser PIN locked for ${formatWait(group.locked_seconds)} - unlock">
+                            <span class="material-symbols-outlined">lock_open</span>
+                        </button>` : ''}
+                        ${group.access_emoji !== null && group.access_emoji !== undefined ? `<button type="button" class="btn btn-ghost btn-icon btn-unlock"
+                                data-action="clear-hub-emoji"
+                                data-group-id="${group.id}"
+                                title="Remove the access emoji">
+                            <span class="material-symbols-outlined">key_off</span>
+                        </button>` : ''}
                         <button type="button" class="btn btn-ghost btn-icon"
                                 data-action="view-hub"
                                 data-group-id="${group.id}"
@@ -1329,6 +1396,63 @@
         }
     }
 
+    /**
+     * Title badge: the access emoji, or "Hub emoji" when a calendar uses its Hub's.
+     * @param {number|null} emoji
+     * @param {boolean} inherited
+     */
+    function emojiBadge(emoji, inherited) {
+        const AE = window.AccessEmoji;
+        if (AE && AE.valid(emoji)) {
+            return `<span class="emoji-badge" title="Access emoji: ${escapeHtml(AE.name(emoji))}">${AE.glyph(emoji)}</span>`;
+        }
+        if (inherited) {
+            return '<span class="emoji-badge emoji-badge-hub" title="Uses the Hub\'s access emoji">Hub emoji</span>';
+        }
+        return '';
+    }
+
+    /**
+     * Remove the access emoji from a calendar ('calendar') or Hub ('group').
+     * Everyone who had opened it with the emoji can then open it without one.
+     */
+    async function clearAccessEmoji(kind, item, btn, rerender) {
+        const what = kind === 'calendar' ? 'calendar' : 'Hub';
+        if (!confirm('Remove the access emoji from "' + (item.title || 'this ' + what) + '"? Anyone with the link will be able to open it.')) return;
+        btn.disabled = true;
+        try {
+            const formData = new FormData();
+            formData.append('kind', kind);
+            formData.append('id', item.id);
+            const data = await apiRequest('admin_set_access_emoji', 'POST', formData);
+            if (data.status !== 'success') throw new Error(data.message || 'Failed to remove the emoji');
+            item.access_emoji = null;
+            rerender();
+        } catch (err) {
+            btn.disabled = false;
+            alert('Error: ' + err.message);
+        }
+    }
+
+    /** Clear a Hub organiser's PIN lockout (also resets the escalation level). */
+    async function unlockHub(groupId, btn) {
+        const group = groups.find(g => parseInt(g.id, 10) === groupId);
+        if (!group) return;
+        if (!confirm('Unlock the organiser PIN for "' + (group.title || 'this Hub') + '"?')) return;
+        btn.disabled = true;
+        try {
+            const formData = new FormData();
+            formData.append('group_id', groupId);
+            const data = await apiRequest('admin_unlock_group', 'POST', formData);
+            if (data.status !== 'success') throw new Error(data.message || 'Failed to unlock');
+            group.locked_seconds = 0;
+            renderHubTable();
+        } catch (err) {
+            btn.disabled = false;
+            alert('Error: ' + err.message);
+        }
+    }
+
     function viewHub(token) {
         window.open('hub.html?g=' + encodeURIComponent(token), '_blank');
     }
@@ -1361,6 +1485,11 @@
             if (group) viewHub(group.token);
         } else if (action === 'delete-hub') {
             initiateDeleteHub(groupId);
+        } else if (action === 'unlock-hub') {
+            unlockHub(groupId, btn);
+        } else if (action === 'clear-hub-emoji') {
+            const group = groups.find(g => parseInt(g.id, 10) === groupId);
+            if (group) clearAccessEmoji('group', group, btn, renderHubTable);
         } else if (action === 'toggle-hub-calendars') {
             toggleHubCalendarsExpand(groupId);
         }
