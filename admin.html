@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Admin - When RU Free?</title>
-  <link rel="stylesheet" href="admin.css?v=20260926c">
+  <link rel="stylesheet" href="admin.css?v=20261008a">
 </head>
 <body>
 
@@ -31,6 +31,11 @@
           <span class="material-symbols-outlined">login</span> Login
         </button>
       </form>
+      <div class="login-divider"><span>or</span></div>
+      <button type="button" id="accountLoginBtn" class="btn btn-ghost btn-full">
+        <span class="material-symbols-outlined">account_circle</span> Use my When RU Free account
+      </button>
+      <p class="login-hint">For admin accounts listed in <code>config.php</code>. <a href="account.html">Sign in</a> on this browser first.</p>
     </div>
   </div>
 
@@ -54,6 +59,9 @@
         </button>
         <button class="admin-tab" data-tab="hubs" role="tab" aria-selected="false" aria-controls="tabHubs">
           <span class="material-symbols-outlined">hub</span> Hubs
+        </button>
+        <button class="admin-tab" data-tab="accounts" role="tab" aria-selected="false" aria-controls="tabAccounts">
+          <span class="material-symbols-outlined">account_circle</span> Accounts
         </button>
         <button class="admin-tab" data-tab="setup" role="tab" aria-selected="false" aria-controls="tabSetup">
           <span class="material-symbols-outlined">tune</span> Setup Page
@@ -211,6 +219,53 @@
         </div>
 
       </div><!-- /tabHubs -->
+
+      <!-- ============================================
+           TAB: ACCOUNTS
+           ============================================ -->
+      <div id="tabAccounts" class="tab-panel hide" role="tabpanel">
+
+        <div id="accountStats" class="account-stats"></div>
+
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="material-symbols-outlined">search</span>
+            <input type="text" id="accountSearchInput" maxlength="20" placeholder="Search by username (starts with)..." autocomplete="off">
+          </div>
+          <button id="accountRefreshBtn" class="btn btn-ghost btn-small">
+            <span class="material-symbols-outlined">refresh</span> Refresh
+          </button>
+        </div>
+
+        <div class="table-container">
+          <table id="accountTable" class="admin-table">
+            <thead>
+              <tr>
+                <th class="col-id">ID</th>
+                <th class="col-title">Username</th>
+                <th class="col-organiser">Profile name</th>
+                <th class="col-created">Created</th>
+                <th class="col-activity">Last seen</th>
+                <th class="col-users">Calendars</th>
+                <th class="col-cal-count">Hubs</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="accountTableBody">
+            </tbody>
+          </table>
+        </div>
+        <p class="account-note">Shows the 100 most recently active accounts. No emails or provider profiles are stored.</p>
+
+        <div id="accountLoadingState" class="state-msg hide">
+          <span class="material-symbols-outlined spin">progress_activity</span> Loading accounts...
+        </div>
+        <div id="accountEmptyState" class="state-msg hide">
+          <span class="material-symbols-outlined">person_off</span> No accounts found
+        </div>
+        <div id="accountErrorState" class="state-msg error hide"></div>
+
+      </div><!-- /tabAccounts -->
 
       <!-- ============================================
            TAB: SETUP PAGE CUSTOMISER
@@ -476,9 +531,10 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0">
 
   <script src="emoji.js?v=20260926b"></script>
-  <script src="admin-core.js?v=20260927a"></script>
-  <script src="admin-calendars.js?v=20260927a"></script>
+  <script src="admin-core.js?v=20261008a"></script>
+  <script src="admin-calendars.js?v=20260927b"></script>
   <script src="admin-hubs.js?v=20260927a"></script>
+  <script src="admin-accounts.js?v=20260927a"></script>
   <script src="admin-setup.js?v=20260927a"></script>
 </body>
 </html>

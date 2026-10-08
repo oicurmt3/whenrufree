@@ -6,7 +6,7 @@
 
 Hub shortcuts in `localStorage` (`wruf_saved_hubs`) posed a privacy risk on shared computers. The feature was originally opt-in at Hub creation, but the product direction moved away from browser-persisted Hub lists entirely.
 
-Hub organiser session cache (`wruf_group_auth_{token}`) remains for organiser Login/Logout on the Hub page.
+Since the September 2026 accounts release, each account's Hubs are listed on its profile page (`account.html`), so no browser storage is needed. The old Hub organiser session cache (`wruf_group_auth_{token}`) has also been removed.
 
 ## Original behaviour
 

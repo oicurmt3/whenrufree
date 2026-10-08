@@ -1,6 +1,6 @@
 /**
  * admin-core.js - Admin panel shared core: state, login/logout, API helper, utilities, access emoji helpers, tabs.
- * Classic script sharing global scope. Load order: emoji.js, admin-core.js, admin-calendars.js, admin-hubs.js, admin-setup.js.
+ * Classic script sharing global scope. Load order: emoji.js, admin-core.js, admin-calendars.js, admin-hubs.js, admin-accounts.js, admin-setup.js.
  */
 'use strict';
 
@@ -30,9 +30,10 @@ const logoutBtn = document.getElementById('logoutBtn');
 /**
  * Make API request with admin authentication
  */
-async function apiRequest(action, method = 'GET', body = null) {
+async function apiRequest(action, method = 'GET', body = null, params = {}) {
     const url = new URL('api.php', window.location.href);
     url.searchParams.set('action', action);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
     const options = {
         method: method,
@@ -123,12 +124,7 @@ async function handleLogin(e) {
         const data = await apiRequest('admin_login', 'POST', formData);
 
         if (data.status === 'success' && data.admin_token) {
-            adminToken = data.admin_token;
-            csrfToken = data.csrf_token;
-
-            // Store in session storage (cleared on browser close)
-            sessionStorage.setItem('adminToken', adminToken);
-            sessionStorage.setItem('csrfToken', csrfToken);
+            startAdminSession(data);
 
             // Ask browser to save the password via Credential Management API.
             // This is the only way to trigger save prompts in fetch-based logins.
@@ -153,6 +149,38 @@ async function handleLogin(e) {
         }
     } catch (err) {
         showLoginError(err.message || 'Login failed');
+    }
+}
+
+/** Keep the admin session for this tab (sessionStorage is cleared when the browser closes). */
+function startAdminSession(data) {
+    adminToken = data.admin_token;
+    csrfToken = data.csrf_token;
+    sessionStorage.setItem('adminToken', adminToken);
+    sessionStorage.setItem('csrfToken', csrfToken);
+    sessionStorage.removeItem('adminNoAutoAccount');
+}
+
+/**
+ * Open the panel with the signed-in When RU Free account (config.php admin.account_ids).
+ * Silent mode is the automatic try on page load: failures just leave the password form.
+ */
+async function handleAccountLogin(silent = false) {
+    if (!silent) loginError.classList.add('hide');
+    try {
+        const tokenData = await apiRequest('csrf_token');
+        csrfToken = tokenData.csrf_token;
+        const data = await apiRequest('admin_login_account', 'POST');
+        if (data.status === 'success' && data.admin_token) {
+            startAdminSession(data);
+            showAdminPanel();
+            loadCalendars();
+            return;
+        }
+        if (!silent) showLoginError('Authentication failed');
+    } catch (err) {
+        csrfToken = null;
+        if (!silent) showLoginError(err.message || 'Login failed');
     }
 }
 
@@ -182,6 +210,7 @@ function handleLogout() {
     hubsLoaded = false;
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('csrfToken');
+    sessionStorage.setItem('adminNoAutoAccount', '1');
 
     adminPanel.classList.add('hide');
     loginScreen.classList.remove('hide');
@@ -201,6 +230,8 @@ function checkExistingSession() {
         csrfToken = storedCsrf;
         showAdminPanel();
         loadCalendars();
+    } else if (!sessionStorage.getItem('adminNoAutoAccount')) {
+        handleAccountLogin(true);
     }
 }
 
@@ -256,6 +287,7 @@ async function clearAccessEmoji(kind, item, btn, rerender) {
 
 // Login form
 loginForm.addEventListener('submit', handleLogin);
+document.getElementById('accountLoginBtn').addEventListener('click', () => handleAccountLogin(false));
 
 // Password visibility toggle on login form
 const toggleAdminPassword = document.getElementById('toggleAdminPassword');
@@ -322,6 +354,7 @@ function switchTab(tabName) {
     const panelMap = {
         calendars: 'tabCalendars',
         hubs: 'tabHubs',
+        accounts: 'tabAccounts',
         setup: 'tabSetup'
     };
     const target = document.getElementById(panelMap[tabName] || 'tabCalendars');
@@ -332,6 +365,9 @@ function switchTab(tabName) {
     }
     if (tabName === 'hubs' && hubsLoaded === false) {
         loadHubs();
+    }
+    if (tabName === 'accounts' && accountsLoaded === false) {
+        loadAccounts();
     }
 }
 

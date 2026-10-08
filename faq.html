@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <!-- Prevents leaking the calendar token in the Referer header -->
   <meta name="referrer" content="no-referrer">
-  <meta name="description" content="Arrange a time when everyone in your group is available. Create free shared calendars, schedule availability, and plan events -- no sign-up required.">
+  <meta name="description" content="Arrange a time when everyone in your group is available. Create free shared calendars, schedule availability, and plan events -- private sign-in, no ads, no tracking.">
   <title>FAQ & Help - When RU Free?</title>
 
   <!-- Common page styles -->
@@ -35,7 +35,7 @@
     <ol>
       <li><b>Create a calendar</b> - Set a title, date range, time slots, and status options</li>
       <li><b>Share the link</b> - Send the unique URL to your group</li>
-      <li><b>Add availability</b> - Each person adds their name, sets a PIN, and marks their slots</li>
+      <li><b>Add availability</b> - Each person signs in, joins the calendar, and marks their slots</li>
       <li><b>See results</b> - The "Best Catch-Up Dates" section ranks optimal times</li>
     </ol>
 
@@ -53,19 +53,19 @@
     </p>
 
     <ol>
-      <li><b>Create a Hub</b> &mdash; set a name and organiser PIN (<a href="hub.html?create=1">Create a Hub</a>)</li>
-      <li><b>Save the Hub link</b> when prompted &mdash; it cannot be recovered if lost</li>
+      <li><b>Create a Hub</b> &mdash; give it a name (<a href="hub.html?create=1">Create a Hub</a>); your account is the organiser</li>
+      <li><b>Save the Hub link</b> when prompted &mdash; it is also listed on your profile page</li>
       <li><b>Add calendars</b> &mdash; anyone with the Hub link can create a new calendar in the Hub; calendar organisers can attach existing calendars via <b>Add to Hub</b> on the calendar page</li>
       <li><b>Share once</b> &mdash; participants pick which calendar to open from the Hub list</li>
     </ol>
 
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Do I need the Hub organiser PIN to create a calendar in a Hub?
+        Do I need to be the Hub organiser to create a calendar in a Hub?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>No. Anyone with the Hub link can create a new calendar in that Hub. The Hub organiser PIN is only for managing the Hub (remove calendars, Share/Email/Poster/Download, Logout on shared computers).</p>
+        <p>No. Anyone signed in with the Hub link can create a new calendar in that Hub. Only the organiser's account can manage the Hub (remove calendars, Settings, Share/Email/Poster/Download).</p>
       </div>
     </div>
 
@@ -75,7 +75,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Log in as that calendar's organiser. On the calendar page, use the Hub bar and tap <b>Add to Hub</b>. Enter the Hub code or full Hub link.</p>
+        <p>Open the calendar signed in with the account that created it. On the calendar page, use the Hub bar and tap <b>Add to Hub</b>. Enter the Hub code or full Hub link.</p>
       </div>
     </div>
 
@@ -85,7 +85,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>No. Hub links cannot be recovered. Save your link when you create the Hub (copy, download, email, or poster).</p>
+        <p>Sign in and open your <a href="account.html">profile page</a>: it lists the Hubs you organise or have opened, and the calendars you have joined. We cannot look up links for anyone else.</p>
       </div>
     </div>
 
@@ -94,8 +94,8 @@
     
     <h3>Adding your availability</h3>
     <ol>
-      <li>Click the <span class="material-symbols-outlined icon-inline">person</span> person icon to open the user list</li>
-      <li>Click "Add Your Name" and enter your name + a 4-digit PIN</li>
+      <li>Sign in (Google, Facebook or passkey) and open the calendar link</li>
+      <li>Tap <b>Join</b>. Your profile name is filled in; change it for this calendar if you like</li>
       <li>Click on time slots to cycle through status options (e.g., Yes -&gt; Maybe -&gt; No -&gt; blank)</li>
       <li>Your changes auto-save after a few seconds, or click <span class="material-symbols-outlined icon-inline">check</span> to save immediately</li>
     </ol>
@@ -129,8 +129,8 @@
         <p>Share the calendar link via your device's share menu or copy to clipboard.</p>
       </div>
       <div class="feature-card">
-        <h4><span class="material-symbols-outlined">person_edit</span> Edit Name</h4>
-        <p>Change your display name (doesn't affect saved availability).</p>
+        <h4><span class="material-symbols-outlined">person_edit</span> Your name here</h4>
+        <p>Change the name you use on this calendar (anyone who has joined can do this; saved availability is kept).</p>
       </div>
       <div class="feature-card">
         <h4><span class="material-symbols-outlined">delete</span> Reset Mine</h4>
@@ -188,49 +188,55 @@
     
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        What happens if I forget my PIN?
+        Why do I need to sign in?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Unfortunately, PINs cannot be recovered. You'll need to create a new name entry. 
-        Contact the organiser if you need your old entry removed.</p>
-      </div>
-    </div>
-    
-    <div class="faq-item">
-      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Can I change my PIN?
-        <span class="material-symbols-outlined faq-icon">expand_more</span>
-      </div>
-      <div class="faq-answer">
-        <p>Currently, PINs cannot be changed after creation. Choose a memorable 4-digit code when you first sign up.</p>
-      </div>
-    </div>
-    
-    <div class="faq-item">
-      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Why am I locked out after entering wrong PINs?
-        <span class="material-symbols-outlined faq-icon">expand_more</span>
-      </div>
-      <div class="faq-answer">
-        <p>For security, 5 wrong PINs in a row lock that name (or the Hub organiser) for 5 minutes.
-        If it keeps happening, each lock is longer: 15 minutes, then 2 hours, then 2 days.
-        The message tells you how long to wait.</p>
-        <p>Entering the correct PIN resets this. If you set up a passkey on your device, it still works while
-        you are locked out and also resets it. The site admin can unlock you too.</p>
+        <p>So only you can change your availability, without remembering a PIN for every calendar. Your profile page also lists all your calendars and Hubs, so a lost link is no longer lost.</p>
+        <p>Sign in with Google, Facebook or a passkey (fingerprint, face or screen lock). We never receive your email, name or photo from Google or Facebook &mdash; only a private ID that we keep scrambled. There are no ads and no tracking.</p>
       </div>
     </div>
 
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Can I use a passkey (fingerprint or face) instead of my PIN?
+        What is my username for?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Yes, on phones and computers with a fingerprint reader, face unlock, Windows Hello or a screen lock. After you log in with your PIN, tap <b>Set up passkey</b> when asked.
-        Next time, pick your name and tap <b>Use Passkey</b> (fingerprint, face or screen lock). Your PIN always still works.</p>
-        <p>It is set up per device and per calendar. To see or remove your passkeys (for example on a lost phone), open the name list and tap the fingerprint icon next to your name.
-        Hub organisers use the <b>Passkey</b> button on the Hub page. Your fingerprint or face never leaves your device.</p>
+        <p>It is private: only you (and the site admin) see it. It is used to confirm big actions such as deleting your account. Other people only see your <b>profile name</b>, or the name you chose for a particular calendar.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        I had a name with a PIN before accounts. What now?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Sign in, open the calendar, tap the <span class="material-symbols-outlined icon-inline">group</span> People button and tap your old name (it says <b>Tap to claim it</b>). Enter its old PIN once. The name and its availability then belong to your account and the PIN is deleted.</p>
+        <p>Old Hubs work the same way: open the Hub and tap <b>Claim this Hub</b>, then enter the old organiser PIN.</p>
+        <p>Five wrong PINs in a row lock that name for 5 minutes (then longer). The site admin can unlock it. If you forgot the PIN, join again with a new name and ask the organiser to remove the old one.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I use a passkey (fingerprint or face)?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>On the sign-in screen tap <b>Sign in with a passkey</b> to use one you already have, or <b>New here? Create an account with a passkey</b>. If you signed in another way, tap <b>Add a passkey</b> under <b>Ways to sign in</b> on your profile page.</p>
+        <p>Your fingerprint or face never leaves your device. You can remove a lost device's passkey on the profile page, as long as one sign-in method remains.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I delete my account?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Open your <a href="account.html">profile page</a>, scroll to <b>Delete account</b>, type your username and confirm. This removes your account, your names on calendars, and every calendar and Hub you organise. See the <a href="privacy.html#delete-account">Privacy Policy</a> for details.</p>
       </div>
     </div>
 
@@ -243,7 +249,7 @@
         <p>Yes. When creating the calendar, set <b>People per slot</b> (under Slots) to 1, 2 or More (up to 20), and choose <b>Bookings per person</b> - how many slots each person can book, counted <b>Per day</b> (e.g. court hire) or <b>In total</b> across the whole calendar (e.g. one interview per candidate).
         People tap a free slot to book it (tap again to un-book) and it saves like any calendar, first come, first served. Slots booked by other people show in red, and if two people tap the last place at the same moment only the first gets it.</p>
         <p>The organiser can remove anyone's booking and use <b>Close bookings</b> to stop changes. Booking settings cannot be changed after the calendar is created, and Blind privacy is not available for booking calendars.</p>
-        <p>There are no accounts, so the per-person limit is a fairness rule: someone could add a second name to book more. The organiser sees every name and can remove extra bookings.</p>
+        <p>Each account can have one name per calendar, so the per-person limit applies per account. Someone with a second account could still book more; the organiser sees every name and can remove extra bookings.</p>
       </div>
     </div>
 
@@ -254,8 +260,8 @@
       </div>
       <div class="faq-answer">
         <p>An optional extra lock on top of the secret link. The organiser picks one of 35 emoji, and anyone opening the calendar or Hub must pick the same one first.
-        The emoji is written next to the link when the organiser copies, shares, emails or prints it. Your browser remembers it for 30 days.</p>
-        <p>Organisers turn it on when creating the calendar (above Privacy Mode) or Hub (below the PIN), or later with the <b>Settings</b> (gear) button.
+        The emoji is written next to the link when the organiser copies, shares, emails or prints it. Your account remembers it for 30 days, and people who have joined the calendar (or organise the Hub) never need it.</p>
+        <p>Organisers turn it on when creating the calendar (above Privacy Mode) or Hub, or later with the <b>Settings</b> (gear) button.
         A calendar in a Hub uses the Hub's emoji unless it has its own. Three wrong picks lock that device out for 5 minutes, then longer.</p>
       </div>
     </div>
@@ -266,7 +272,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Ask the organiser - it is usually in the message or poster with the link. Organisers can see and change it in <b>Settings</b> on any device that has already opened the calendar or Hub.
+        <p>Ask the organiser - it is usually in the message or poster with the link. Organisers can see and change it in <b>Settings</b> on any device where they are signed in.
         If the organiser forgot it too, the site admin can remove it.</p>
       </div>
     </div>
@@ -300,9 +306,9 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>The calendar link acts like a password - anyone with the link can view and participate. 
-        Only share links with trusted participants. PINs protect individual entries from being 
-        modified by others. <b>Do not enter sensitive or private information.</b></p>
+        <p>The calendar link is the invite - anyone signed in with the link can view and join. 
+        Only share links with trusted participants. Only your account can change your entry. 
+        <b>Do not enter sensitive or private information.</b></p>
       </div>
     </div>
     
@@ -417,9 +423,9 @@
     <!-- TIPS -->
     <h2><span class="material-symbols-outlined">tooltip_2</span> Tips</h2>
     <ul>
-      <li><b>Bookmark the calendar link</b> - You'll need it to return and update your availability</li>
+      <li><b>Find your calendars on your profile</b> - Every calendar you join is listed on your <a href="account.html">profile page</a></li>
       <li><b>Use the Go page</b> - Open <a href="go/">Go to code</a> if you have a calendar or Hub code or URL</li>
-      <li><b>Use a memorable PIN</b> - You can't recover it if forgotten</li>
+      <li><b>Add a second sign-in method</b> - For example a passkey as well as Google, so you can still get in if one stops working</li>
       <li><b>Check the organiser indicator</b> - The coloured left border on slots shows which times the organiser prefers</li>
       <li><b>View "Top 10"</b> - Click the "Top 10" button to see more ranked date options</li>
       <li><b>Use date filtering</b> - Organisers can narrow the visible dates using "Only chosen" or "All except" modes</li>

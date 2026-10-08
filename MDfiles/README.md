@@ -1,18 +1,20 @@
 # When RU Free?
 
-Privacy-focused group availability scheduling. No accounts, no tracking, no ads.
+Privacy-focused group availability scheduling. Free sign-in with Google, Facebook or a passkey; no email stored, no PINs, no tracking, no ads.
 
 **Live:** [whenrufree.net](https://whenrufree.net) 
 
 ## What It Does
 
-An organiser creates a calendar with custom time slots, date ranges, and status options. They share a link. Participants add their name, set a 4-digit PIN, and tap slots to mark availability. The app scores and ranks date+slot combinations so the group can find the best match.
+An organiser signs in, creates a calendar with custom time slots, date ranges, and status options, and shares its link. Participants sign in, join with their profile name (or a name just for that calendar), and tap slots to mark availability. The app scores and ranks date+slot combinations so the group can find the best match.
 
 ## Key Features
 
-- No sign-up required -- PIN-based authentication per calendar
-- Optional fingerprint / face unlock (WebAuthn passkeys) for users and organisers, with the PIN as backup
-- Optional access emoji: the organiser picks 1 of 35 emoji for a calendar or Hub, and visitors must pick it before the page opens (calendars in a Hub use the Hub's emoji unless they have their own)
+- Sign in with Google (openid only), Facebook (user ID only) or a passkey (fingerprint, face or screen lock). Only a keyed hash of the provider's ID is stored - never an email, name or photo
+- Private unique username; a profile name used on calendars by default, with a per-calendar override
+- Profile page: edit your name, manage sign-in methods, see all your calendars and Hubs, sign out, delete your account
+- No PINs: the unique link is the invite, and who you are comes from your account. Names and Hubs from before accounts can be claimed once with their old PIN
+- Optional access emoji: the organiser picks 1 of 35 emoji for a calendar or Hub as an invite confirmation; each account picks it once (calendars in a Hub use the Hub's emoji unless they have their own)
 - Three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices)
 - Customisable time slots (1-6), status options (1-5 with colours and weights), and date ranges (up to 360 days)
 - Date filtering: organiser can show/hide specific dates for participants
@@ -24,9 +26,9 @@ An organiser creates a calendar with custom time slots, date ranges, and status 
 - Template URLs for pre-configured calendars
 - Google Calendar and ICS export from rank cards
 - Mobile-responsive with 44x44px touch targets
-- Automatic cleanup of inactive calendars (configurable retention)
+- Automatic cleanup of inactive calendars, Hubs and accounts (configurable retention)
 - Up to 17 category icons (Material Symbols Outlined)
-- **Calendar Hubs:** one private link lists multiple calendars; open create-in-Hub; organiser PIN for management
+- **Calendar Hubs:** one private link lists multiple calendars; open create-in-Hub; managed by the account that created it
 
 ## Tech Stack
 
@@ -50,15 +52,19 @@ index.css        - Creation page styles
 calendar.html    - Calendar view/interaction page
 calendar-*.js    - Calendar logic, 6 files loaded in order: core, users, grid, rank, booking, main
 calendar.css     - Calendar styles
-passkey.js       - Fingerprint / face unlock browser helper (window.Passkey)
+account.html     - Profile page: username, profile name, sign-in methods, calendars and Hubs, sign out, delete
+account.js       - Profile page logic
+account-core.js  - Sign-in panel, account badge and API error handling shared by every page (window.Account)
+account.css      - Sign-in panel, badge and profile page styles
+passkey.js       - Passkey browser helper (window.Passkey)
 emoji.js         - Access emoji list, picker, gate popup and grant storage (window.AccessEmoji)
 emoji.css        - Access emoji picker / gate styles
-includes/        - Server-only PHP helpers for api.php (http, data, security, sessions, hubs, webauthn, lockout, access, booking); blocked by .htaccess
+includes/        - Server-only PHP helpers for api.php (http, data, security, sessions, hubs, accounts, oauth, webauthn, lockout, access, booking); blocked by .htaccess
 migrations/      - SQL migrations (blocked from the web)
 admin.html       - Super admin panel
-admin-*.js       - Admin panel logic, 4 files loaded in order: core, calendars, hubs, setup
+admin-*.js       - Admin panel logic, 5 files loaded in order: core, calendars, hubs, accounts, setup
 admin.css        - Admin panel styles
-api.php          - All backend endpoints (~2,200 lines); helpers live in includes/
+api.php          - All backend endpoints (~2,400 lines); helpers live in includes/
 cleanup.php      - Cron maintenance script
 _htaccess        - Apache security rules
 guide.html       - User help page
@@ -71,26 +77,31 @@ robots.txt       - Search engine directives
 
 ## Database Tables
 
+- `accounts` - Private username, profile name, created / last seen
+- `account_identities` - Google / Facebook logins as keyed hashes of the provider's user ID
+- `account_passkeys` - Passkey public keys
+- `account_sessions` - Hashed 30-day sign-in sessions
+- `account_access` - Access emoji already picked by an account
+- `account_hubs` - Hubs an account has opened (profile page list)
 - `calendars` - Calendar configuration and metadata (`group_id` FK when in a Hub)
-- `groups` - Hub metadata and organiser PIN hash
-- `group_sessions` - Hub organiser auth tokens
-- `users` - Participants per calendar (name, PIN hash, role)
+- `groups` - Hub metadata, organiser account (`organiser_account_id`) and, until claimed, the old organiser PIN hash
+- `users` - Names per calendar (`account_id`, `name_custom`, role; old unclaimed names still have a PIN hash)
 - `availability` - Status selections per user/date/slot
-- `user_sessions` - Auth tokens with expiry
-- `user_passkeys` / `group_passkeys` - Fingerprint / face unlock public keys
 - `access_grants` - Hashed 30-day grants issued after the right access emoji is picked
 - `access_attempts` - Wrong emoji picks per IP and calendar/Hub
 - `api_rate_limit` - Per-IP request throttling
 
+The old `user_sessions`, `group_sessions`, `user_passkeys` and `group_passkeys` tables are dropped by `migrations/008_drop_pins.sql` about 90 days after accounts go live.
+
 ## Security Model
 
 - CSRF tokens on all POST requests
-- Per-IP rate limiting (configurable, default 120/min)
-- PIN hashing with password_hash/password_verify
-- Escalating PIN lockout: 5 wrong PINs lock for 5 min, then 15 min, 2 hours, 2 days; resets on a correct PIN, passkey login, admin Unlock or after 30 quiet days
-- Passkeys: user verification required, origin + RP ID checked, single-use challenges bound to the user, sign-counter replay detection
+- Per-IP rate limiting (configurable, default 120/min), plus per-action limits on sign-in and account changes
+- Account sessions: HttpOnly, Secure, SameSite=Lax cookie; 64-char hex, stored as SHA-256; 30 days, renewed on use
+- Google / Facebook: signed state cookie, OIDC nonce and PKCE; provider IDs stored only as HMAC-SHA-256 with a server secret
+- Passkeys: user verification required, origin + RP ID checked, single-use challenges, sign-counter replay detection
+- Old PIN claims: password_verify; 5 wrong PINs lock for 5 min, then 15 min, 2 hours, 2 days
 - Access emoji: checked server-side before every calendar/Hub request; 3 wrong picks lock that IP for 5 min, then 15 min, 2 hours, 2 days; max 20 wrong picks and 30 unknown codes per IP per hour; grants stored as SHA-256 hashes; the emoji is never sent to visitors
-- Session tokens: 64-char hex, 24-hour expiry
 - Calendar tokens: 8-char URL-safe (new) or 48-char (legacy)
 - All dynamic HTML output escaped
 - Prepared statements for all database queries
@@ -101,6 +112,7 @@ robots.txt       - Search engine directives
 
 - [API Reference](API%20Reference.md) - Complete endpoint documentation
 - [Deployment Guide](deployment.md) - Server setup and configuration
+- [Google Sign-In Setup](google-oauth-setup.md) - Step-by-step Google Cloud console setup (reusable for other sites)
 - [User Manual](user_manual.md) - End-user instructions
 - [JS Functions Reference](js_functions.md) - Frontend function catalogue
 - [Data Dictionary](dictionary.md) - Database schema reference

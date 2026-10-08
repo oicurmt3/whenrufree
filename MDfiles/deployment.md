@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- PHP 8.x with PDO MySQL and OpenSSL extensions
+- PHP 8.x with PDO MySQL, OpenSSL and cURL extensions (cURL talks to Google / Facebook during sign-in)
 - MariaDB 10.x or MySQL 8.x
 - Apache with mod_rewrite (shared hosting via cPanel)
 - HTTPS certificate (Let's Encrypt or cPanel AutoSSL)
@@ -16,7 +16,8 @@ Create a MariaDB database and import the schema. The SQL dump is in `perthrel_gr
 ```sql
 -- See dictionary.md for full schema
 -- Tables: calendars, groups, group_sessions, users, availability, user_sessions, api_rate_limit
--- (migrations add user_passkeys, group_passkeys, access_grants, access_attempts)
+-- (migrations add access_grants, access_attempts and the account_* tables;
+--  008 later drops group_sessions, user_sessions, user_passkeys, group_passkeys)
 ```
 
 After importing, run migrations in order:
@@ -31,13 +32,17 @@ ALTER TABLE calendars
 
 2. **Calendar Hubs** - run `migrations/add_groups.sql` (creates `groups`, `group_sessions`, adds `calendars.group_id`).
 
-3. **Fingerprint / face unlock** - run `migrations/001_passkeys.sql` (creates `user_passkeys`, `group_passkeys`). Safe to re-run (`CREATE TABLE IF NOT EXISTS`). Until this runs, the feature is hidden automatically and the site works with PINs only.
+3. **Old per-calendar passkeys** - `migrations/001_passkeys.sql` (creates `user_passkeys`, `group_passkeys`). Not needed on a new install; the accounts code no longer uses these tables and migration 008 drops them.
 
-4. **Escalating PIN lockout** - run `migrations/002_escalating_lockout.sql` (adds `lockout_level`, `last_locked_at` to `users` and `groups`). Safe to re-run (`ADD COLUMN IF NOT EXISTS`, MariaDB). Until this runs, wrong PINs use the old flat 15-minute lock.
+4. **Escalating PIN lockout** - run `migrations/002_escalating_lockout.sql` (adds `lockout_level`, `last_locked_at` to `users` and `groups`). Safe to re-run (`ADD COLUMN IF NOT EXISTS`, MariaDB). It is now used only when claiming old PIN names and Hubs.
 
 5. **Access emoji** - run `migrations/003_access_emoji.sql` (adds `access_emoji` to `calendars` and `groups`; creates `access_grants`, `access_attempts`). Safe to re-run. Until this runs, the emoji switch is hidden and no calendar or Hub asks for an emoji.
 
 6. **Booking** - run `migrations/004_booking.sql` (adds `slot_capacity`, `max_per_user`, `bookings_closed` to `calendars`). Safe to re-run. Until this runs, **People per slot** is hidden on the create page and every calendar is a normal availability poll. Then run `migrations/005_booking_total.sql` (adds `per_user_total`) to show the **Per day / In total** toggle under Bookings per person; until then every limit is per day. Then run `migrations/006_booking_styles.sql` (adds `partial_color`, `full_color`, `partial_label`, `full_label`) to show the Partly booked / Full colour and name settings; until then cells use the default orange / red and names.
+
+7. **Accounts** - run `migrations/007_accounts.sql` **before** uploading the accounts code (creates `accounts`, `account_identities`, `account_passkeys`, `account_sessions`, `account_access`, `account_hubs`; adds `users.account_id`, `users.name_custom`, `groups.organiser_account_id`; makes the PIN hashes nullable). Safe to re-run. Until it runs, every page shows "Sign-in is not set up on this server yet".
+
+8. **Drop old PINs** - `migrations/008_drop_pins.sql` is a draft: run it about 90 days after accounts go live, once Admin > Accounts shows few unclaimed names and Hubs. It deletes all remaining PIN hashes (they can no longer be claimed) and drops the old session and passkey tables.
 
 And fix the known column width issue:
 
@@ -80,7 +85,18 @@ return [
         'max_attempts' => 5,
         'lockout_minutes' => 15,
     ],
-    // Optional. PIN lockout for calendar users and Hub organisers. Defaults shown:
+    // Required. Sign-in accounts. pepper: 64+ hex characters, generated once with
+    //   php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
+    // and never changed (changing it breaks every Google / Facebook login).
+    // Leave a provider's keys empty to hide its button. Passkeys need no keys.
+    'accounts' => [
+        'pepper' => 'paste_64_hex_characters_here',
+        'base_url' => 'https://whenrufree.net',
+        'google' => ['client_id' => '', 'client_secret' => ''],
+        'facebook' => ['app_id' => '', 'app_secret' => '', 'graph_version' => 'v21.0'],
+        'inactive_days' => 730,   // cleanup.php deletes accounts unused this long with no calendars or Hubs
+    ],
+    // Optional. Lockout when claiming old PIN names and Hubs. Defaults shown:
     // 5 wrong PINs lock for 5 min, then 15 min, 2 hours, 2 days (last step repeats);
     // the escalation resets after 30 days without a lockout.
     // 'pin_lockout' => [
@@ -99,7 +115,7 @@ return [
     //     'grant_days' => 30,
     //     'attempts_keep_days' => 30,
     // ],
-    // Optional. Fingerprint / face unlock (passkeys). Leave out to use the request host,
+    // Optional. Passkeys. Leave out to use the request host,
     // which is best when the site answers on more than one domain.
     // 'webauthn' => [
     //     'rp_id' => 'whenrufree.net',
@@ -108,13 +124,31 @@ return [
 ];
 ```
 
-Passkeys are tied to the domain they were created on. A passkey set up on `whenrufree.net` will not work on `sandgroper.net` (the PIN still does). Changing `rp_id` later invalidates every existing passkey; users simply fall back to their PIN and can turn it on again.
+Passkeys are tied to the domain they were created on. A passkey set up on `whenrufree.net` will not work on `sandgroper.net`. Changing `rp_id` later invalidates every existing passkey; people then need Google or Facebook on the same account, or a new account.
+
+### 2a. Google and Facebook sign-in
+
+Both are optional; with neither, people sign in with passkeys only. The redirect URIs use `accounts.base_url`:
+
+- `https://whenrufree.net/api.php?action=oauth_google`
+- `https://whenrufree.net/api.php?action=oauth_facebook`
+
+**Google** (Google Cloud console > APIs & Services; full walkthrough with troubleshooting in [google-oauth-setup.md](google-oauth-setup.md)):
+1. OAuth consent screen: External, app name "When RU Free", privacy policy `https://whenrufree.net/privacy.html`, terms `https://whenrufree.net/terms.html`. Add no scopes beyond `openid`.
+2. Credentials > Create OAuth client ID > Web application. Authorised redirect URI: the `oauth_google` URL above.
+3. Copy the client ID and secret into `accounts.google`.
+
+**Facebook** (Meta for Developers):
+1. Create an app (Consumer) and add **Facebook Login**. Keep only the default `public_profile` permission; the app reads nothing but the user ID.
+2. Facebook Login > Settings > Valid OAuth Redirect URIs: the `oauth_facebook` URL above.
+3. App settings > Basic: privacy policy `https://whenrufree.net/privacy.html`, terms `https://whenrufree.net/terms.html`, **User data deletion** > Data deletion instructions URL `https://whenrufree.net/privacy.html#delete-account`.
+4. Copy the app ID and secret into `accounts.facebook`, then switch the app to Live.
 
 ### 3. File Upload
 
 Upload all project files to the web-accessible directory (e.g. `/home/perthrel/public_html/grape/` or equivalent subfolder on sandgroper.net).
 
-Include the whole `includes/` folder (`http.php`, `data.php`, `security.php`, `sessions.php`, `hubs.php`, `webauthn.php`, `lockout.php`, `access.php`, `booking.php`, `.htaccess`); `api.php` stops with a fatal error if any is missing. The calendar page needs all six `calendar-*.js` files and the admin panel all four `admin-*.js` files.
+Include the whole `includes/` folder (`http.php`, `data.php`, `security.php`, `sessions.php`, `hubs.php`, `accounts.php`, `oauth.php`, `webauthn.php`, `lockout.php`, `access.php`, `booking.php`, `.htaccess`); `api.php` stops with a fatal error if any is missing. Every page needs `passkey.js`, `account-core.js` and `account.css`; the profile page is `account.html` + `account.js`. The calendar page needs all six `calendar-*.js` files and the admin panel all five `admin-*.js` files.
 
 Rename `_htaccess` to `.htaccess`.
 
@@ -130,15 +164,17 @@ Set up the cleanup script to run daily:
 0 3 * * * /usr/bin/php /home/perthrel/public_html/grape/cleanup.php >> /home/perthrel/grape_private/logs/cleanup.log 2>&1
 ```
 
-This handles: inactive calendar deletion, expired session cleanup, rate limit table pruning, PIN lockout resets, resetting the PIN lockout escalation after 30 days without a lockout, and deleting expired access emoji grants and old wrong-pick counters.
+This handles: inactive calendar and Hub deletion, rate limit table pruning, claim lockout resets, resetting the lockout escalation after 30 days without a lockout, deleting expired access emoji grants and old wrong-pick counters, and (step 10) expired account sessions, abandoned passkey sign-ups, emoji picks for deleted calendars/Hubs, and accounts unused for `accounts.inactive_days` that have no calendars or Hubs. Steps 3 and 6 (old PIN sessions) are skipped once migration 008 has run.
 
 ## Security Checklist
 
 - [ ] Config file is outside webroot (`/home/perthrel/grape_private/config.php`)
 - [ ] `.htaccess` blocks `cleanup.php`, `config.php`, `error_log`, `*.sql`
 - [ ] `includes/.htaccess` (`Require all denied`) is uploaded
-- [ ] HTTPS is enabled and HSTS header is active (browsers only allow fingerprint / face unlock over HTTPS)
-- [ ] PHP `openssl` extension is enabled (needed to verify passkey signatures)
+- [ ] HTTPS is enabled and HSTS header is active (browsers only allow passkeys over HTTPS, and the account cookie is Secure)
+- [ ] PHP `openssl` extension is enabled (needed to verify passkey signatures) and `curl` is enabled (Google / Facebook)
+- [ ] `accounts.pepper` is set to 64+ random hex characters and backed up with the config
+- [ ] Google and Facebook redirect URIs match `accounts.base_url` exactly
 - [ ] Log directory (`grape_private/logs/`) exists with 0750 permissions
 - [ ] `cleanup.php` runs as CLI only (has `php_sapi_name()` guard)
 - [ ] Database user has minimal privileges (SELECT, INSERT, UPDATE, DELETE on app tables only)
@@ -161,6 +197,7 @@ All files must use plain ASCII only. No em dashes, curly quotes, or Unicode char
 3. Clear browser cache if CSS/JS changed (or use versioned query strings)
 4. No build step required
 5. When files are renamed or split, delete the old ones from the server too. The 2026-09-27 split replaced `calendar.js` with `calendar-core.js`, `calendar-users.js`, `calendar-grid.js`, `calendar-rank.js`, `calendar-booking.js`, `calendar-main.js`, and `admin.js` with `admin-core.js`, `admin-calendars.js`, `admin-hubs.js`, `admin-setup.js`; `api.php` now needs `includes/http.php`, `data.php`, `security.php`, `sessions.php` and `hubs.php`. Upload `api.php` together with the new includes, and the HTML pages together with their new scripts.
+6. **Accounts release:** run migration 007, add the `accounts` block to `config.php`, then upload `api.php`, all of `includes/` (new `accounts.php`, `oauth.php`), `cleanup.php`, every HTML page, `account.html`, `account.js`, `account-core.js`, `account.css`, `passkey.js`, the `calendar-*.js`, `admin-*.js` (new `admin-accounts.js`), `hub.js`, `index.js` and the CSS files. Existing PIN names and Hubs keep working as "claimable" until migration 008.
 
 ## Monitoring
 
@@ -173,5 +210,5 @@ All files must use plain ASCII only. No em dashes, curly quotes, or Unicode char
 
 - The app is designed for shared hosting with tens of thousands of calendar entries
 - Rate limiting uses a MariaDB upsert pattern (known race condition, acceptable at current scale)
-- Session tokens are stored in DB, not files (works across load-balanced instances)
+- Account sessions are stored in DB, not files (works across load-balanced instances)
 - No external dependencies at runtime (no CDNs, no npm, no build)

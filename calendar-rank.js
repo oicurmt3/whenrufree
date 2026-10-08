@@ -1,6 +1,6 @@
 /**
  * calendar-rank.js - Calendar page Best Match: calendar links, share, rank scores, sort/limit toggles, organiser message, chosen slot.
- * Classic script sharing global scope. Load order: passkey.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
+ * Classic script sharing global scope. Load order: passkey.js, account-core.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
  */
 'use strict';
 

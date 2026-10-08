@@ -22,8 +22,9 @@
       -webkit-font-smoothing:antialiased;
     }
   </style>
-  <link rel="stylesheet" href="hub.css?v=20260927a">
+  <link rel="stylesheet" href="hub.css?v=20260927b">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
+  <link rel="stylesheet" href="account.css?v=20260927c">
 </head>
 <body>
   <div class="hub-wrap">
@@ -37,13 +38,9 @@
         <input type="text" id="hubTitle" maxlength="80" placeholder='e.g. "Netball Club"' autocomplete="off">
       </div>
       <div class="field">
-        <label for="organiserName">Your name (organiser)</label>
-        <input type="text" id="organiserName" maxlength="32" placeholder="Your display name" autocomplete="name">
-      </div>
-      <div class="field">
-        <label for="organiserPin">4-digit PIN</label>
-        <input type="password" id="organiserPin" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="0000" autocomplete="new-password">
-        <p class="hint">Remember this PIN &mdash; it is not stored in the download file. Used to manage the Hub.</p>
+        <label for="organiserName">Organiser name shown on the Hub</label>
+        <input type="text" id="organiserName" maxlength="32" placeholder="Your profile name" autocomplete="off">
+        <p class="hint">Leave blank to use your profile name. Only your account can manage this Hub.</p>
       </div>
       <div class="field hideme" id="hubAccessWrap">
         <div id="hubAccessField"></div>
@@ -62,16 +59,12 @@
           <h1 id="hubTitleDisplay"><span class="material-symbols-outlined">hub</span> Hub</h1>
           <div class="hub-controls">
             <span id="organiserBadge" class="organiser-badge hideme"></span>
-            <button type="button" id="organiserLoginBtn" class="btn btn-secondary btn-small">Organiser login</button>
-            <button type="button" id="organiserPasskeyBtn" class="btn btn-ghost btn-passkey-toggle hideme">
-              <span class="material-symbols-outlined" aria-hidden="true">fingerprint</span>
-              <span>Passkey</span>
-            </button>
+            <button type="button" id="claimHubBtn" class="btn btn-secondary btn-small hideme" aria-haspopup="dialog">Claim this Hub</button>
             <button type="button" id="organiserSettingsBtn" class="btn btn-ghost btn-passkey-toggle hideme" aria-haspopup="dialog">
               <span class="material-symbols-outlined" aria-hidden="true">settings</span>
               <span>Settings</span>
             </button>
-            <button type="button" id="organiserLogoutBtn" class="btn btn-ghost hideme">Logout</button>
+            <span id="accountBadge"></span>
           </div>
         </div>
 
@@ -147,7 +140,7 @@
           <li>This is your only chance to get this link from us automatically.</li>
           <li>If you lose the Hub link, <strong>it cannot be recovered</strong>.</li>
           <li>Bookmark it, download the text file, or email it to yourself now.</li>
-          <li>Your organiser PIN is <strong>not</strong> included in the download &mdash; remember it separately.</li>
+          <li>Only you, signed in to this account, can manage the Hub.</li>
         </ul>
       </div>
 
@@ -182,20 +175,11 @@
     </div>
   </div>
 
-  <!-- PIN modal -->
-  <div id="pinModal" class="modal-overlay hideme" role="dialog" aria-modal="true">
+  <!-- Claim an old Hub (created before sign-in accounts) with its organiser PIN, once -->
+  <div id="pinModal" class="modal-overlay hideme" role="dialog" aria-modal="true" aria-labelledby="pinModalTitle">
     <div class="modal">
-      <h2>Organiser PIN</h2>
-      <div id="pinPasskeyWrap" class="hideme">
-        <button type="button" id="pinPasskeyBtn" class="btn btn-passkey" aria-label="Use passkey: fingerprint, face or screen lock">
-          <span class="passkey-icons" aria-hidden="true">
-            <span class="material-symbols-outlined">fingerprint</span><span class="material-symbols-outlined">face</span><span class="material-symbols-outlined">pattern</span>
-          </span>
-          Use Passkey
-        </button>
-        <p class="passkey-or">or enter your PIN</p>
-      </div>
-      <p>Enter your 4-digit PIN.</p>
+      <h2 id="pinModalTitle">Claim this Hub</h2>
+      <p>Enter the 4-digit organiser PIN you used for this Hub. After this it belongs to your account and the PIN is deleted.</p>
       <div class="pin-field">
         <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" autocomplete="off">
         <button type="button" id="togglePinVisibility" class="pin-toggle" aria-label="Show PIN">
@@ -205,32 +189,7 @@
       <div class="error" id="pinError"></div>
       <div class="modal-actions">
         <button type="button" id="pinCancelBtn" class="btn btn-cancel">Cancel</button>
-        <button type="button" id="pinConfirmBtn" class="btn btn-confirm">Unlock</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Passkeys: set up on this device, or manage every device for the Hub organiser -->
-  <div id="passkeyModal" class="modal-overlay hideme" role="dialog" aria-modal="true">
-    <div class="modal">
-      <div id="passkeySetup">
-        <h2>Set up a passkey?</h2>
-        <div class="passkey-offer-icons" aria-hidden="true">
-          <span class="material-symbols-outlined">fingerprint</span><span class="material-symbols-outlined">face</span><span class="material-symbols-outlined">pattern</span>
-        </div>
-        <p>Next time, unlock with your <strong>fingerprint</strong>, <strong>face</strong> or <strong>screen lock</strong> (for example Touch ID, Face ID, Windows Hello, or your phone's PIN or pattern) instead of typing your 4-digit PIN.</p>
-        <p class="passkey-offer-note">Only for this device. Your fingerprint or face never leaves it, and your PIN still works as a backup.</p>
-      </div>
-      <div id="passkeyManageHead" class="hideme">
-        <h2><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">fingerprint</span> Passkeys</h2>
-        <p>Devices that can open organiser tools with your fingerprint, face or screen lock instead of the PIN. Your PIN always works as a backup.</p>
-      </div>
-      <p class="passkey-others-title hideme" id="passkeyOthersTitle">Passkeys on other devices</p>
-      <ul class="passkey-list hideme" id="passkeyList"></ul>
-      <div class="error" id="passkeyError"></div>
-      <div class="modal-actions">
-        <button type="button" id="passkeyClose" class="btn btn-cancel">Not now</button>
-        <button type="button" id="passkeyAdd" class="btn btn-confirm">Set up passkey</button>
+        <button type="button" id="pinConfirmBtn" class="btn btn-confirm">Claim</button>
       </div>
     </div>
   </div>
@@ -248,8 +207,9 @@
   </div>
 
   <div id="toast"></div>
-  <script src="passkey.js?v=20260926d" defer></script>
+  <script src="passkey.js?v=20260927a" defer></script>
+  <script src="account-core.js?v=20260927c" defer></script>
   <script src="emoji.js?v=20260926b" defer></script>
-  <script src="hub.js?v=20260927a" defer></script>
+  <script src="hub.js?v=20260927b" defer></script>
 </body>
 </html>

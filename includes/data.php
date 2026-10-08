@@ -150,5 +150,5 @@ function buildAvailabilitySummary(PDO $pdo, int $calId, string $from, string $to
 
 /** Respond 409 when a unique display_name constraint is violated. */
 function respondDuplicateName(): void {
-    respond(409, ['status' => 'error', 'message' => 'Name already taken']);
+    respond(409, ['status' => 'error', 'code' => 'NAME_TAKEN', 'message' => 'Someone on this calendar already uses that name. Add a letter or number to make it unique.']);
 }

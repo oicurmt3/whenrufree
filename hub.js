@@ -1,8 +1,5 @@
 'use strict';
 
-const GROUP_AUTH_CACHE_PREFIX = 'wruf_group_auth_';
-const CREATOR_AUTH_KEY = 'hub_creator_auth';
-
 function qs(sel) { return document.querySelector(sel); }
 function showToast(msg) {
   const t = qs('#toast');
@@ -88,8 +85,8 @@ const hubSaveKit = {
       'INSTRUCTIONS',
       '- Share the Hub link with your group so they can pick a calendar.',
       '- Bookmark this link - it cannot be recovered if lost.',
-      '- Your organiser PIN is NOT stored here. Remember it separately.',
-      '- Each calendar inside the Hub has its own link and participant PINs.',
+      '- Everyone signs in (Google, Facebook or passkey) to open the Hub and its calendars.',
+      '- Only the organiser account can manage the Hub.',
       '',
       window.location.origin
     ].join('\n');
@@ -144,7 +141,7 @@ const hubSaveKit = {
       'If you lose the full link, enter the code on the Go page:',
       goUrl,
       '',
-      'Remember your organiser PIN separately - it is not included here.',
+      'Sign in with the same account to manage the Hub.',
       '',
       'Share this link with participants so they can pick a calendar.'
     ].join('\n');
@@ -452,33 +449,36 @@ function requireHubAccess() {
   return accessGatePromise;
 }
 
-/** fetch() with X-Access-Grant; after the emoji popup succeeds the request is sent again. */
+/**
+ * fetch() with X-Access-Grant; after the emoji popup succeeds the request is sent again.
+ * Signed-out / unfinished accounts get the sign-in panel instead (the promise then never settles).
+ */
 async function accessFetch(url, opts = {}) {
   for (let tries = 0; ; tries++) {
     const headers = { ...(opts.headers || {}) };
     const grants = (window.AccessEmoji && state.token) ? AccessEmoji.grantHeader([`g_${state.token}`]) : '';
     if (grants) headers['X-Access-Grant'] = grants;
     const resp = await fetch(url, { ...opts, headers });
-    if (resp.status !== 403 || tries >= 2 || !window.AccessEmoji || !state.token) return resp;
+    if (resp.status !== 401 && resp.status !== 403) return resp;
     let data = null;
     try { data = await resp.clone().json(); } catch (e) { data = null; }
+    if (data && window.Account && Account.handleApiError(data)) return new Promise(() => {});
+    if (resp.status !== 403 || tries >= 2 || !window.AccessEmoji || !state.token) return resp;
     if (!data || data.code !== 'ACCESS_REQUIRED') return resp;
     await requireHubAccess();
   }
 }
 
-async function apiGet(action, params = {}, withAuth = false) {
+async function apiGet(action, params = {}) {
   const url = new URL('api.php', window.location.href);
   url.searchParams.set('action', action);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const headers = {};
-  if (withAuth && state.auth?.token) headers['X-Group-Auth-Token'] = state.auth.token;
-  const resp = await accessFetch(url.toString(), { credentials: 'same-origin', headers });
+  const resp = await accessFetch(url.toString(), { credentials: 'same-origin' });
   return resp.json();
 }
 
-/** POST to a Hub action (?g=) with CSRF, plus the organiser session when withAuth. */
-async function hubPost(action, body = {}, withAuth = false) {
+/** POST to a Hub action (?g=) with CSRF. Who you are comes from the account cookie. */
+async function hubPost(action, body = {}) {
   const url = new URL('api.php', window.location.href);
   url.searchParams.set('action', action);
   url.searchParams.set('g', state.token);
@@ -486,7 +486,6 @@ async function hubPost(action, body = {}, withAuth = false) {
     'Content-Type': 'application/json',
     'X-CSRF-Token': (await ensureCsrfToken()) || ''
   };
-  if (withAuth && state.auth?.token) headers['X-Group-Auth-Token'] = state.auth.token;
   const resp = await accessFetch(url.toString(), {
     method: 'POST',
     headers,
@@ -496,54 +495,16 @@ async function hubPost(action, body = {}, withAuth = false) {
   return resp.json();
 }
 
-// -------------------------
-// Group auth cache
-// -------------------------
-
-function groupAuthCacheKey(token) {
-  return GROUP_AUTH_CACHE_PREFIX + token;
-}
-
-function cacheGroupAuth(token, auth) {
-  try {
-    localStorage.setItem(groupAuthCacheKey(token), JSON.stringify({
-      token: auth.auth_token,
-      role: auth.role,
-      organiser_name: auth.organiser_name,
-      exp: Date.now() + 86400000
-    }));
-  } catch (e) { /* ignore */ }
-}
-
-function getCachedGroupAuth(token) {
-  try {
-    const raw = localStorage.getItem(groupAuthCacheKey(token));
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (!obj?.token || obj.exp < Date.now()) {
-      localStorage.removeItem(groupAuthCacheKey(token));
-      return null;
-    }
-    return obj;
-  } catch (e) {
-    return null;
-  }
-}
-
-function clearCachedGroupAuth(token) {
-  try { localStorage.removeItem(groupAuthCacheKey(token)); } catch (e) { /* ignore */ }
-}
-
 const state = {
   token: null,
   title: '',
-  auth: null,
+  auth: null,             // { organiser_name } when your account organises this Hub
+  claimable: false,       // Old Hub with an organiser PIN that no account has claimed yet
+  organiserName: '',
   calendars: [],
   accessAvailable: false, // Server has the access emoji tables (group_meta.group.access.available)
   accessField: null,      // Create form emoji switch (AccessEmoji.field)
-  hubEmoji: null,         // The Hub's emoji position, loaded for the logged-in organiser
-  passkeysEnabled: false, // Server has fingerprint / face unlock tables (group_meta.group.passkeys)
-  platformPasskey: false  // This device has a built-in fingerprint / face / screen-lock authenticator
+  hubEmoji: null          // The Hub's emoji position, loaded for the organiser
 };
 
 // -------------------------
@@ -596,13 +557,6 @@ function showSaveHubPanel(meta) {
   continueBtn.onclick = () => {
     if (!ack.checked) return;
     overlay.classList.add('hideme');
-    try {
-      sessionStorage.setItem(CREATOR_AUTH_KEY, JSON.stringify({
-        token: meta.token,
-        organiser_pin: meta.organiser_pin || '',
-        organiser_name: meta.organiser_name || ''
-      }));
-    } catch (e) { /* ignore */ }
     window.location.href = `hub.html?g=${encodeURIComponent(meta.token)}`;
   };
 }
@@ -617,18 +571,15 @@ async function createHub() {
   try {
     const title = (qs('#hubTitle').value || '').trim().replace(/\s+/g, ' ');
     const organiserName = (qs('#organiserName').value || '').trim().replace(/\s+/g, ' ');
-    const organiserPin = (qs('#organiserPin').value || '').trim();
-
-    if (!organiserName || !/^\d{4}$/.test(organiserPin)) {
-      alert('Please enter your name and a valid 4-digit PIN.');
+    if (organiserName && !/^[A-Za-z0-9][A-Za-z0-9'\- ]{0,31}$/.test(organiserName)) {
+      alert("Organiser name: use letters, numbers, spaces, ' or - (up to 32).");
       return;
     }
 
     const accessEmoji = state.accessField ? state.accessField.value : null;
     const body = {
       title: title || null,
-      organiser_name: organiserName,
-      organiser_pin: organiserPin
+      organiser_name: organiserName
     };
     if (accessEmoji !== null) body.access_emoji = accessEmoji;
 
@@ -643,17 +594,16 @@ async function createHub() {
       body: JSON.stringify(body)
     });
     const data = await resp.json();
+    if (window.Account && Account.handleApiError(data)) return;
 
     if (data.status !== 'success' || !data.token) {
-      throw new Error(data.message || 'Create failed');
+      alert(data.message || 'Failed to create Hub. Please try again.');
+      return;
     }
-    if (data.access_grant) AccessEmoji.saveGrant(`g_${data.token}`, data.access_grant, data.expires_at);
 
     showSaveHubPanel({
       token: data.token,
       title: data.title || title || 'Untitled Hub',
-      organiser_name: organiserName,
-      organiser_pin: organiserPin,
       access_emoji: accessEmoji
     });
   } catch (e) {
@@ -728,9 +678,9 @@ function getHubMeta() {
 /** Loads the Hub's emoji for the organiser's copy / share / email / download buttons. */
 async function loadHubEmoji() {
   state.hubEmoji = null;
-  if (!state.auth?.token || !state.accessAvailable) return;
+  if (!state.auth || !state.accessAvailable) return;
   try {
-    const data = await apiGet('access_settings', { g: state.token }, true);
+    const data = await apiGet('access_settings', { g: state.token });
     if (data.status === 'success' && window.AccessEmoji && AccessEmoji.valid(data.emoji)) {
       state.hubEmoji = data.emoji;
     }
@@ -762,16 +712,14 @@ function updateHubPublicUI() {
 }
 
 function updateOrganiserUI() {
-  const loginBtn = qs('#organiserLoginBtn');
-  const logoutBtn = qs('#organiserLogoutBtn');
   const badge = qs('#organiserBadge');
   const organiserBtns = document.querySelectorAll('.hub-action-organiser');
 
+  qs('#claimHubBtn').classList.toggle('hideme', !!state.auth || !state.claimable);
+  badge.classList.toggle('hideme', !state.organiserName);
+  badge.textContent = state.auth ? `Organiser: ${state.organiserName} (you)` : `Organiser: ${state.organiserName}`;
+
   if (state.auth) {
-    loginBtn.classList.add('hideme');
-    logoutBtn.classList.remove('hideme');
-    badge.classList.remove('hideme');
-    badge.textContent = state.auth.organiser_name || 'Organiser';
     organiserBtns.forEach(btn => btn.classList.remove('hideme'));
 
     qs('#barShareBtn').onclick = () => hubSaveKit.shareHubLink(getHubMeta());
@@ -779,19 +727,8 @@ function updateOrganiserUI() {
     qs('#barPosterBtn').onclick = () => hubSaveKit.openHubPosterPopup(getHubMeta());
     qs('#barDownloadBtn').onclick = () => hubSaveKit.downloadHubDetailsTxt(getHubMeta());
   } else {
-    loginBtn.classList.remove('hideme');
-    logoutBtn.classList.add('hideme');
-    badge.classList.add('hideme');
     organiserBtns.forEach(btn => btn.classList.add('hideme'));
   }
-
-  const pkBtn = qs('#organiserPasskeyBtn');
-  const pkOn = passkeysUsable() && !!Passkey.deviceCredential(passkeyId());
-  const showPk = !!state.auth && passkeysUsable();
-  pkBtn.classList.toggle('hideme', !showPk);
-  pkBtn.classList.toggle('on', pkOn);
-  pkBtn.title = pkOn ? 'Passkey is on for this device - manage passkeys' : 'Set up a passkey';
-  pkBtn.setAttribute('aria-label', pkBtn.title);
 
   const showSettings = !!state.auth && state.accessAvailable && !!window.AccessEmoji;
   qs('#organiserSettingsBtn').classList.toggle('hideme', !showSettings);
@@ -802,7 +739,7 @@ function updateOrganiserUI() {
 // -------------------------
 
 async function openHubSettings() {
-  if (!state.auth?.token || !window.AccessEmoji) return;
+  if (!state.auth || !window.AccessEmoji) return;
   const modal = qs('#settingsModal');
   const fieldEl = qs('#settingsAccessField');
   const errEl = qs('#settingsError');
@@ -810,7 +747,7 @@ async function openHubSettings() {
   fieldEl.innerHTML = '<p class="ae-note">Loading...</p>';
   modal.classList.remove('hideme');
 
-  const data = await apiGet('access_settings', { g: state.token }, true);
+  const data = await apiGet('access_settings', { g: state.token });
   if (data.status !== 'success' || !data.available) {
     fieldEl.innerHTML = '';
     errEl.textContent = data.message || 'Settings are not available yet.';
@@ -832,7 +769,7 @@ async function openHubSettings() {
       } else if (saved !== null && !confirm('Change the emoji? Everyone will need to pick the new one.')) {
         return false;
       }
-      const res = await hubPost('set_group_access_emoji', { emoji: next }, true);
+      const res = await hubPost('set_group_access_emoji', { emoji: next });
       if (res.status !== 'success') {
         errEl.textContent = res.message || 'Could not save the emoji.';
         return false;
@@ -857,10 +794,9 @@ async function loadHubView() {
   state.title = data.group?.title || 'Hub';
   state.calendars = data.calendars || [];
   state.accessAvailable = data.group?.access?.available === true;
-  state.passkeysEnabled = data.group?.passkeys === true;
-  if (state.passkeysEnabled && window.Passkey && !state.platformPasskey) {
-    state.platformPasskey = await Passkey.platformAvailable();
-  }
+  state.organiserName = data.group?.organiser_name || '';
+  state.auth = data.group?.is_organiser === true ? { organiser_name: state.organiserName } : null;
+  state.claimable = data.group?.claimable === true;
 
   const displayTitle = state.title || 'Hub';
   qs('#hubTitleDisplay').innerHTML =
@@ -873,57 +809,16 @@ async function loadHubView() {
   updateOrganiserUI();
 }
 
-async function authGroup(pin) {
-  const url = new URL('api.php', window.location.href);
-  url.searchParams.set('action', 'auth_group');
-  url.searchParams.set('g', state.token);
-
-  const resp = await accessFetch(url.toString(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': (await ensureCsrfToken()) || ''
-    },
-    credentials: 'same-origin',
-    body: JSON.stringify({ pin })
-  });
-  return resp.json();
-}
-
-async function tryAutoAuthCreator() {
-  try {
-    const raw = sessionStorage.getItem(CREATOR_AUTH_KEY);
-    if (!raw) return false;
-    const c = JSON.parse(raw);
-    if (c.token !== state.token || !c.organiser_pin) return false;
-    sessionStorage.removeItem(CREATOR_AUTH_KEY);
-
-    const authData = await authGroup(c.organiser_pin);
-    if (authData.status === 'success' && authData.auth_token) {
-      state.auth = {
-        token: authData.auth_token,
-        role: authData.role,
-        organiser_name: authData.organiser_name || c.organiser_name
-      };
-      cacheGroupAuth(state.token, authData);
-      return true;
-    }
-  } catch (e) {
-    console.warn('Auto auth failed', e);
-  }
-  return false;
-}
+// -------------------------
+// Claim an old Hub (created before sign-in accounts) with its organiser PIN, once
+// -------------------------
 
 function showPinModal() {
   qs('#pinModal').classList.remove('hideme');
   qs('#pinInput').value = '';
   setPinVisible(false);
   qs('#pinError').textContent = '';
-
-  const hasPasskey = passkeysUsable() && !!Passkey.deviceCredential(passkeyId());
-  qs('#pinPasskeyWrap').classList.toggle('hideme', !hasPasskey);
-  // The device prompt only opens when the button is pressed (Enter works: the button gets focus).
-  qs(hasPasskey ? '#pinPasskeyBtn' : '#pinInput').focus();
+  qs('#pinInput').focus();
 }
 
 function hidePinModal() {
@@ -937,204 +832,33 @@ function setPinVisible(show) {
   btn.setAttribute('aria-label', show ? 'Hide PIN' : 'Show PIN');
 }
 
-async function confirmPinLogin() {
+async function confirmClaimHub() {
   const pin = (qs('#pinInput').value || '').trim();
   if (!/^\d{4}$/.test(pin)) {
     qs('#pinError').textContent = 'Enter a 4-digit PIN';
     return;
   }
-
-  const data = await authGroup(pin);
-  if (data.status !== 'success') {
-    qs('#pinError').textContent = data.message || 'Invalid PIN';
-    return;
-  }
-
-  finishOrganiserLogin(data);
-  maybeOfferPasskey();
-}
-
-/** Applies a successful organiser login (PIN or passkey). */
-function finishOrganiserLogin(data) {
-  state.auth = {
-    token: data.auth_token,
-    role: data.role,
-    organiser_name: data.organiser_name
-  };
-  cacheGroupAuth(state.token, data);
-  hidePinModal();
-  updateOrganiserUI();
-  renderCalendarGrid();
-  showToast('Logged in as organiser');
-  loadHubEmoji();
-}
-
-// -------------------------
-// Passkeys: fingerprint / face / device screen lock login (PIN stays as backup)
-// -------------------------
-
-function passkeyId() { return `hub_${state.token}`; }
-function passkeysUsable() { return state.passkeysEnabled && !!window.Passkey && Passkey.supported(); }
-
-async function unlockWithPasskey() {
-  const btn = qs('#pinPasskeyBtn');
-  const errEl = qs('#pinError');
-  errEl.textContent = '';
+  const btn = qs('#pinConfirmBtn');
   btn.disabled = true;
   try {
-    const begin = await hubPost('passkey_login_begin');
-    if (begin.status !== 'success') {
-      if (begin.code === 'NO_PASSKEY') {
-        Passkey.forgetDevice(passkeyId());
-        qs('#pinPasskeyWrap').classList.add('hideme');
-      }
-      throw new Error(begin.message || 'Passkey sign-in failed. Use your PIN.');
-    }
-    const credential = await Passkey.get(begin.publicKey);
-    const data = await hubPost('passkey_login_finish', { credential });
+    const data = await hubPost('claim_hub', { pin });
     if (data.status !== 'success') {
-      if (data.code === 'NO_PASSKEY') {
-        Passkey.forgetDevice(passkeyId());
-        qs('#pinPasskeyWrap').classList.add('hideme');
-      }
-      throw new Error(data.message || 'Passkey sign-in failed. Use your PIN.');
-    }
-    Passkey.rememberDevice(passkeyId(), credential.rawId);
-    finishOrganiserLogin(data);
-  } catch (e) {
-    if (Passkey.isCancel(e)) {
-      qs('#pinInput').focus();
+      qs('#pinError').textContent = data.message || 'Could not claim this Hub.';
       return;
     }
-    errEl.textContent = e.message || 'Passkey sign-in failed. Use your PIN.';
+    hidePinModal();
+    await loadHubView();
+    loadHubEmoji();
+    showToast('Hub claimed - it now belongs to your account');
+  } catch (e) {
+    qs('#pinError').textContent = 'Could not claim this Hub. Try again.';
   } finally {
     btn.disabled = false;
   }
 }
 
-/** After a PIN login, offers fingerprint / face unlock once per Hub on capable devices. */
-async function maybeOfferPasskey() {
-  if (!passkeysUsable() || !state.platformPasskey) return;
-  const id = passkeyId();
-  if (Passkey.deviceCredential(id) || Passkey.wasDismissed(id)) return;
-  openPasskeyWindow(true);
-}
-
-/** Registers this device for the logged-in organiser. Returns true when fingerprint unlock is on. */
-async function enrolPasskey(errEl, btn) {
-  if (!state.auth?.token) return false;
-  const id = passkeyId();
-  const fail = (msg) => { if (errEl) errEl.textContent = msg; else showToast(msg); };
-
-  if (btn) btn.disabled = true;
-  if (errEl) errEl.textContent = '';
-  try {
-    const begin = await hubPost('passkey_register_begin', {}, true);
-    if (begin.status !== 'success') {
-      fail(begin.message || 'Could not add a passkey.');
-      return false;
-    }
-    const credential = await Passkey.create(begin.publicKey);
-    const res = await hubPost('passkey_register_finish', { credential, device_label: Passkey.deviceLabel() }, true);
-    if (res.status !== 'success' && res.code !== 'PASSKEY_EXISTS') {
-      fail(res.message || 'Could not add a passkey.');
-      return false;
-    }
-    Passkey.rememberDevice(id, res.credential_id || credential.rawId);
-    showToast('Passkey added on this device');
-    return true;
-  } catch (e) {
-    if (Passkey.isDuplicate(e)) {
-      Passkey.rememberDevice(id, null);
-      showToast('Passkey added on this device');
-      return true;
-    }
-    if (!Passkey.isCancel(e)) fail('Could not add a passkey.');
-    return false;
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-/**
- * The Passkeys window for the Hub organiser (toolbar Passkey button, or once after a PIN login).
- * On a device without a passkey it shows the setup prompt, plus any passkeys on other devices
- * so a lost phone can still be removed. Once this device has one, it lists every device.
- * silent: opened automatically after a PIN login, so list errors are not shown.
- */
-async function openPasskeyWindow(silent = false) {
-  if (!state.auth?.token) return;
-  const id = passkeyId();
-  const modal = qs('#passkeyModal');
-  const listEl = qs('#passkeyList');
-  const errEl = qs('#passkeyError');
-  const addBtn = qs('#passkeyAdd');
-  let credentials = [];
-  let loaded = false;
-
-  const render = () => {
-    const mine = loaded ? Passkey.syncDevice(id, credentials) : Passkey.deviceCredential(id);
-    const setup = !mine;
-    modal.classList.toggle('is-setup', setup);
-    qs('#passkeySetup').classList.toggle('hideme', !setup);
-    qs('#passkeyManageHead').classList.toggle('hideme', setup);
-    qs('#passkeyOthersTitle').classList.toggle('hideme', !(loaded && setup && credentials.length));
-    listEl.classList.toggle('hideme', !loaded || (setup && !credentials.length));
-    if (loaded) Passkey.renderList(listEl, credentials, mine, removeDevice);
-    addBtn.classList.toggle('hideme', !setup);
-    qs('#passkeyClose').textContent = setup ? 'Not now' : 'Close';
-    updateOrganiserUI();
-  };
-
-  const removeDevice = async (cred, btn) => {
-    const isThis = cred.credential_id === Passkey.deviceCredential(id);
-    const what = isThis ? 'this device' : (cred.device_label || 'this device');
-    if (!confirm(`Remove the passkey from ${what}? The PIN still works.`)) return;
-    btn.disabled = true;
-    errEl.textContent = '';
-    const res = await hubPost('passkey_remove', { credential_id: cred.credential_id }, true);
-    if (res.status !== 'success') {
-      btn.disabled = false;
-      errEl.textContent = res.message || 'Could not remove this device.';
-      return;
-    }
-    if (isThis) Passkey.forgetDevice(id);
-    Passkey.signalRemoved(cred.credential_id);
-    credentials = Array.isArray(res.credentials) ? res.credentials : [];
-    render();
-    showToast('Passkey removed');
-  };
-
-  errEl.textContent = '';
-  render();
-  modal.classList.remove('hideme');
-  qs('#passkeyClose').onclick = () => {
-    if (!Passkey.deviceCredential(id)) Passkey.dismiss(id);
-    modal.classList.add('hideme');
-  };
-  addBtn.onclick = async () => {
-    if (await enrolPasskey(errEl, addBtn)) {
-      modal.classList.add('hideme');
-      updateOrganiserUI();
-    }
-  };
-
-  try {
-    const res = await hubPost('passkey_list', {}, true);
-    if (res.status !== 'success') {
-      if (!silent) errEl.textContent = res.message || 'Could not load devices.';
-      return;
-    }
-    credentials = Array.isArray(res.credentials) ? res.credentials : [];
-    loaded = true;
-    render();
-  } catch (e) {
-    if (!silent) errEl.textContent = 'Could not load devices. Check your connection.';
-  }
-}
-
 async function removeCalendarFromHub(calToken, btn) {
-  if (!state.auth?.token) return;
+  if (!state.auth) return;
   if (!confirm('Remove this calendar from the Hub? The calendar itself will still work at its own link.')) return;
 
   btn.disabled = true;
@@ -1147,8 +871,7 @@ async function removeCalendarFromHub(calToken, btn) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': (await ensureCsrfToken()) || '',
-        'X-Group-Auth-Token': state.auth.token
+        'X-CSRF-Token': (await ensureCsrfToken()) || ''
       },
       credentials: 'same-origin',
       body: JSON.stringify({})
@@ -1166,19 +889,6 @@ async function removeCalendarFromHub(calToken, btn) {
   }
 }
 
-function tryRestoreCachedAuth() {
-  const cached = getCachedGroupAuth(state.token);
-  if (cached) {
-    state.auth = {
-      token: cached.token,
-      role: cached.role || 'admin',
-      organiser_name: cached.organiser_name
-    };
-    return true;
-  }
-  return false;
-}
-
 async function initViewMode() {
   state.token = getGroupTokenFromUrl();
   if (!state.token || !/^[A-Za-z0-9_-]{8,64}$/.test(state.token)) {
@@ -1187,45 +897,33 @@ async function initViewMode() {
     return;
   }
 
+  const me = await Account.require();
+  Account.renderBadge(me, qs('#accountBadge'));
   qs('#viewSection').classList.remove('hideme');
 
   await loadHubView();
-
-  const autoAuth = await tryAutoAuthCreator();
-  if (!autoAuth) tryRestoreCachedAuth();
   loadHubEmoji();
 
-  updateHubPublicUI();
-  updateOrganiserUI();
-  renderCalendarGrid();
-
-  qs('#organiserLoginBtn').addEventListener('click', showPinModal);
-  qs('#organiserLogoutBtn').addEventListener('click', () => {
-    state.auth = null;
-    clearCachedGroupAuth(state.token);
-    updateOrganiserUI();
-    renderCalendarGrid();
-    showToast('Logged out');
-  });
-  qs('#pinConfirmBtn').addEventListener('click', confirmPinLogin);
+  qs('#claimHubBtn').addEventListener('click', showPinModal);
+  qs('#pinConfirmBtn').addEventListener('click', confirmClaimHub);
   qs('#pinCancelBtn').addEventListener('click', hidePinModal);
   qs('#togglePinVisibility').addEventListener('click', () => setPinVisible(qs('#pinInput').type === 'password'));
-  qs('#pinPasskeyBtn').addEventListener('click', unlockWithPasskey);
-  qs('#organiserPasskeyBtn').addEventListener('click', () => openPasskeyWindow());
   qs('#organiserSettingsBtn').addEventListener('click', openHubSettings);
   qs('#settingsClose').addEventListener('click', () => qs('#settingsModal').classList.add('hideme'));
   qs('#pinInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') confirmPinLogin();
+    if (e.key === 'Enter') confirmClaimHub();
   });
 }
 
-function initCreateMode() {
+async function initCreateMode() {
+  const me = await Account.require();
   qs('#createSection').classList.remove('hideme');
+  if (me.display_name) qs('#organiserName').placeholder = me.display_name;
   qs('#createHubBtn').addEventListener('click', createHub);
   initCreateAccessField();
 }
 
-/** Shows the optional emoji switch under the PIN once the server supports it. */
+/** Shows the optional emoji switch once the server supports it. */
 async function initCreateAccessField() {
   if (!window.AccessEmoji) return;
   try {
@@ -1247,7 +945,7 @@ async function initCreateAccessField() {
 
 async function init() {
   if (isCreateMode()) {
-    initCreateMode();
+    await initCreateMode();
     return;
   }
 

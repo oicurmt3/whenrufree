@@ -1,6 +1,6 @@
 /**
- * calendar-main.js - Calendar page startup: event wiring, session restore and init.
- * Classic script sharing global scope. Load order: passkey.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
+ * calendar-main.js - Calendar page startup: event wiring, sign-in check and init.
+ * Classic script sharing global scope. Load order: passkey.js, account-core.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
  */
 'use strict';
 
@@ -129,78 +129,6 @@ els.submitBtn.addEventListener('click', async ()=>{
   }
 });
 
-/*** Auto-authenticate calendar creator (called once on page load after creation) */
-async function tryAutoAuthCreator(){
-  try {
-    const raw = sessionStorage.getItem('creator_auth');
-    if(!raw) return false;
-    
-    const creds = JSON.parse(raw);
-    // Clear immediately to prevent reuse
-    sessionStorage.removeItem('creator_auth');
-    
-    // Verify this is for the current calendar
-    if(creds.token !== state.token) return false;
-    
-    // Find the admin user by name
-    const adminUser = state.users.find(u => 
-      u.role === 'admin' && 
-      u.display_name.toLowerCase() === creds.admin_name.toLowerCase()
-    );
-    
-    if(!adminUser) {
-      console.warn('Creator auto-auth: admin user not found');
-      return false;
-    }
-    
-    // Authenticate with the stored PIN
-    const res = await apiPost('auth_user', {
-      user_id: adminUser.id, 
-      pin: creds.admin_pin
-    });
-    
-    if(res.status !== 'success') {
-      console.warn('Creator auto-auth failed:', res.message);
-      return false;
-    }
-    
-    // Success - set up the user session
-    state.currentUserId = adminUser.id;
-    state.currentUserName = `${adminUser.display_name} (organiser)`;
-    state.currentUserRole = adminUser.role;
-    cacheAuth(adminUser.id, res.auth_token, res.role, 86400);
-    
-    console.log('Creator auto-authenticated as:', adminUser.display_name);
-    return true;
-  } catch(e) {
-    console.warn('Creator auto-auth error:', e);
-    // Clear any corrupted data
-    try { sessionStorage.removeItem('creator_auth'); } catch(x){}
-    return false;
-  }
-}
-
-/**
- * Restores a cached user session from localStorage on page load.
- * Checks all users for a valid cached auth token and restores the first found.
- * This allows users to stay logged in across page refreshes.
- */
-function tryRestoreCachedSession(){
-  for(const u of state.users){
-    const cached = getCachedAuth(u.id);
-    if(cached){
-      // Found valid cached auth - restore session
-      state.currentUserId = u.id;
-      state.currentUserName = u.role === 'admin' ? `${u.display_name} (organiser)` : u.display_name;
-      state.currentUserRole = u.role;
-      state.auth.set(u.id, cached);
-      console.log('Restored cached session for:', u.display_name);
-      return true;
-    }
-  }
-  return false;
-}
-
 /*** Initialise */
 async function init(){
   // Restore hide-past-dates preference from session
@@ -216,19 +144,13 @@ async function init(){
     alert('Missing or invalid calendar token. Go back to the home page to create one.');
     window.location.href='index.html'; return;
   }
+  const me = await Account.require();
+  Account.renderBadge(me, els.accountBadge);
   try{
     await loadCalendarMeta();
     await loadUsers();
-    
-    // Auto-authenticate creator if they just created this calendar
-    const creatorAuth = await tryAutoAuthCreator();
-    
-    // If no creator auth, try to restore cached session from localStorage
-    if(!creatorAuth){
-      tryRestoreCachedSession();
-    }
 
-    // Restore any unsaved pending changes for the selected user
+    // Restore any unsaved pending changes for your name
     if(state.currentUserId){
       state.pending = restorePendingForUser(state.currentUserId);
     }

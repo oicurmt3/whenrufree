@@ -1,6 +1,6 @@
 /**
  * admin-calendars.js - Calendars tab: list, search, sort, selection, delete, bulk delete, pagination and the Users expander.
- * Classic script sharing global scope. Load order: emoji.js, admin-core.js, admin-calendars.js, admin-hubs.js, admin-setup.js.
+ * Classic script sharing global scope. Load order: emoji.js, admin-core.js, admin-calendars.js, admin-hubs.js, admin-accounts.js, admin-setup.js.
  */
 'use strict';
 
@@ -651,8 +651,9 @@ function renderUserPills(calendarId) {
         (function(u) {
             var isAdmin = u.role === 'admin';
             var label = isAdmin ? u.display_name + ' (organiser)' : u.display_name;
+            if (!u.has_account) label += ' - not claimed';
             var btn = document.createElement('button');
-            btn.className = 'user-pill' + (isAdmin ? ' is-admin' : '');
+            btn.className = 'user-pill' + (isAdmin ? ' is-admin' : '') + (u.has_account ? '' : ' is-unclaimed');
             btn.title = 'Click to delete ' + label;
             btn.appendChild(document.createTextNode(label + ' '));
             var icon = document.createElement('span');

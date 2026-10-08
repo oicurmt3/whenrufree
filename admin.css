@@ -76,6 +76,29 @@ html, body {
   color: var(--primary);
 }
 
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border-dark);
+}
+
+.login-hint {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .form-group {
   margin-bottom: 20px;
 }
@@ -513,6 +536,35 @@ html, body {
   font-size: 28px;
 }
 
+/* ============================================
+   ACCOUNTS TAB
+   ============================================ */
+.account-stats { margin-bottom: 16px; }
+.account-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+.account-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+.account-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+.account-stat-value { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+.account-stat-label { font-size: 0.8rem; color: var(--text-muted); }
+.account-note { font-size: 0.85rem; color: var(--text-muted); margin: 8px 0; }
+
 /* Spinner animation */
 @keyframes spin {
   from { transform: rotate(0deg); }
@@ -707,6 +759,7 @@ html, body {
   font-weight:600;
 }
 .user-pill.is-admin:hover{background:#c5cae9;}
+.user-pill.is-unclaimed{border-style:dashed;}
 .user-pill .pill-icon{
   font-size:16px;
   color:var(--danger);

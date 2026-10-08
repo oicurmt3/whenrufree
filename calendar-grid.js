@@ -1,6 +1,6 @@
 /**
  * calendar-grid.js - Calendar page grid: availability fetch, slot status, date filter, grid skeleton, past dates, slot click, save and reset.
- * Classic script sharing global scope. Load order: passkey.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
+ * Classic script sharing global scope. Load order: passkey.js, account-core.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
  */
 'use strict';
 
@@ -441,15 +441,8 @@ function onSlotClick(dateStr, slotId){
     showToast('Calendar finalised - no changes allowed.');
     return;
   }
-  // Check if no user is selected - show user select modal
-  if(!state.currentUserId){
-    openUserSelectModal();
-    return;
-  }
-  const auth = state.auth.get(state.currentUserId);
-  if(!auth){
-    const u = state.users.find(x => x.id === state.currentUserId);
-    openPinModal(state.currentUserId, u);
+  if(!state.currentUserId || !state.auth.get(state.currentUserId)){
+    promptJoin();
     return;
   }
   const {status}=getStatus(state.currentUserId, dateStr, slotId);
@@ -509,12 +502,11 @@ async function savePending(isAutosave = false){
   setLoading(true, isAutosave ? 'Auto-saving...' : 'Saving...');
   state.isSaving = true;
 
-  const postSave = async (authToken) => {
+  const postSave = async () => {
     const url=new URL('api.php', window.location.href);
     url.searchParams.set('action','save');
     url.searchParams.set('c', state.token);
     const headers={'Content-Type':'application/json'};
-    if(authToken) headers['X-Auth-Token']=authToken;
     const csrf = await ensureCsrfToken();
     if(csrf) headers['X-CSRF-Token']=csrf;
     const resp = await accessFetch(url.toString(), {
@@ -544,7 +536,7 @@ async function savePending(isAutosave = false){
     let bookingsClosed = false;
     for(let attempt=1; attempt<=maxAttempts; attempt++){
       try{
-        const res = await postSave(auth.token);
+        const res = await postSave();
         if(res.data && res.data.status === 'success'){
           lastErr = null;
           saveData = res.data;
@@ -663,7 +655,7 @@ async function resetMyAvailability(){
   
   const auth = state.auth.get(state.currentUserId);
   if(!auth){
-    showToast('Please unlock your name first.');
+    showToast('Join this calendar first.');
     return;
   }
   

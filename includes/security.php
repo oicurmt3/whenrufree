@@ -1,17 +1,12 @@
 <?php
 /**
- * includes/security.php - Database connection, security log, per-IP rate limiting, admin login lockout and session, PIN hashing and lockout wrappers.
+ * includes/security.php - Database connection, security log, per-IP rate limiting, admin login lockout and session, old-PIN checks (claiming) and lockout wrappers.
  * Loaded by api.php.
  */
 
 declare(strict_types=1);
 
-function hashPin(string $pin): ?string {
-    $pin = trim($pin);
-    if (!preg_match('/^\d{4}$/', $pin)) return null;
-    return password_hash($pin, PASSWORD_DEFAULT);
-}
-
+/** Old PINs are only checked, never created: claim_name / claim_hub. */
 function verifyPin(string $pin, string $hash): bool {
     $pin = trim($pin);
     if (!preg_match('/^\d{4}$/', $pin)) return false;
@@ -108,17 +103,22 @@ function isSensitivePostAction(string $action): bool {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return false;
     static $sensitive = [
         'admin_login',
-        'auth_user',
-        'auth_group',
+        'admin_login_account',
+        'claim_name',
+        'claim_hub',
         'create_calendar',
         'create_group',
         'save',
-        'add_user',
-        'passkey_register_begin',
-        'passkey_register_finish',
-        'passkey_login_begin',
-        'passkey_login_finish',
-        'passkey_remove',
+        'join_calendar',
+        'account_update',
+        'account_remove_method',
+        'account_delete',
+        'account_passkey_signup_begin',
+        'account_passkey_signup_finish',
+        'account_passkey_add_begin',
+        'account_passkey_add_finish',
+        'account_passkey_login_begin',
+        'account_passkey_login_finish',
         'access_check',
         'set_access_emoji',
         'set_group_access_emoji',
@@ -238,6 +238,23 @@ function recordFailedAttempt(PDO $pdo, int $userId): ?int {
 
 function resetFailedAttempts(PDO $pdo, int $userId): void {
     pinLockoutReset($pdo, 'user', $userId);
+}
+
+/** Account ids allowed to open the admin panel without the password (config admin.account_ids). */
+function adminAccountIds(array $config): array {
+    $ids = $config['admin']['account_ids'] ?? [];
+    if (!is_array($ids)) return [];
+    return array_values(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0));
+}
+
+/** Start a 1-hour admin session; returns the token and a CSRF token for the panel. */
+function adminIssueSession(): array {
+    startSecureSession();
+    session_regenerate_id(true);
+    $adminToken = bin2hex(random_bytes(32));
+    $_SESSION['admin_token'] = $adminToken;
+    $_SESSION['admin_token_expires'] = time() + 3600;
+    return ['admin_token' => $adminToken, 'csrf_token' => generateCsrfToken()];
 }
 
 /**

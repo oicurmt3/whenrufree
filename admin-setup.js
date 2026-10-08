@@ -1,6 +1,6 @@
 /**
  * admin-setup.js - Setup tab: site config editor (slots, options, presets, dates, retention) and save/reload.
- * Classic script sharing global scope. Load order: emoji.js, admin-core.js, admin-calendars.js, admin-hubs.js, admin-setup.js.
+ * Classic script sharing global scope. Load order: emoji.js, admin-core.js, admin-calendars.js, admin-hubs.js, admin-accounts.js, admin-setup.js.
  */
 'use strict';
 

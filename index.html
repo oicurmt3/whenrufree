@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="description" content="Arrange a time when everyone in your group is available. Create free shared calendars, schedule availability, and plan events - no sign-up required.">
+  <meta name="description" content="Arrange a time when everyone in your group is available. Create free shared calendars, schedule availability, and plan events - no ads, no tracking.">
   <!-- Prevents leaking the calendar token in the Referer header -->
   <meta name="referrer" content="no-referrer">
-  <title>When RU Free - no login required</title>
+  <title>When RU Free - free group availability planner</title>
 
 
 
@@ -41,11 +41,15 @@
   <!-- Page styles -->
   <link rel="stylesheet" href="index.css?v=20260926g">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
+  <link rel="stylesheet" href="account.css?v=20260927c">
 </head>
 <body>
   <div class="card">
-    <h1><span class="material-symbols-outlined" style="vertical-align:middle;padding-bottom:5px;">calendar_month</span> When RU Free?</h1>
-    <p class="sub"><strong>When RU Free</strong> helps your group arrange a time when everyone is available. Create free shared calendars, schedule availability, and plan events - no login required. </p>
+    <div class="acct-page-head">
+      <h1><span class="material-symbols-outlined" style="vertical-align:middle;padding-bottom:5px;">calendar_month</span> When RU Free?</h1>
+      <span id="accountBadge"></span>
+    </div>
+    <p class="sub"><strong>When RU Free</strong> helps your group arrange a time when everyone is available. Create free shared calendars, schedule availability, and plan events. Sign in with Google, Facebook or a passkey &mdash; we never see or store your email, and there are no ads or tracking.</p>
     
     <div class="info-box">
       Use <a href="https://whenrufree.net/ideas.html">these templates</a> to get started quickly, or create your own calendar from scratch below.
@@ -83,7 +87,7 @@ celebration
 
     
     <div class="warn">
-      <strong>What does it look like?</strong> Try a <a href="https://whenrufree.net/calendar.html?c=3PNpKJTs" target="_blank">working example</a> (use the name "Guest" with PIN "0000"). *The organiser's choices are highlighted as a coloured bar on the left of the Slot</em>.
+      <strong>What does it look like?</strong> Try a <a href="https://whenrufree.net/calendar.html?c=3PNpKJTs" target="_blank">working example</a> (sign in, then join with any name). *The organiser's choices are highlighted as a coloured bar on the left of the Slot</em>.
     </div>
 
 
@@ -334,35 +338,11 @@ celebration
     <!-- Organiser (Admin) -->
     <div class="section">
       <h2>Organiser</h2>
-      <div class="field" style="max-width:240px;">
-        <label for="adminName">Organiser name</label>
-        <input id="adminName" type="text" maxlength="40" placeholder="e.g., Bob" required />
-        <p class="hint hideme">This user will show at the top of the calendar with "(organiser)".</p>
+      <div class="field" style="max-width:320px;">
+        <label for="adminName">Your name on this calendar</label>
+        <input id="adminName" type="text" maxlength="32" placeholder="Your profile name" autocomplete="off" />
+        <p class="hint">Leave blank to use your profile name. You manage the calendar from this account &mdash; no PIN needed.</p>
         <div id="adminNameErr" class="error"></div>
-      </div>
-
-      <div class="field" style="max-width:160px;">
-        <label for="adminPin">4-digit PIN</label>
-        <div class="pin-field">
-          <input id="adminPin" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" placeholder="Numbers only" required />
-          <button type="button" id="toggleAdminPin" class="pin-toggle" aria-label="Show PIN">
-            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
-          </button>
-        </div>
-        <p class="hint hideme" >Needed to access your calendar.</p>
-        <div id="adminPinErr" class="error"></div>
-      </div>
-
-      <div class="field" style="max-width:160px;">
-        <label for="adminPin2">Confirm 4-digit PIN</label>
-        <div class="pin-field">
-          <input id="adminPin2" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" placeholder="re-enter PIN" required />
-          <button type="button" id="toggleAdminPin2" class="pin-toggle" aria-label="Show PIN">
-            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
-          </button>
-        </div>
-        <p class="hint hideme">Enter the same 4 digits again.</p>
-        <div id="adminPin2Err" class="error"></div>
       </div>
 
       <!-- Access emoji (optional; shown once migrations/003 has run) -->
@@ -432,10 +412,9 @@ celebration
       <div class="warn-strong">
         <strong>Important &mdash; read before continuing</strong>
         <ul>
-          <li>This is your only chance to get this link from us automatically.</li>
-          <li>If you lose the calendar link, <strong>it cannot be recovered</strong>.</li>
+          <li>The link is the invite: share it with your group so they can sign in and join.</li>
           <li>Bookmark it, download the text file, or email it to yourself now.</li>
-          <li>Your organiser PIN is <strong>not</strong> included in the download &mdash; remember it separately.</li>
+          <li>While you are signed in to this account, the calendar is also listed on your <a href="account.html" target="_blank">profile page</a>.</li>
         </ul>
       </div>
 
@@ -473,7 +452,9 @@ celebration
   <div id="toast"></div>
 
   <!-- Page script -->
+  <script src="passkey.js?v=20260927a" defer></script>
+  <script src="account-core.js?v=20260927c" defer></script>
   <script src="emoji.js?v=20260926b" defer></script>
-  <script src="index.js?v=20260926n" defer></script>
+  <script src="index.js?v=20260927a" defer></script>
 </body>
 </html>

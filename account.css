@@ -1,0 +1,448 @@
+/* ============================================
+   ACCOUNT.CSS - Sign-in panel, profile badge and toast (account-core.js),
+   shared by every page, plus the profile page (account.html).
+   Class names start with acct- so they never clash with page styles.
+   ============================================ */
+
+:root {
+  --acct-bg: #f4f5f7;
+  --acct-card: #ffffff;
+  --acct-border: #d5d8dd;
+  --acct-text: #2b2f36;
+  --acct-muted: #5f6570;
+  --acct-primary: #3f51b5;
+  --acct-primary-dark: #303f9f;
+  --acct-danger: #b00020;
+  --acct-radius: 10px;
+}
+
+body.acct-locked {
+  overflow: hidden;
+}
+
+/* ---------- Sign-in overlay ---------- */
+.acct-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(228, 230, 234, 0.97);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.acct-box {
+  width: min(420px, 100%);
+  background: var(--acct-card);
+  border: 1px solid var(--acct-border);
+  border-radius: var(--acct-radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  padding: 22px 20px 16px;
+  color: var(--acct-text);
+}
+
+.acct-title {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  color: var(--acct-text);
+  border: none;
+  padding: 0;
+  background: none;
+}
+
+.acct-text {
+  margin: 0 0 16px;
+  color: var(--acct-muted);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.acct-links {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--acct-muted);
+}
+
+.acct-links a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* ---------- Buttons (shape and size shared; colour by function) ---------- */
+.acct-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.acct-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: filter 0.15s ease, transform 0.08s ease;
+}
+
+/* Sign-in panel: every method laid out like Google's button (Google requires equal prominence):
+   icon 12px from the left edge, 10px gap, label centred in the remaining space. */
+.acct-methods .acct-btn {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 12px;
+  gap: 10px;
+  border-radius: 4px;
+  font-family: 'Roboto', arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+}
+
+.acct-methods .acct-btn-label { flex-grow: 1; }
+
+.acct-methods .acct-btn-label,
+.acct-btn-facebook .acct-btn-label { font-family: inherit; }
+
+.acct-btn-label { min-width: 0; }
+
+.acct-logo {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  flex-shrink: 0;
+  display: block;
+}
+
+.acct-list .acct-logo { margin: 2px; }
+.acct-list .acct-logo-facebook { color: #1877f2; }
+
+.acct-btn:hover { filter: brightness(0.95); }
+.acct-btn:active { transform: translateY(1px); }
+.acct-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.acct-btn:focus-visible { outline: 3px solid #9fa8da; outline-offset: 2px; }
+
+.acct-btn .material-symbols-outlined { font-size: 20px; }
+
+.acct-btn-primary { background: var(--acct-primary); color: #fff; }
+.acct-btn-secondary { background: #e8eaf6; color: var(--acct-primary-dark); border-color: #c5cae9; }
+.acct-btn-ghost { background: #fff; color: var(--acct-text); border-color: var(--acct-border); }
+.acct-btn-danger { background: var(--acct-danger); color: #fff; }
+.acct-btn-facebook {
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 4px;
+  background: #1877f2;
+  color: #fff;
+  border-color: #1877f2;
+  font-family: 'Roboto', arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+}
+.acct-btn-facebook:hover { filter: none; background: #166fe5; border-color: #166fe5; }
+.acct-btn-small { min-height: 44px; padding: 8px 12px; font-size: 0.9rem; }
+
+/* ---------- Sign in with Google button ----------
+   Google's HTML button from https://developers.google.com/identity/branding-guidelines, as generated
+   by its configurator. Required for Google app verification: keep the colours, font, padding and
+   logo size. Only the height is raised from 40px to the site's 44px touch target. */
+.gsi-material-button {
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  -webkit-appearance: none;
+  background-color: #fff;
+  background-image: none;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #1f1f1f;
+  cursor: pointer;
+  font-family: 'Roboto', arial, sans-serif;
+  font-size: 14px;
+  height: 44px;
+  letter-spacing: 0.25px;
+  outline: none;
+  overflow: hidden;
+  padding: 0 12px;
+  position: relative;
+  text-align: center;
+  transition: background-color 0.218s, border-color 0.218s, box-shadow 0.218s;
+  vertical-align: middle;
+  white-space: nowrap;
+  width: auto;
+  max-width: 400px;
+  min-width: min-content;
+}
+
+.gsi-material-button .gsi-material-button-icon {
+  height: 20px;
+  margin-right: 10px;
+  min-width: 20px;
+  width: 20px;
+}
+
+.gsi-material-button .gsi-material-button-content-wrapper {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  height: 100%;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+}
+
+.gsi-material-button .gsi-material-button-contents {
+  flex-grow: 1;
+  font-family: 'Roboto', arial, sans-serif;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+.gsi-material-button .gsi-material-button-state {
+  transition: opacity 0.218s;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.gsi-material-button:disabled {
+  cursor: default;
+  background-color: #ffffff61;
+  border-color: #1f1f1f1f;
+}
+
+.gsi-material-button:disabled .gsi-material-button-contents,
+.gsi-material-button:disabled .gsi-material-button-icon {
+  opacity: 38%;
+}
+
+.gsi-material-button:not(:disabled):active .gsi-material-button-state,
+.gsi-material-button:not(:disabled):focus .gsi-material-button-state {
+  background-color: #303030;
+  opacity: 12%;
+}
+
+.gsi-material-button:not(:disabled):hover {
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+
+.gsi-material-button:not(:disabled):hover .gsi-material-button-state {
+  background-color: #303030;
+  opacity: 8%;
+}
+
+.gsi-material-button:focus-visible { outline: 3px solid #9fa8da; outline-offset: 2px; }
+
+.acct-methods .gsi-material-button { width: 100%; max-width: none; }
+
+.acct-status {
+  min-height: 1.2em;
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--acct-muted);
+  text-align: center;
+}
+
+/* ---------- Profile badge (page headers) ---------- */
+.acct-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 22px;
+  background: #fff;
+  border: 1px solid var(--acct-border);
+  color: var(--acct-text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  max-width: 220px;
+}
+
+.acct-badge-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Page title with the profile badge on the right */
+.acct-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.acct-page-head h1 { margin-right: auto; }
+
+/* ---------- Toast ---------- */
+.acct-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 10001;
+  background: #333;
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  max-width: min(460px, calc(100% - 24px));
+  font-size: 0.95rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- Profile page (account.html) ---------- */
+.acct-page {
+  background: var(--acct-bg);
+}
+
+.acct-page .card {
+  width: min(760px, 100%);
+}
+
+.acct-section {
+  background: var(--acct-card);
+  border: 1px solid var(--acct-border);
+  border-radius: var(--acct-radius);
+  padding: 14px;
+  margin: 12px 0;
+}
+
+.acct-section h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  border: none;
+  padding: 0;
+}
+
+.acct-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.acct-field label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.acct-field input {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--acct-border);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: #fff;
+}
+
+.acct-field input:focus {
+  outline: 3px solid #c5cae9;
+  border-color: var(--acct-primary);
+}
+
+.acct-hint {
+  font-size: 0.85rem;
+  color: var(--acct-muted);
+}
+
+.acct-error {
+  color: var(--acct-danger);
+  font-size: 0.9rem;
+  min-height: 1.2em;
+  margin: 4px 0 0;
+}
+
+.acct-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.acct-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.acct-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eceef1;
+}
+
+.acct-list li:last-child { border-bottom: none; }
+
+.acct-list .material-symbols-outlined { color: var(--acct-muted); }
+
+.acct-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.acct-item-text a,
+.acct-item-text strong {
+  color: var(--acct-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.acct-item-sub {
+  font-size: 0.85rem;
+  color: var(--acct-muted);
+}
+
+.acct-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #e8eaf6;
+  color: var(--acct-primary-dark);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.acct-empty {
+  color: var(--acct-muted);
+  font-size: 0.95rem;
+}
+
+.acct-danger-zone {
+  border-color: #f1b8c0;
+}
+
+@media (max-width: 600px) {
+  .acct-box { padding: 18px 14px 12px; }
+  .acct-row .acct-btn,
+  .acct-row .gsi-material-button { flex: 1 1 auto; max-width: none; }
+  .acct-badge { max-width: 160px; }
+}

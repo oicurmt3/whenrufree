@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <meta name="description" content="Your When RU Free profile: your name, sign-in methods, calendars and Hubs.">
+  <title>Your profile - When RU Free</title>
+  <link rel="stylesheet" href="page.css">
+  <link rel="stylesheet" href="account.css?v=20260927c">
+</head>
+<body class="acct-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <div class="card">
+    <div class="top-actions">
+      <h1 style="margin:0;"><span class="material-symbols-outlined" aria-hidden="true">account_circle</span> Your profile</h1>
+      <a class="acct-btn acct-btn-ghost acct-btn-small" href="index.html">Home</a>
+    </div>
+
+    <main id="main-content">
+      <p id="loading" class="acct-empty">Loading...</p>
+
+      <!-- Signed out -->
+      <section id="signedOut" class="acct-section hide" aria-labelledby="signedOutTitle">
+        <h2 id="signedOutTitle">Sign in</h2>
+        <p class="sub">You need a free account to open, join or create calendars and Hubs. We never get your email, name or photo from Google or Facebook - only a private ID we keep scrambled.</p>
+        <div id="signInButtons"></div>
+      </section>
+
+      <!-- First sign-in: choose a username and a name -->
+      <section id="setup" class="acct-section hide" aria-labelledby="setupTitle">
+        <h2 id="setupTitle">Welcome! Set up your account</h2>
+        <form id="setupForm" novalidate>
+          <div class="acct-field">
+            <label for="setupUsername">Username</label>
+            <input id="setupUsername" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required>
+            <span class="acct-hint">Private - only you see it. 3-20 lowercase letters, numbers or _.</span>
+          </div>
+          <div class="acct-field">
+            <label for="setupName">Your name on calendars</label>
+            <input id="setupName" name="display_name" autocomplete="nickname" maxlength="32" required>
+            <span class="acct-hint">Others see this on calendars you join. You can use a different name on any calendar.</span>
+          </div>
+          <p id="setupError" class="acct-error" role="alert"></p>
+          <button type="submit" class="acct-btn acct-btn-primary">Save and continue</button>
+        </form>
+      </section>
+
+      <!-- Signed in -->
+      <div id="signedIn" class="hide">
+        <section class="acct-section" aria-labelledby="profileTitle">
+          <h2 id="profileTitle">Profile</h2>
+          <form id="profileForm" novalidate>
+            <div class="acct-field">
+              <label for="profileName">Your name on calendars</label>
+              <input id="profileName" name="display_name" autocomplete="nickname" maxlength="32" required>
+              <span class="acct-hint">Changing it also changes your name on every calendar where you haven't picked a different one.</span>
+            </div>
+            <div class="acct-field">
+              <label for="profileUsername">Username (private)</label>
+              <input id="profileUsername" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required>
+            </div>
+            <p id="profileError" class="acct-error" role="alert"></p>
+            <p id="profileNote" class="acct-hint" role="status"></p>
+            <button type="submit" class="acct-btn acct-btn-primary">Save profile</button>
+          </form>
+        </section>
+
+        <section class="acct-section" aria-labelledby="calTitle">
+          <h2 id="calTitle">Your calendars</h2>
+          <ul id="calendarList" class="acct-list"></ul>
+        </section>
+
+        <section class="acct-section" aria-labelledby="hubTitle">
+          <h2 id="hubTitle">Your Hubs</h2>
+          <ul id="hubList" class="acct-list"></ul>
+        </section>
+
+        <section class="acct-section" aria-labelledby="methodsTitle">
+          <h2 id="methodsTitle">Ways to sign in</h2>
+          <p class="sub">Add more than one so you can still get in if you lose a device or stop using a service.</p>
+          <ul id="methodList" class="acct-list"></ul>
+          <div id="addMethods" class="acct-row" style="margin-top:10px;"></div>
+          <p id="methodStatus" class="acct-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="acct-section" aria-labelledby="signOutTitle">
+          <h2 id="signOutTitle">Sign out</h2>
+          <p class="sub">Signs out on this device only. You stay signed in for 30 days on each device you use, unless you sign out.</p>
+          <button id="signOutBtn" type="button" class="acct-btn acct-btn-ghost">
+            <span class="material-symbols-outlined" aria-hidden="true">logout</span> Sign out
+          </button>
+        </section>
+
+        <section class="acct-section acct-danger-zone" aria-labelledby="deleteTitle">
+          <h2 id="deleteTitle">Delete account</h2>
+          <p class="sub">Deletes your account, your sign-in methods, your names and availability on every calendar, and every calendar and Hub you organise. This can't be undone.</p>
+          <button id="deleteStartBtn" type="button" class="acct-btn acct-btn-danger">Delete my account...</button>
+          <div id="deleteConfirm" class="hide" style="margin-top:12px;">
+            <div id="deleteSummary" class="acct-hint"></div>
+            <div class="acct-field" style="margin-top:10px;">
+              <label for="deleteTyped">Type your username to confirm</label>
+              <input id="deleteTyped" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="20">
+            </div>
+            <p id="deleteError" class="acct-error" role="alert"></p>
+            <div class="acct-row">
+              <button id="deleteCancelBtn" type="button" class="acct-btn acct-btn-ghost">Cancel</button>
+              <button id="deleteBtn" type="button" class="acct-btn acct-btn-danger">Delete everything</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <p class="muted" style="margin-top: 10px;">
+      <a href="privacy.html" style="color:inherit; text-decoration:underline;">Privacy</a>
+      <span aria-hidden="true"> | </span>
+      <a href="terms.html" style="color:inherit; text-decoration:underline;">Terms</a>
+      <span aria-hidden="true"> | </span>
+      <a href="faq.html" style="color:inherit; text-decoration:underline;">FAQs</a>
+      <span aria-hidden="true"> | </span>
+      <a href="go/" style="color:inherit; text-decoration:underline;">Go to code</a>
+    </p>
+  </div>
+
+  <script src="passkey.js?v=20260927a"></script>
+  <script src="account-core.js?v=20260927c"></script>
+  <script src="account.js?v=20260927c"></script>
+</body>
+</html>

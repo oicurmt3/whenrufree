@@ -1,6 +1,6 @@
 /**
  * admin-hubs.js - Hubs tab: list, search, sort, selection, delete, bulk delete, pagination and the calendars expander.
- * Classic script sharing global scope. Load order: emoji.js, admin-core.js, admin-calendars.js, admin-hubs.js, admin-setup.js.
+ * Classic script sharing global scope. Load order: emoji.js, admin-core.js, admin-calendars.js, admin-hubs.js, admin-accounts.js, admin-setup.js.
  */
 'use strict';
 

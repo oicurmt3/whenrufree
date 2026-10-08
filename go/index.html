@@ -58,7 +58,10 @@
     .go-btn:hover{background:#303f9f;}
     .go-footer{margin-top:20px;font-size:0.82rem;color:#999;}
     .go-footer a{color:#666;text-decoration:underline;}
+    .go-account{margin-top:12px;display:flex;justify-content:center;}
+    .go-account:has(#accountBadge:empty){display:none;}
   </style>
+  <link rel="stylesheet" href="../account.css?v=20260927c">
 </head>
 <body>
   <div class="go-card">
@@ -87,8 +90,11 @@
       <a href="../index.html">Create a calendar</a> |
       <a href="../hub.html?create=1">Create a Hub</a>
     </div>
+    <div class="go-account"><span id="accountBadge"></span></div>
   </div>
 
+<script src="../passkey.js?v=20260927a"></script>
+<script src="../account-core.js?v=20260927c"></script>
 <script>
 'use strict';
 
@@ -193,7 +199,9 @@ async function go(){
     url.searchParams.set('c', token);
     const resp = await fetch(url.toString(), { credentials: 'same-origin' });
     const data = await resp.json();
-    if(data.status !== 'success'){
+    if(Account.handleApiError(data)) return;
+    // ACCESS_REQUIRED: a real calendar with an emoji; the calendar page asks for it
+    if(data.status !== 'success' && data.code !== 'ACCESS_REQUIRED'){
       showGoError('Please enter a valid calendar code or link.');
       return;
     }
@@ -225,7 +233,11 @@ codeInput.addEventListener('input', () => {
   codeInput.classList.remove('error');
 });
 
-codeInput.focus();
+document.addEventListener('DOMContentLoaded', async () => {
+  const me = await Account.require();
+  Account.renderBadge(me, document.getElementById('accountBadge'));
+  codeInput.focus();
+});
 </script>
 </body>
 </html>

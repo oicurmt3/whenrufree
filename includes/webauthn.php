@@ -5,9 +5,11 @@
  * Minimal WebAuthn verifier with no Composer dependencies. Supports ES256 (P-256)
  * and RS256 public keys, attestation "none". Adapted from the loyalty app.
  *
- * A passkey subject is either a calendar user or a Hub organiser:
- *   ['kind' => 'user',  'id' => users.id,  'calendar_id' => int, 'name' => string, 'context' => string]
- *   ['kind' => 'group', 'id' => groups.id, 'name' => string, 'context' => string]
+ * A passkey subject is an account:
+ *   ['kind' => 'account', 'id' => accounts.id, 'name' => string, 'context' => string]
+ *
+ * Account passkeys are discoverable, so signing in needs no username: the device offers the
+ * passkeys it holds for this site and the server finds the account from the credential ID.
  */
 
 declare(strict_types=1);
@@ -21,25 +23,6 @@ function webauthnFail(string $message, int $status = 400, ?string $code = null):
     $payload = ['status' => 'error', 'message' => $message];
     if ($code !== null) $payload['code'] = $code;
     respond($status, $payload);
-}
-
-function webauthnTablesReady(PDO $pdo): bool {
-    static $ready = null;
-    if ($ready !== null) return $ready;
-    try {
-        $pdo->query('SELECT 1 FROM user_passkeys LIMIT 1');
-        $pdo->query('SELECT 1 FROM group_passkeys LIMIT 1');
-        $ready = true;
-    } catch (Throwable $e) {
-        $ready = false;
-    }
-    return $ready;
-}
-
-function webauthnRequireTables(PDO $pdo): void {
-    if (!webauthnTablesReady($pdo)) {
-        webauthnFail('Passkeys are not available yet.', 503, 'PASSKEYS_UNAVAILABLE');
-    }
 }
 
 /** Relying-party ID: config webauthn.rp_id, else the request host without port. */
@@ -84,10 +67,18 @@ function webauthnB64uDecode(string $b64u): string {
     return $raw;
 }
 
+/** Challenge key: one account ('a:<id>'), or 'a:*' for a usernameless sign-in. */
 function webauthnSubjectKey(array $subject): string {
-    return $subject['kind'] === 'group'
-        ? 'g:' . (int)$subject['id']
-        : 'u:' . (int)$subject['calendar_id'] . ':' . (int)$subject['id'];
+    return $subject['kind'] === 'discover' ? 'a:*' : 'a:' . (int)$subject['id'];
+}
+
+function webauthnAccountSubject(int $accountId, string $name = ''): array {
+    return ['kind' => 'account', 'id' => $accountId, 'name' => $name, 'context' => ''];
+}
+
+/** WebAuthn user handle for an account: stable, opaque, 32 bytes. */
+function webauthnAccountUserHandle(int $accountId): string {
+    return hash('sha256', 'wruf-' . webauthnSubjectKey(webauthnAccountSubject($accountId)), true);
 }
 
 function webauthnChallengeStore(string $purpose, array $subject): string {
@@ -117,9 +108,7 @@ function webauthnChallengeTake(string $purpose, array $subject): string {
 
 /** @return array{table:string, column:string} */
 function webauthnTableFor(array $subject): array {
-    return $subject['kind'] === 'group'
-        ? ['table' => 'group_passkeys', 'column' => 'group_id']
-        : ['table' => 'user_passkeys', 'column' => 'user_id'];
+    return ['table' => 'account_passkeys', 'column' => 'account_id'];
 }
 
 /** @return list<array{type:string,id:string,transports?:list<string>}> */
@@ -142,7 +131,7 @@ function webauthnCredentialDescriptors(PDO $pdo, array $subject): array {
 function webauthnRegisterOptions(PDO $pdo, array $config, array $subject): array {
     $existing = webauthnCredentialDescriptors($pdo, $subject);
     if (count($existing) >= WEBAUTHN_MAX_PER_SUBJECT) {
-        webauthnFail('Too many passkeys for this name. Remove one first.', 409, 'PASSKEY_LIMIT');
+        webauthnFail('Too many passkeys for this account. Remove one first.', 409, 'PASSKEY_LIMIT');
     }
 
     $label = (string)$subject['name'];
@@ -155,7 +144,7 @@ function webauthnRegisterOptions(PDO $pdo, array $config, array $subject): array
         'challenge' => webauthnChallengeStore('register', $subject),
         'rp' => ['name' => 'When RU Free', 'id' => webauthnRpId($config)],
         'user' => [
-            'id' => webauthnB64uEncode(hash('sha256', 'wruf-' . webauthnSubjectKey($subject), true)),
+            'id' => webauthnB64uEncode(webauthnAccountUserHandle((int)$subject['id'])),
             'name' => $label,
             'displayName' => $label,
         ],
@@ -167,24 +156,10 @@ function webauthnRegisterOptions(PDO $pdo, array $config, array $subject): array
         'attestation' => 'none',
         'excludeCredentials' => $existing,
         'authenticatorSelection' => [
-            'residentKey' => 'discouraged',
-            'requireResidentKey' => false,
+            'residentKey' => 'required',
+            'requireResidentKey' => true,
             'userVerification' => 'required',
         ],
-    ];
-}
-
-function webauthnLoginOptions(PDO $pdo, array $config, array $subject): array {
-    $allow = webauthnCredentialDescriptors($pdo, $subject);
-    if (!$allow) {
-        webauthnFail('A passkey is not set up for this name. Use your PIN.', 404, 'NO_PASSKEY');
-    }
-    return [
-        'challenge' => webauthnChallengeStore('login', $subject),
-        'timeout' => 120000,
-        'rpId' => webauthnRpId($config),
-        'userVerification' => 'required',
-        'allowCredentials' => $allow,
     ];
 }
 
@@ -255,12 +230,6 @@ function webauthnRegisterFinish(PDO $pdo, array $config, array $subject, array $
     }
 
     $t = webauthnTableFor($subject);
-    $cols = $subject['kind'] === 'group'
-        ? 'group_id'
-        : 'calendar_id, user_id';
-    $vals = $subject['kind'] === 'group'
-        ? ':sid'
-        : ':cid, :sid';
     $params = [
         ':sid' => (int)$subject['id'],
         ':cred' => $parsed['credential_id'],
@@ -270,12 +239,11 @@ function webauthnRegisterFinish(PDO $pdo, array $config, array $subject, array $
         ':tr' => $transJson,
         ':lbl' => webauthnCleanLabel($deviceLabel),
     ];
-    if ($subject['kind'] !== 'group') $params[':cid'] = (int)$subject['calendar_id'];
 
     try {
         $pdo->prepare(
-            "INSERT INTO {$t['table']} ({$cols}, credential_id, public_key_pem, alg, sign_count, transports_json, device_label, created_at)
-             VALUES ({$vals}, :cred, :pem, :alg, :sc, :tr, :lbl, NOW())"
+            "INSERT INTO {$t['table']} ({$t['column']}, credential_id, public_key_pem, alg, sign_count, transports_json, device_label, created_at)
+             VALUES (:sid, :cred, :pem, :alg, :sc, :tr, :lbl, NOW())"
         )->execute($params);
     } catch (PDOException $e) {
         if ((string)$e->getCode() === '23000') {
@@ -287,22 +255,43 @@ function webauthnRegisterFinish(PDO $pdo, array $config, array $subject, array $
     return webauthnB64uEncode($parsed['credential_id']);
 }
 
-/** Verify a login assertion for the given subject. Throws a 4xx response on failure. */
-function webauthnLoginFinish(PDO $pdo, array $config, array $subject, array $cred): void {
-    $expected = webauthnChallengeTake('login', $subject);
+/** Options for signing in with a discoverable account passkey (no username needed). */
+function webauthnDiscoverOptions(array $config): array {
+    return [
+        'challenge' => webauthnChallengeStore('login', ['kind' => 'discover', 'id' => 0]),
+        'timeout' => 120000,
+        'rpId' => webauthnRpId($config),
+        'userVerification' => 'required',
+        'allowCredentials' => [],
+    ];
+}
+
+/** Verify a discoverable passkey sign-in and return the account ID it belongs to. */
+function webauthnDiscoverFinish(PDO $pdo, array $config, array $cred): int {
+    $expected = webauthnChallengeTake('login', ['kind' => 'discover', 'id' => 0]);
     $rawId = webauthnB64uDecode((string)($cred['rawId'] ?? $cred['id'] ?? ''));
 
-    $t = webauthnTableFor($subject);
     $stmt = $pdo->prepare(
-        "SELECT id, public_key_pem, sign_count FROM {$t['table']}
-         WHERE credential_id = :cred AND {$t['column']} = :sid LIMIT 1"
+        "SELECT id, account_id, public_key_pem, sign_count FROM account_passkeys
+         WHERE credential_id = :cred LIMIT 1"
     );
-    $stmt->execute([':cred' => $rawId, ':sid' => (int)$subject['id']]);
+    $stmt->execute([':cred' => $rawId]);
     $row = $stmt->fetch();
     if (!$row) {
-        webauthnFail('This passkey is not set up for this name. Use your PIN.', 404, 'NO_PASSKEY');
+        webauthnFail('This passkey is not linked to an account here. Sign in another way, or remove it from your device.', 404, 'NO_PASSKEY');
     }
+    $accountId = (int)$row['account_id'];
 
+    $handle = (string)($cred['response']['userHandle'] ?? '');
+    if ($handle !== '' && !hash_equals(webauthnAccountUserHandle($accountId), webauthnB64uDecode($handle))) {
+        webauthnFail('Passkey could not be verified');
+    }
+    webauthnVerifyAssertion($pdo, $config, 'account_passkeys', $row, $cred, $expected, 'a:' . $accountId);
+    return $accountId;
+}
+
+/** Check an assertion against a stored credential row and bump its counter. */
+function webauthnVerifyAssertion(PDO $pdo, array $config, string $table, array $row, array $cred, string $expected, string $logKey): void {
     $clientDataJSON = webauthnCheckClientData($cred, 'webauthn.get', $expected, $config);
     $authenticatorData = webauthnB64uDecode((string)($cred['response']['authenticatorData'] ?? ''));
     $signature = webauthnB64uDecode((string)($cred['response']['signature'] ?? ''));
@@ -313,7 +302,7 @@ function webauthnLoginFinish(PDO $pdo, array $config, array $subject, array $cre
     $prev = (int)$row['sign_count'];
     $next = $parsed['sign_count'];
     if ($prev > 0 && $next > 0 && $next <= $prev) {
-        logSecurityEvent('PASSKEY_COUNTER_REPLAY', ['subject' => webauthnSubjectKey($subject), 'passkey_id' => (int)$row['id']]);
+        logSecurityEvent('PASSKEY_COUNTER_REPLAY', ['subject' => $logKey, 'passkey_id' => (int)$row['id']]);
         webauthnFail('Passkey could not be verified');
     }
 
@@ -332,7 +321,7 @@ function webauthnLoginFinish(PDO $pdo, array $config, array $subject, array $cre
         webauthnFail('Passkey could not be verified');
     }
 
-    $pdo->prepare("UPDATE {$t['table']} SET sign_count = :sc, last_used_at = NOW() WHERE id = :id")
+    $pdo->prepare("UPDATE {$table} SET sign_count = :sc, last_used_at = NOW() WHERE id = :id")
         ->execute([':sc' => max($prev, $next), ':id' => (int)$row['id']]);
 }
 

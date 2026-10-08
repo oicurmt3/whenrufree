@@ -4,11 +4,13 @@ alwaysApply: true
 
 # Backend
 
-- All endpoints live in the single `api.php` file, dispatched on an action parameter. Shared helpers live in `includes/` (http, data, security, sessions, hubs, webauthn, lockout, access, booking), each with `declare(strict_types=1)`.
+- All endpoints live in the single `api.php` file, dispatched on an action parameter. Shared helpers live in `includes/` (http, data, security, sessions, hubs, accounts, oauth, webauthn, lockout, access, booking), each with `declare(strict_types=1)`.
+- `accountGate()` runs before every action: everything except `csrf_token`, `diag`, `get_site_config`, `account_*`, `oauth_*` and `admin_*` needs a signed-in, set-up account. No auth headers: identity comes from the HttpOnly `wruf_account` cookie; calendar roles from `users.account_id` + `role`; Hub organiser from `groups.organiser_account_id`.
 - PDO prepared statements for MariaDB. Never string-concatenated SQL.
 - CSRF tokens on all POSTs; per-IP rate limiting (default 120/min); sensitive POSTs fail closed if the limiter DB is unavailable.
-- PINs: `password_hash` / `password_verify`. Session tokens: 64-char hex, 24-hour expiry. Calendar/Hub tokens: 8-char URL-safe.
+- Account sessions: 64-char hex cookie stored as SHA-256, 30 days, renewed on use. Provider IDs: HMAC-SHA-256 with `accounts.pepper`. Old PINs are only verified (`password_verify`) when claiming. Calendar/Hub tokens: 8-char URL-safe.
+- Never log cookies, provider IDs, emails or other secrets; log accounts by numeric id only.
 - Client IP from `REMOTE_ADDR`; honour `X-Forwarded-For` only when the direct connection is from `trusted_proxies`.
 - Escape all dynamic HTML output.
 - Security events log to `grape_private/logs/` outside the webroot; config also lives outside the webroot.
-- `cleanup.php` is the cron maintenance script for inactive calendars and Hubs.
+- `cleanup.php` is the cron maintenance script for inactive calendars, Hubs and accounts.

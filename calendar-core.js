@@ -1,6 +1,6 @@
 /**
  * calendar-core.js - Calendar page core: constants, colours, status options, utilities, pending queue, autosave, dates, els, state, CSRF, access gate and API helpers.
- * Classic script sharing global scope. Load order: passkey.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
+ * Classic script sharing global scope. Load order: passkey.js, account-core.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
  */
 'use strict';
 
@@ -613,7 +613,7 @@ function formatDayHeader(dateStr){
 }
 function getDayOfWeek(date){return date.getDay();}
 
-/*** API helpers (X-Auth-Token for save/reset) */
+/*** Page elements and state */
 const els = {
   calendarTitle: qs('#calendarTitle'),
   currentUserDisplay: qs('#currentUserDisplay'),
@@ -649,14 +649,9 @@ const els = {
   userModalText: qs('#userModalText'),
   userNameInput: qs('#userNameInput'),
   userNameErr: qs('#userNameErr'),
-  userPinWrap: qs('#userPinWrap'),
-  userPin2Wrap: qs('#userPin2Wrap'),
-  userPinInput: qs('#userPinInput'),
-  userPin2Input: qs('#userPin2Input'),
-  toggleUserPin: qs('#toggleUserPin'),
-  toggleUserPin2:qs('#toggleUserPin2'),
-  userPinErr: qs('#userPinErr'),
-  userPin2Err: qs('#userPin2Err'),
+  userUseProfileBtn: qs('#userUseProfileBtn'),
+  userClaimHint: qs('#userClaimHint'),
+  userClaimLink: qs('#userClaimLink'),
   userModalError:qs('#userModalError'),
   userModalCancel:qs('#userModalCancel'),
   userModalConfirm:qs('#userModalConfirm'),
@@ -682,16 +677,7 @@ const els = {
   pinModalError: qs('#pinModalError'),
   pinCancel: qs('#pinCancel'),
   pinConfirm: qs('#pinConfirm'),
-  pinPasskeyWrap: qs('#pinPasskeyWrap'),
-  pinPasskeyBtn: qs('#pinPasskeyBtn'),
-  passkeyModal: qs('#passkeyModal'),
-  passkeySetup: qs('#passkeySetup'),
-  passkeyManageHead: qs('#passkeyManageHead'),
-  passkeyOthersTitle: qs('#passkeyOthersTitle'),
-  passkeyList: qs('#passkeyList'),
-  passkeyError: qs('#passkeyError'),
-  passkeyAdd: qs('#passkeyAdd'),
-  passkeyClose: qs('#passkeyClose'),
+  accountBadge: qs('#accountBadge'),
   infoModal: qs('#infoModal'),
   infoModalCancel:qs('#infoModalCancel'),
   infoModalAdd: qs('#infoModalAdd')
@@ -730,15 +716,13 @@ const state = {
   booking:null, // { capacity, perUser, perUserTotal, closed } for booking calendars (null = availability poll)
   bookingView:null, // 'booked' (organiser) / 'mine' (others) / 'free' once chosen; null = default for the role
   expandedRanks:new Set(),
-  auth:new Map(), // user_id -> {token, role, exp}
-  _pendingAuthUserId:null, // Tracks user ID during PIN authentication flow
-  _pendingAuthUserObj:null, // Tracks user object during PIN authentication flow
+  auth:new Map(), // user_id -> {token:true, role}: only your own name (the signed-in account's)
+  account:null, // calendar_meta.account: {profile_name, me, claimable}
+  nameCustom:false, // Your name here differs from your profile name
   accessAvailable:false, // Server has the access emoji tables (calendar_meta.access.available)
   accessEmoji:null, // This calendar's own emoji position (organiser only, for Share)
   accessHubEmoji:false, // Calendar uses its Hub's emoji (organiser only, for Share)
   accessEmojiLoaded:false,
-  passkeysEnabled:false, // Server has fingerprint / face unlock tables (calendar_meta.passkeys)
-  platformPasskey:false, // This device has a built-in fingerprint / face / screen-lock authenticator
   hidePastDates:true // Whether past date columns are currently hidden
 };
 
@@ -818,9 +802,11 @@ async function accessFetch(url, opts={}, extraHubToken=null){
     const grants = window.AccessEmoji ? AccessEmoji.grantHeader(accessGrantKeys(extraHubToken)) : '';
     if(grants) headers['X-Access-Grant'] = grants;
     const resp = await fetch(url, { ...opts, headers });
-    if(resp.status !== 403 || tries >= 2 || !window.AccessEmoji) return resp;
+    if(resp.status !== 401 && resp.status !== 403) return resp;
     let data = null;
     try{ data = await resp.clone().json(); }catch(e){ data = null; }
+    if(window.Account && Account.handleApiError(data)) return new Promise(() => {});
+    if(resp.status !== 403 || tries >= 2 || !window.AccessEmoji) return resp;
     if(!data || data.code !== 'ACCESS_REQUIRED') return resp;
     await requireAccess(data.access || {});
   }
@@ -831,34 +817,22 @@ async function apiGet(action, params={}){
   url.searchParams.set('action', action);
   url.searchParams.set('c', state.token);
   for(const [k,v] of Object.entries(params)) url.searchParams.set(k, v);
-  const headers = {};
-  if (action === 'availability' || action === 'access_settings') {
-    const auth = state.currentUserId
-      ? (state.auth.get(state.currentUserId) || getCachedAuth(state.currentUserId))
-      : null;
-    if (auth?.token) headers['X-Auth-Token'] = auth.token;
-  }
-  const resp = await accessFetch(url.toString(), {
-    credentials:'same-origin',
-    headers
-  });
+  const resp = await accessFetch(url.toString(), { credentials:'same-origin' });
   return resp.json();
 }
 /**
- * Makes an authenticated POST request to the API.
- * Adds X-CSRF-Token and (optionally) X-Auth-Token.
+ * POST to the API with the CSRF token. The signed-in account's session cookie identifies you.
  * @param {string} action
  * @param {Object} body
- * @param {string|null} authToken
+ * @param {*} _unused Ignored: who you are comes from the account cookie
  * @param {string|null} extraHubToken Also send this Hub's access grant (adding to a Hub)
  * @returns {Promise<Object>} Parsed JSON response
  */
-async function apiPost(action, body={}, authToken=null, extraHubToken=null){
+async function apiPost(action, body={}, _unused=null, extraHubToken=null){
   const url=new URL('api.php', window.location.href);
   url.searchParams.set('action', action);
   url.searchParams.set('c', state.token);
   const headers={'Content-Type':'application/json'};
-  if(authToken) headers['X-Auth-Token']=authToken;
   const csrf = await ensureCsrfToken();
   if(csrf) headers['X-CSRF-Token']=csrf;
   const resp = await accessFetch(url.toString(), {

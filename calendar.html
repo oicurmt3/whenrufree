@@ -34,8 +34,9 @@
     }
   </style>
   <!-- App styles -->
-  <link rel="stylesheet" href="calendar.css?v=20260926t">
+  <link rel="stylesheet" href="calendar.css?v=20260927a">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
+  <link rel="stylesheet" href="account.css?v=20260927c">
 </head>
 <body>
 <header>
@@ -47,12 +48,14 @@
     <span id="serverStatus" class="server-status hide">Checking Server...</span>
   </div>
   <div class="controls">
-    <!-- User select icon button (opens modal) -->
-    <button id="userSelectBtn" class="btn btn-ghost icon-btn" type="button" title="Select user" aria-label="Select user" aria-haspopup="dialog">
-      <span class="material-symbols-outlined" aria-hidden="true">person</span>
+    <!-- Profile link (signed-in account) -->
+    <span id="accountBadge"></span>
+    <!-- People on this calendar (opens modal) -->
+    <button id="userSelectBtn" class="btn btn-ghost icon-btn" type="button" title="People" aria-label="People on this calendar" aria-haspopup="dialog">
+      <span class="material-symbols-outlined" aria-hidden="true">group</span>
     </button>
-    <!-- Edit name (admin only) -->
-    <button id="renameBtn" class="btn btn-ghost icon-btn" type="button" disabled title="Edit name" aria-label="Edit name" style="display:none;">
+    <!-- Your name on this calendar (after joining) -->
+    <button id="renameBtn" class="btn btn-ghost icon-btn" type="button" disabled title="Your name on this calendar" aria-label="Your name on this calendar" style="display:none;">
       <span class="material-symbols-outlined" aria-hidden="true">person_edit</span>
     </button>
     <!-- Share (admin only) -->
@@ -89,13 +92,13 @@
 <main>
   <section class="analysis-section">
     <div id="nameBanner" class="analysis-card" style="display:none;">
-      <h3 class="analysis-title"> Add your name to start </h3>
+      <h3 class="analysis-title"> Join this calendar to start </h3>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
         <p style="margin:0; color:#555; line-height:1.4; flex:1; min-width:220px;">
-          <b>Step 1:</b> Add your name and set a 4-digit PIN, then tap time-slots and press <b>Submit</b>.
+          <b>Step 1:</b> Tap <b>Join</b> to add your name, then tap time-slots and press <b>Submit</b>.
           You must <b>Submit/Save</b> to protect the calendar from cleanup.
         </p>
-        <button id="bannerAddBtn" class="btn btn-submit is-submit icon-btn" type="button" title="Add your name" aria-label="Add your name">
+        <button id="bannerAddBtn" class="btn btn-submit is-submit icon-btn" type="button" title="Join" aria-label="Join this calendar">
           <span class="material-symbols-outlined" aria-hidden="true">person_add</span>
         </button>
       </div>
@@ -178,8 +181,8 @@
 <!-- User Selection Modal -->
 <div class="modal-overlay" id="userSelectModal">
   <div class="modal">
-    <h2>Select Name</h2>
-    <p>Choose your name from the list below, or <a href="#" id="userSelectAddLink" class="add-name-link">Add Your Name</a>.</p>
+    <h2>People</h2>
+    <p id="userSelectIntro">Everyone on this calendar. <a href="#" id="userSelectAddLink" class="add-name-link">Join</a></p>
     <div class="user-select-list" id="userSelectList">
       <!-- Users will be populated here by JS -->
     </div>
@@ -189,65 +192,38 @@
   </div>
 </div>
 
-<!-- Add / Rename user Modal -->
+<!-- Join / your name on this calendar -->
 <div class="modal-overlay" id="userModal">
   <div class="modal">
-    <h2 id="userModalTitle">Add your name</h2>
-    <p id="userModalText">Enter your name and a 4-digit PIN (keep it secret).</p>
+    <h2 id="userModalTitle">Join this calendar</h2>
+    <p id="userModalText"></p>
 
-    <!-- Name -->
     <div class="fieldish">
-      <input id="userNameInput" placeholder="e.g. John" maxlength="40" />
+      <input id="userNameInput" placeholder="Your name" maxlength="32" autocomplete="nickname" />
       <div class="error" id="userNameErr"></div>
     </div>
 
-    <!-- PIN (add mode only) -->
-    <div class="fieldish" id="userPinWrap">
-      <div class="pin-field">
-        <input id="userPinInput" placeholder="4-digit PIN" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" />
-        <button type="button" id="toggleUserPin" class="pin-toggle" aria-label="Show PIN">
-          <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
-        </button>
-      </div>
-      <div class="error" id="userPinErr"></div>
-    </div>
-
-    <!-- Confirm PIN (add mode only) -->
-    <div class="fieldish" id="userPin2Wrap">
-      <div class="pin-field">
-        <input id="userPin2Input" placeholder="Confirm" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" />
-        <button type="button" id="toggleUserPin2" class="pin-toggle" aria-label="Show PIN">
-          <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
-        </button>
-      </div>
-      <div class="error" id="userPin2Err"></div>
-    </div>
+    <button type="button" id="userUseProfileBtn" class="btn btn-ghost btn-sm" hidden>Use my profile name</button>
+    <p id="userClaimHint" class="user-claim-hint" hidden>
+      Were you on this calendar before sign-in accounts? <a href="#" id="userClaimLink">Claim your old name</a> instead.
+    </p>
 
     <div class="error" id="userModalError"></div>
 
     <div class="modal-actions">
       <button class="btn btn-cancel" id="userModalCancel" type="button">Cancel</button>
-      <button class="btn btn-confirm" id="userModalConfirm" type="button">Save</button>
+      <button class="btn btn-confirm" id="userModalConfirm" type="button">Join</button>
     </div>
   </div>
 </div>
 
-<!-- PIN prompt (unlock selected user) -->
+<!-- Claim an old name (from before accounts) with its PIN, once -->
 <div class="modal-overlay" id="pinModal">
   <div class="modal">
-    <h2 id="pinModalTitle">Enter PIN</h2>
-    <div id="pinPasskeyWrap" hidden>
-      <button class="btn btn-passkey" id="pinPasskeyBtn" type="button" aria-label="Use passkey: fingerprint, face or screen lock">
-        <span class="passkey-icons" aria-hidden="true">
-          <span class="material-symbols-outlined">fingerprint</span><span class="material-symbols-outlined">face</span><span class="material-symbols-outlined">pattern</span>
-        </span>
-        Use Passkey
-      </button>
-      <p class="passkey-or">or enter your PIN</p>
-    </div>
-    <p id="pinModalText">Enter your 4-digit PIN.</p>
+    <h2 id="pinModalTitle">Claim your old name</h2>
+    <p id="pinModalText">Enter the 4-digit PIN you used for this name. After this it belongs to your account and the PIN is no longer needed.</p>
     <div class="pin-field">
-      <input id="pinInput" placeholder="4-digit PIN" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" />
+      <input id="pinInput" placeholder="4-digit PIN" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" autocomplete="off" />
       <button type="button" id="toggleUnlockPin" class="pin-toggle" aria-label="Show PIN">
         <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
       </button>
@@ -255,32 +231,7 @@
     <div class="error" id="pinModalError"></div>
     <div class="modal-actions">
       <button class="btn btn-cancel" id="pinCancel" type="button">Cancel</button>
-      <button class="btn btn-confirm" id="pinConfirm" type="button">Unlock</button>
-    </div>
-  </div>
-</div>
-
-<!-- Passkeys: set up on this device, or manage every device for the logged-in name -->
-<div class="modal-overlay" id="passkeyModal">
-  <div class="modal">
-    <div id="passkeySetup">
-      <h2>Set up a passkey?</h2>
-      <div class="passkey-offer-icons" aria-hidden="true">
-        <span class="material-symbols-outlined">fingerprint</span><span class="material-symbols-outlined">face</span><span class="material-symbols-outlined">pattern</span>
-      </div>
-      <p>Next time, unlock with your <strong>fingerprint</strong>, <strong>face</strong> or <strong>screen lock</strong> (for example Touch ID, Face ID, Windows Hello, or your phone's PIN or pattern) instead of typing your 4-digit PIN.</p>
-      <p class="passkey-offer-note">Only for this device. Your fingerprint or face never leaves it, and your PIN still works as a backup.</p>
-    </div>
-    <div id="passkeyManageHead" hidden>
-      <h2><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">fingerprint</span> Passkeys</h2>
-      <p>Devices that can unlock this name with your fingerprint, face or screen lock instead of the PIN. Your PIN always works as a backup.</p>
-    </div>
-    <p class="passkey-others-title" id="passkeyOthersTitle" hidden>Passkeys on other devices</p>
-    <ul class="passkey-list" id="passkeyList" hidden></ul>
-    <div class="error" id="passkeyError"></div>
-    <div class="modal-actions">
-      <button class="btn btn-cancel" id="passkeyClose" type="button">Not now</button>
-      <button class="btn btn-confirm" id="passkeyAdd" type="button">Set up passkey</button>
+      <button class="btn btn-confirm" id="pinConfirm" type="button">Claim</button>
     </div>
   </div>
 </div>
@@ -288,11 +239,11 @@
 <!-- Simple info modal -->
 <div class="modal-overlay" id="infoModal">
   <div class="modal">
-    <h2>Select a Name</h2>
-    <p style="margin: 0 0 16px;">Please select a name or add your name first.</p>
+    <h2>Join first</h2>
+    <p style="margin: 0 0 16px;">Join this calendar to add your availability.</p>
     <div class="modal-actions">
       <button class="btn btn-cancel" id="infoModalCancel" type="button">OK</button>
-      <button class="btn btn-confirm" id="infoModalAdd" type="button">Add Name</button>
+      <button class="btn btn-confirm" id="infoModalAdd" type="button">Join</button>
     </div>
   </div>
 </div>
@@ -326,13 +277,14 @@
 <div id="toast" class="toast">Saved</div>
 
 <!-- App script -->
-<script src="passkey.js?v=20260926d"></script>
+<script src="passkey.js?v=20260927a"></script>
+<script src="account-core.js?v=20260927c"></script>
 <script src="emoji.js?v=20260926b"></script>
-<script src="calendar-core.js?v=20260927a"></script>
-<script src="calendar-users.js?v=20260927a"></script>
-<script src="calendar-grid.js?v=20260927a"></script>
-<script src="calendar-rank.js?v=20260927a"></script>
-<script src="calendar-booking.js?v=20260927a"></script>
-<script src="calendar-main.js?v=20260927a"></script>
+<script src="calendar-core.js?v=20260927b"></script>
+<script src="calendar-users.js?v=20260927b"></script>
+<script src="calendar-grid.js?v=20260927b"></script>
+<script src="calendar-rank.js?v=20260927b"></script>
+<script src="calendar-booking.js?v=20260927b"></script>
+<script src="calendar-main.js?v=20260927b"></script>
 </body>
 </html>

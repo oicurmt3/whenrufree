@@ -32,7 +32,7 @@
     <p class="meta">Last updated: 26 September 2026</p>
 
     <div class="warn">
-      <strong>Important:</strong> Calendar and Hub access links act as shared secrets. Anyone with the link can view and respond (calendars) or see the calendar list (Hubs).
+      <strong>Important:</strong> Calendar and Hub links are invites. Anyone who signs in with the link can view and join (calendars) or see the calendar list (Hubs).
       Share links only with intended participants.
     </div>
 
@@ -51,27 +51,35 @@
 
     <div class="section">
       <h2>2. What personal information we collect (APP 3 &amp; APP 5)</h2>
-      <p>The Service collects personal information that users and participants choose to enter, including:</p>
+      <p>You need a free account to open, join or create calendars and Hubs. For your account we store:</p>
       <ul>
-        <li><b>Participant names</b> (display names entered by participants).</li>
-        <li><b>Availability selections</b> (status selections per date and time slot).</li>
-        <li><b>Organiser details</b> (organiser name as entered).</li>
-        <li><b>Hub details</b> (Hub name and Hub organiser name as entered when creating a Hub).</li>
+        <li><b>A private username</b> you choose (only you and the site admin see it) and a <b>profile name</b> (shown on calendars you join unless you change it for one calendar).</li>
+        <li><b>How you sign in:</b>
+          <ul>
+            <li><b>Google:</b> we ask Google only for a sign-in ID (the <code>openid</code> scope). We do <b>not</b> receive or store your email, name or photo.</li>
+            <li><b>Facebook:</b> we read only your app-scoped Facebook ID. We do <b>not</b> receive or store your email, name, photo or friends.</li>
+            <li>We never store the Google or Facebook ID itself &mdash; only a scrambled (keyed hash) copy that cannot be turned back into the ID.</li>
+            <li><b>Passkeys</b> (fingerprint / face / screen lock): we store a <b>public key</b> for your device, a short device name (for example "iPhone"), and when it was added and last used. Your fingerprint, face or screen lock is checked by your own device and <b>is never sent to us</b>.</li>
+          </ul>
+        </li>
+        <li><b>When</b> the account was created and last used, and a hashed copy of your sign-in session code.</li>
+      </ul>
+      <p>On calendars and Hubs we also store what you and other participants enter:</p>
+      <ul>
+        <li><b>Names on calendars</b> and <b>availability selections</b> (status per date and time slot).</li>
+        <li><b>Organiser details</b> (the organiser name shown on a calendar or Hub).</li>
+        <li><b>Hub details</b> (Hub name and organiser name).</li>
       </ul>
       <p>
         The Service also collects calendar configuration information (title, category, time slots, date range, status options, privacy mode, date display filter settings, and any finalised date/slot selection).
         Hub configuration includes the Hub title. This information may not be personal information on its own, but may become personal information when combined with names and responses.
       </p>
       <p>
-        <b>PINs</b> used for access controls are stored as a <b>hashed value</b> (not plaintext) using industry-standard password hashing.
-      </p>
-      <p>
-        <b>Passkeys (optional fingerprint / face / screen lock sign-in):</b> if you add a passkey, we store a <b>public key</b> for your device, a short device name (for example "iPhone"), and when it was added and last used.
-        Your fingerprint, face or screen lock is checked by your own device and <b>is never sent to us</b>. You can remove a device at any time from the device list; it is also deleted with the calendar, name or Hub.
+        <b>Old PINs:</b> names and Hubs created before accounts had a 4-digit PIN, stored only as a <b>hashed value</b>. When you claim an old name or Hub with its PIN, the PIN is deleted. Unclaimed PINs are deleted after a transition period.
       </p>
       <p>
         <b>Access emoji (optional):</b> if the organiser sets one, we store which of the 35 emoji was chosen for that calendar or Hub.
-        When someone picks the right emoji, their browser receives a random access code that lasts 30 days; we store only a <b>hashed</b> copy of it.
+        When you pick the right emoji, we remember that for your account (and your browser receives a random access code) for 30 days; we store only a <b>hashed</b> copy of the code.
         To stop guessing, we record wrong picks against the IP address and the calendar or Hub, and delete these records after 30 days without a wrong pick.
       </p>
     </div>
@@ -79,9 +87,9 @@
     <div class="section">
       <h2>3. How we collect personal information</h2>
       <ul>
-        <li>Directly from you when you create a calendar and enter organiser details.</li>
-        <li>Directly from you when you create a Hub and enter Hub organiser details.</li>
-        <li>Directly from participants when they enter their name and availability.</li>
+        <li>From you when you create an account, choose a username and profile name, and add sign-in methods.</li>
+        <li>From Google or Facebook, limited to the sign-in ID described above, when you choose to sign in with them.</li>
+        <li>From you when you create a calendar or Hub, join a calendar, or record availability.</li>
         <li>Limited technical information may be processed by the server to operate and secure the Service (for example, request logs).
           We do not use this information for advertising.</li>
       </ul>
@@ -91,21 +99,23 @@
       <h2>4. Why we collect, hold, use and disclose personal information (APP 6)</h2>
       <p>We collect and use personal information for the primary purpose of operating the Service, including to:</p>
       <ul>
+        <li>Sign you in and show your calendars and Hubs on your profile page.</li>
         <li>Create and display calendars and Hubs and allow participants to record availability.</li>
         <li>Provide ranking and aggregation features based on participant selections.</li>
-        <li>Apply basic access controls (including PIN verification, optional passkeys and the optional access emoji) and reduce misuse.</li>
+        <li>Apply access controls (accounts, the optional access emoji, and claiming old PIN names) and reduce misuse.</li>
         <li>Maintain, troubleshoot, and secure the Service.</li>
       </ul>
       <p>
-        We do not use personal information for direct marketing.
+        We do not use personal information for direct marketing, and there is no tracking or advertising.
       </p>
     </div>
 
     <div class="section">
       <h2>5. Disclosure of personal information (APP 6)</h2>
       <p>
-        The Service is designed so calendars and Hubs are not published publicly. However, access is controlled primarily by possession of the unique link.
-        Anyone with a calendar link can view and interact with that calendar. Anyone with a Hub link can view the list of calendars in that Hub (each calendar still requires its own participant login).
+        The Service is designed so calendars and Hubs are not published publicly. You need to be signed in <b>and</b> have the unique link (plus the emoji, if the organiser set one) to open a calendar or Hub.
+        Anyone signed in with a calendar link can view and join that calendar. Anyone signed in with a Hub link can view the list of calendars in that Hub.
+        Other participants see the name you use on that calendar &mdash; never your username or how you sign in.
       </p>
       <p>
         We may disclose personal information:
@@ -115,9 +125,11 @@
         <li>To service providers who support hosting, infrastructure, or security of the Service (see "Overseas disclosure").</li>
         <li>If required or authorised by law (for example, in response to a valid legal request).</li>
       </ul>
+      <p>
+        When you sign in with Google or Facebook, you use their sign-in page and their own privacy policies apply to that step. We do not send them your calendar data.
+      </p>
     </div>
 
-    <div class="section">
       <h2>6. Overseas disclosure (APP 8)</h2>
       <p>
         The Service may use hosting, storage, or security providers that operate or store data outside Australia.
@@ -140,8 +152,11 @@
         information from interception or modification.
       </p>
       <p>
-        Calendar access links act as shared secrets. Anyone with the link can view and respond to the calendar. Hub links reveal the list of calendars in that Hub. For this reason, links should only be shared
+        Calendar links are invites. Anyone signed in with the link can view and join the calendar. Hub links reveal the list of calendars in that Hub. For this reason, links should only be shared
         with intended participants and should not be posted publicly or forwarded unnecessarily.
+      </p>
+      <p>
+        Sign-in sessions are kept in a secure, HttpOnly cookie for 30 days (renewed while you use the Service); we store only a hashed copy of the session code.
       </p>
     </div>
 
@@ -152,7 +167,27 @@
         This is intended to reduce data retention.
       </p>
       <p>
+        Accounts that have not been used for about two years, and that have no names on calendars and no Hubs, are deleted automatically.
+      </p>
+      <p>
         If you need a permanent record of arrangements, you should export or record outcomes outside the Service.
+      </p>
+    </div>
+
+    <div class="section" id="delete-account">
+      <h2>8a. Deleting your account and data</h2>
+      <p>You can delete your account yourself at any time:</p>
+      <ol>
+        <li>Sign in and open your <a href="account.html">profile page</a>.</li>
+        <li>Under <b>Delete account</b>, check the list of what will be removed, type your username and press <b>Delete my account</b>.</li>
+      </ol>
+      <p>
+        This immediately deletes your account, its sign-in links (Google, Facebook, passkeys) and sessions, your names and availability on every calendar,
+        every calendar and Hub you organise (for all participants), and your remembered access emoji picks.
+      </p>
+      <p>
+        You can also remove a single sign-in method (for example Facebook) on the profile page, as long as one method remains.
+        If you signed in with Facebook and removed our app in your Facebook settings, you can still delete your data here, or email <b>admin@whenrufree.net</b> and we will delete it within 30 days.
       </p>
     </div>
     
@@ -171,18 +206,16 @@
     <div class="section">
       <h2>10. Cookies and local storage</h2>
       <p>
-        The Service may use essential browser storage (for example, local storage or session storage) to improve usability, such as:
+        The Service uses only essential cookies and browser storage. There are no tracking or advertising cookies.
       </p>
       <ul>
-        <li>Remembering your calendar login on this browser (until it expires or you log out)</li>
-        <li>Storing unsaved availability changes temporarily before they are sent to the server</li>
-        <li>Caching Hub organiser login on this browser (until you tap <b>Logout</b> on the Hub page or the session expires)</li>
-        <li>Remembering which names or Hubs have a passkey on this device, and whether you chose <b>Not now</b></li>
-        <li>Remembering that you picked the right access emoji for a calendar or Hub (a random code, for up to 30 days)</li>
+        <li><b>Sign-in cookie</b> (<code>wruf_account</code>): keeps you signed in for up to 30 days, renewed while you use the Service.</li>
+        <li><b>Sign-in step cookie</b> (<code>wruf_oauth</code>): a short-lived (10 minute) cookie used only while you sign in with Google or Facebook, to protect that step.</li>
+        <li><b>Security session cookie</b>: used for security controls such as CSRF protection and passkey sign-in.</li>
+        <li><b>Browser storage</b>: unsaved availability changes (kept until they are sent to the server) and your access emoji picks (a random code, for up to 30 days).</li>
       </ul>
       <p>
-        We do not store lists of your Hubs or calendars in the browser for quick access. If enabled on the server, essential session cookies may be used for security controls (such as CSRF protection).
-        On shared computers, log out from calendars and use <b>Logout</b> on the Hub page when you finish managing a Hub.
+        On shared computers, use <b>Sign out</b> on your profile page when you finish.
       </p>
     </div>
 

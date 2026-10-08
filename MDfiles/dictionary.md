@@ -2,6 +2,113 @@
 
 Database schema for When RU Free. MariaDB 10.x, utf8mb4 charset.
 
+## Table: accounts
+
+One row per person. Created by `migrations/007_accounts.sql`. No email, real name or picture is stored.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
+| username | VARCHAR(20) | NULL | Private unique username: 3-20 lowercase letters, numbers or `_`, not reserved. NULL until setup is finished |
+| display_name | VARCHAR(40) | NULL | Profile name used on calendars by default (app limit 32). NULL until setup is finished |
+| created_at | DATETIME | - | Created |
+| last_seen_at | DATETIME | - | Last use (updated at most once a day with the session renewal) |
+
+**Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_accounts_username` (`username`), INDEX `idx_accounts_last_seen` (`last_seen_at`)
+
+**Business rules:**
+- An account without `username` or `display_name` "needs setup" and can only use `account_*` actions
+- Deleting an account removes the calendars and Hubs it organises, its names and availability elsewhere, and every `account_*` row (FK cascades)
+- cleanup.php deletes accounts unused for `accounts.inactive_days` (default 730) that have no names and no Hubs, and passkey sign-ups abandoned before a passkey was saved
+
+---
+
+## Table: account_identities
+
+Google / Facebook logins linked to an account.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
+| account_id | BIGINT UNSIGNED | - | FK to accounts.id (CASCADE DELETE) |
+| provider | ENUM('google','facebook') | - | Provider |
+| subject_hash | BINARY(32) | - | HMAC-SHA-256 of the provider's user ID (Google `sub`, Facebook app-scoped `id`) keyed with `accounts.pepper`. The raw ID is never stored |
+| created_at | DATETIME | - | Linked |
+| last_used_at | DATETIME | NULL | Last sign-in with it |
+
+**Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_account_identity` (`provider`, `subject_hash`), INDEX (`account_id`)
+
+---
+
+## Table: account_passkeys
+
+Passkeys (discoverable WebAuthn credentials) for accounts.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
+| account_id | BIGINT UNSIGNED | - | FK to accounts.id (CASCADE DELETE) |
+| credential_id | VARBINARY(255) | - | Raw WebAuthn credential ID (unique across the site) |
+| public_key_pem | TEXT | - | Device public key (SPKI PEM). Not a secret |
+| alg | SMALLINT | -7 | COSE algorithm: -7 = ES256, -257 = RS256 |
+| sign_count | INT UNSIGNED | 0 | Last authenticator counter (replay / clone detection) |
+| transports_json | VARCHAR(255) | NULL | JSON array of transports reported by the browser |
+| device_label | VARCHAR(40) | NULL | Short device name shown on the profile page ("iPhone", "Windows PC"). Sanitised plain text |
+| created_at | DATETIME | CURRENT_TIMESTAMP | When the passkey was added |
+| last_used_at | DATETIME | NULL | Last sign-in with it |
+
+**Business rules:**
+- Max 10 passkeys per account (`WEBAUTHN_MAX_PER_SUBJECT`)
+- No biometric data is stored; the fingerprint / face check happens on the device
+
+---
+
+## Table: account_sessions
+
+Signed-in devices.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
+| account_id | BIGINT UNSIGNED | - | FK to accounts.id (CASCADE DELETE) |
+| token_hash | BINARY(32) | - | SHA-256 of the 64-hex `wruf_account` cookie. The raw token is never stored |
+| created_at | DATETIME | - | Signed in |
+| expires_at | DATETIME | - | 30 days; pushed forward at most once a day while used |
+
+**Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_account_sessions_hash` (`token_hash`), INDEX (`expires_at`)
+
+---
+
+## Table: account_access
+
+Access emoji already picked by an account (asked once per account, on any device).
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| account_id | BIGINT UNSIGNED | - | FK to accounts.id (CASCADE DELETE) |
+| kind | ENUM('calendar','group') | - | Calendar or Hub |
+| subject_id | BIGINT UNSIGNED | - | calendars.id or groups.id (no FK; orphans removed by cleanup.php) |
+| created_at | DATETIME | - | When it was picked |
+
+**Indexes:** PRIMARY KEY (`account_id`, `kind`, `subject_id`), INDEX (`kind`, `subject_id`)
+
+**Business rules:** changing or removing the emoji deletes every row for that calendar/Hub.
+
+---
+
+## Table: account_hubs
+
+Hubs an account has opened (listed on its profile page).
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| account_id | BIGINT UNSIGNED | - | FK to accounts.id (CASCADE DELETE) |
+| group_id | BIGINT UNSIGNED | - | FK to groups.id (CASCADE DELETE) |
+| created_at | DATETIME | - | First opened |
+| last_opened_at | DATETIME | - | Last opened |
+
+---
+
 ## Table: calendars
 
 Core configuration for each scheduling calendar.
@@ -61,37 +168,42 @@ Core configuration for each scheduling calendar.
 
 ## Table: users
 
-Participants within a calendar.
+Names on a calendar. Each belongs to an account, except old names from before accounts that nobody has claimed yet.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
 | id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
 | calendar_id | BIGINT UNSIGNED | - | FK to calendars.id (CASCADE DELETE) |
-| display_name | VARCHAR(40) | - | User's display name |
+| display_name | VARCHAR(40) | - | Name shown on this calendar (app limit 32) |
 | role | VARCHAR(10) | 'member' | "admin" (organiser) or "member" |
-| pin_hash | VARCHAR(255) | - | bcrypt hash of 4-digit PIN |
+| account_id | BIGINT UNSIGNED | NULL | FK to accounts.id (CASCADE DELETE). NULL = old name not claimed yet. Migration 007 |
+| name_custom | TINYINT(1) | 0 | 0 = follows the account's profile name; 1 = a name just for this calendar. Migration 007 |
+| pin_hash | VARCHAR(255) | NULL | Old names only: bcrypt hash of the 4-digit PIN, set to NULL when claimed (and for all rows by migration 008) |
 | created_at | DATETIME | CURRENT_TIMESTAMP | Creation timestamp |
 | updated_at | DATETIME | NULL | Last update (currently unused) |
-| failed_attempts | TINYINT UNSIGNED | 0 | Consecutive failed PIN attempts |
-| locked_until | DATETIME | NULL | Account locked until this time. NULL = not locked |
+| failed_attempts | TINYINT UNSIGNED | 0 | Consecutive wrong PINs when claiming |
+| locked_until | DATETIME | NULL | Claim locked until this time. NULL = not locked |
 | lockout_level | TINYINT UNSIGNED | 0 | Lockouts so far (0-4); picks the next lock length. Migration 002 |
 | last_locked_at | DATETIME | NULL | When the last lockout started; used for the 30-day reset. Migration 002 |
 
 **Indexes:**
 - PRIMARY KEY (`id`)
 - UNIQUE `ux_users_cal_name` (`calendar_id`, `display_name`)
+- UNIQUE `ux_users_cal_account` (`calendar_id`, `account_id`) - one name per account per calendar
 - INDEX `idx_users_cal` (`calendar_id`)
 - INDEX `idx_users_locked` (`locked_until`)
 
 **Constraints:**
 - FK `fk_users_calendar` -> calendars.id ON DELETE CASCADE
+- FK `fk_users_account` -> accounts.id ON DELETE CASCADE
 
 **Business rules:**
-- Each calendar has exactly one admin (the organiser, created with the calendar)
-- After 5 failed PIN attempts in a row the account locks for 5 minutes, then 15 minutes, then 2 hours, then 2 days (repeats); `lockout_level` goes up by one each time and `failed_attempts` restarts at 0
-- A correct PIN, passkey login or super admin Unlock sets `lockout_level` back to 0; so does `cleanup.php` after 30 days without a lockout
-- Without migration 002 the lock is a flat 15 minutes
-- Display names are unique per calendar (enforced by unique index)
+- Each calendar has exactly one admin (the organiser: the account that created the calendar)
+- A claimable name has `account_id` NULL and a `pin_hash`. `claim_name` checks the PIN once, sets `account_id`, clears `pin_hash`
+- After 5 wrong PINs in a row the claim locks for 5 minutes, then 15 minutes, then 2 hours, then 2 days (repeats); `lockout_level` goes up by one each time and `failed_attempts` restarts at 0
+- A successful claim or super admin Unlock sets `lockout_level` back to 0; so does `cleanup.php` after 30 days without a lockout
+- Changing the profile name updates every row with `name_custom` = 0 (a calendar where that name is taken keeps the old one)
+- Names are unique per calendar (enforced by unique index)
 
 ---
 
@@ -126,9 +238,9 @@ Individual status selections per user, date, and slot.
 
 ---
 
-## Table: user_sessions
+## Table: user_sessions (legacy)
 
-Authentication tokens for logged-in users.
+Old PIN login tokens. No longer written; cleanup.php deletes expired rows, and `migrations/008_drop_pins.sql` drops the table.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -164,10 +276,11 @@ Hub (group calendar folder) - one private URL lists multiple calendars.
 | id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
 | token | VARCHAR(64) | - | URL token for `hub.html?g=` (8 chars new) |
 | title | VARCHAR(80) | '' | Hub display name |
-| organiser_name | VARCHAR(40) | - | Single hub organiser display name |
-| organiser_pin_hash | VARCHAR(255) | - | bcrypt hash of 4-digit PIN |
-| failed_attempts | TINYINT UNSIGNED | 0 | Failed PIN attempts |
-| locked_until | DATETIME | NULL | Hub organiser lockout expiry |
+| organiser_name | VARCHAR(40) | - | Organiser name shown on the Hub (profile name unless one was typed) |
+| organiser_account_id | BIGINT UNSIGNED | NULL | FK to accounts.id (ON DELETE SET NULL). NULL = old Hub not claimed yet. Migration 007 |
+| organiser_pin_hash | VARCHAR(255) | NULL | Old Hubs only: bcrypt hash of the organiser PIN, set to NULL when claimed (and for all rows by migration 008) |
+| failed_attempts | TINYINT UNSIGNED | 0 | Wrong PINs when claiming |
+| locked_until | DATETIME | NULL | Claim lockout expiry |
 | lockout_level | TINYINT UNSIGNED | 0 | Escalation level, same rules as `users.lockout_level`. Migration 002 |
 | last_locked_at | DATETIME | NULL | When the last organiser lockout started. Migration 002 |
 | created_at | DATETIME | CURRENT_TIMESTAMP | Creation timestamp |
@@ -175,13 +288,15 @@ Hub (group calendar folder) - one private URL lists multiple calendars.
 | never_expires | TINYINT(1) | 0 | 1 = protected from cleanup.php Hub deletion |
 | access_emoji | TINYINT UNSIGNED | NULL | Hub access emoji position 0-34, NULL = none. Also guards every calendar in the Hub that has no emoji of its own. Migration 003 |
 
-**Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_groups_token` (`token`)
+**Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_groups_token` (`token`), INDEX `idx_groups_organiser_account` (`organiser_account_id`)
+
+**Business rules:** deleting the organiser's account deletes its Hubs (calendars in them are detached, not deleted). Old Hubs are claimed once with `claim_hub`.
 
 ---
 
-## Table: group_sessions
+## Table: group_sessions (legacy)
 
-Hub organiser auth sessions.
+Old Hub organiser PIN sessions. No longer written; dropped by migration 008.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -193,9 +308,9 @@ Hub organiser auth sessions.
 
 ---
 
-## Table: user_passkeys
+## Table: user_passkeys (legacy)
 
-Fingerprint / face unlock (WebAuthn) credentials for calendar users. Created by `migrations/001_passkeys.sql`.
+Old per-calendar passkeys, from `migrations/001_passkeys.sql`. No longer read (passkeys now belong to accounts, see `account_passkeys`); rows are deleted when a name is claimed, and migration 008 drops the table.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -218,15 +333,15 @@ Fingerprint / face unlock (WebAuthn) credentials for calendar users. Created by 
 
 ---
 
-## Table: group_passkeys
+## Table: group_passkeys (legacy)
 
-Same as `user_passkeys`, but for Hub organisers. `group_id` (FK to groups.id, CASCADE DELETE) replaces `calendar_id` / `user_id`.
+Same as `user_passkeys`, but for old Hub organisers. `group_id` (FK to groups.id, CASCADE DELETE) replaces `calendar_id` / `user_id`.
 
 ---
 
 ## Table: access_grants
 
-Proof that a browser picked the right access emoji. Created by `migrations/003_access_emoji.sql`.
+Proof that a browser picked the right access emoji (the account-wide record is `account_access`). Created by `migrations/003_access_emoji.sql`.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -289,7 +404,7 @@ Per-IP request throttling.
 - General API limit uses `minute_key` as `YYYYMMDDHHmm`
 - Hub add limits use `hg{YYYYMMDDHH}{groupId in base 36}` (per Hub) and `hi{YYYYMMDDHH}` (all Hubs) (see `enforceHubCalendarRateLimit` in includes/hubs.php)
 - Every action key must fit the 16-char column: `enforceActionRateLimit` passes keys through `rateLimitKey()`, which replaces longer keys with `x` + 15 hex chars of their SHA-256. A too-long key would be truncated on insert and never match the count query, silently disabling the limit
-- Passkey limits use `pkr{YYYYMMDDHHmm}` (enrolment) and `pkl{YYYYMMDDHHmm}` (login) - kept within the 16-char column
+- Account limits use `apr{YYYYMMDDHHmm}` (passkey enrolment), `apl{YYYYMMDDHHmm}` (passkey sign-in), `aps{YYYYMMDDHH}` (new passkey accounts, 10/hour), `acu{YYYYMMDDHHmm}` (profile changes), `oas` / `oac{YYYYMMDDHHmm}` (Google / Facebook start and callback) - kept within the 16-char column
 - Access emoji hourly caps use `aw{YYYYMMDDHH}` (wrong picks, default 20/hour) and `nf{YYYYMMDDHH}` (unknown calendar/Hub codes, default 30/hour)
 - Known race condition on concurrent upserts (acceptable at current scale)
 - Pruned by cleanup.php (default: entries older than 60 minutes)

@@ -67,7 +67,7 @@ function requireGroupTokenParam(): string {
 
 function getGroupByToken(PDO $pdo, string $token): ?array {
     $stmt = $pdo->prepare(
-        "SELECT id, token, title, organiser_name, organiser_pin_hash, failed_attempts, locked_until,
+        "SELECT id, token, title, organiser_name, organiser_pin_hash, organiser_account_id, failed_attempts, locked_until,
                 created_at, last_activity, never_expires
          FROM `groups` WHERE token = :t LIMIT 1"
     );

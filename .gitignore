@@ -1,6 +1,7 @@
 # Secrets (config lives outside the webroot, but never commit a copy)
 config*.php
 .env*
+client_secret*.json
 
 # Database dumps (schema migrations are fine)
 *.sql

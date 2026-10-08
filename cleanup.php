@@ -23,6 +23,11 @@
  *  7) Reset expired Hub organiser PIN lockouts
  *  8) Reset PIN lockout escalation (lockout_level) after 30 days without a lockout
  *  9) Access emoji: delete expired or orphaned grants, and wrong-pick rows after 30 quiet days
+ * 10) Accounts: delete expired account sessions, passkey sign-ups abandoned before finishing,
+ *     emoji picks for deleted calendars/Hubs, and accounts unused for accounts.inactive_days
+ *     (default 730) that no longer have any calendar name or Hub
+ *
+ * Steps 3 and 6 clean the old PIN session tables and are skipped once migration 008 drops them.
  *
  * Security Notes:
  *  - This script should NOT be web-accessible. Place outside webroot or protect via .htaccess.
@@ -178,6 +183,8 @@ $stats = [
     'lockout_levels_reset' => 0,
     'access_grants_deleted' => 0,
     'access_attempts_deleted' => 0,
+    'account_sessions_deleted' => 0,
+    'accounts_deleted' => 0,
     'errors' => [],
 ];
 
@@ -257,6 +264,8 @@ try {
     $stmt->execute();
     $stats['sessions_deleted'] = $stmt->rowCount();
     echo "[3] Sessions deleted (expired): {$stats['sessions_deleted']}\n";
+} catch (PDOException $e) {
+    echo "[3] Old PIN sessions: skipped - table removed\n";
 } catch (Throwable $e) {
     $stats['errors'][] = "Sessions: " . $e->getMessage();
     echo "[3] ERROR deleting sessions: " . $e->getMessage() . "\n";
@@ -302,6 +311,8 @@ try {
     $stmt->execute();
     $groupSessionsDeleted = $stmt->rowCount();
     echo "[6] Group sessions deleted (expired): {$groupSessionsDeleted}\n";
+} catch (PDOException $e) {
+    echo "[6] Old Hub PIN sessions: skipped - table removed\n";
 } catch (Throwable $e) {
     $stats['errors'][] = "Group sessions: " . $e->getMessage();
     echo "[6] ERROR deleting group sessions: " . $e->getMessage() . "\n";
@@ -394,6 +405,60 @@ try {
     echo "[9] ERROR cleaning access emoji data: " . $e->getMessage() . "\n";
 }
 
+// 10. Accounts
+// -----------------------------------------------------------------------------
+// Account sessions are written with PHP time by includes/accounts.php. An account removed
+// here takes its sign-in data with it (foreign keys cascade).
+try {
+    $accountsReady = true;
+    try {
+        $pdo->query("SELECT token_hash FROM account_sessions LIMIT 0");
+        $pdo->query("SELECT account_id FROM users LIMIT 0");
+    } catch (PDOException $e) {
+        $accountsReady = false;
+        echo "[10] Accounts: skipped - run migrations/007_accounts.sql\n";
+    }
+    if ($accountsReady) {
+        $now = date('Y-m-d H:i:s');
+        $stmt = $pdo->prepare("DELETE FROM account_sessions WHERE expires_at < :now");
+        $stmt->execute([':now' => $now]);
+        $stats['account_sessions_deleted'] = $stmt->rowCount();
+        echo "[10] Account sessions deleted (expired): {$stats['account_sessions_deleted']}\n";
+
+        $stmt = $pdo->prepare("
+            DELETE FROM accounts
+            WHERE created_at < :cutoff
+              AND username IS NULL
+              AND NOT EXISTS (SELECT 1 FROM account_identities i WHERE i.account_id = accounts.id)
+              AND NOT EXISTS (SELECT 1 FROM account_passkeys p WHERE p.account_id = accounts.id)
+        ");
+        $stmt->execute([':cutoff' => date('Y-m-d H:i:s', time() - 86400)]);
+        $abandoned = $stmt->rowCount();
+        echo "[10] Unfinished sign-ups deleted (>1 day): {$abandoned}\n";
+
+        $orphanPicks = $pdo->exec("
+            DELETE FROM account_access
+            WHERE (kind = 'calendar' AND NOT EXISTS (SELECT 1 FROM calendars c WHERE c.id = account_access.subject_id))
+               OR (kind = 'group' AND NOT EXISTS (SELECT 1 FROM `groups` g WHERE g.id = account_access.subject_id))
+        ");
+        echo "[10] Account emoji picks deleted (orphaned): {$orphanPicks}\n";
+
+        $accountDays = max(30, (int)($config['accounts']['inactive_days'] ?? 730));
+        $stmt = $pdo->prepare("
+            DELETE FROM accounts
+            WHERE last_seen_at < :cutoff
+              AND NOT EXISTS (SELECT 1 FROM users u WHERE u.account_id = accounts.id)
+              AND NOT EXISTS (SELECT 1 FROM `groups` g WHERE g.organiser_account_id = accounts.id)
+        ");
+        $stmt->execute([':cutoff' => date('Y-m-d H:i:s', time() - $accountDays * 86400)]);
+        $stats['accounts_deleted'] = $abandoned + $stmt->rowCount();
+        echo "[10] Accounts deleted (unused >{$accountDays} days, nothing left): {$stmt->rowCount()}\n";
+    }
+} catch (Throwable $e) {
+    $stats['errors'][] = "Accounts: " . $e->getMessage();
+    echo "[10] ERROR cleaning accounts: " . $e->getMessage() . "\n";
+}
+
 // -------------------------------------------------------------------------
 // Summary
 // -------------------------------------------------------------------------
@@ -407,6 +472,8 @@ echo "Lockouts reset:        {$stats['lockouts_reset']}\n";
 echo "Lockout levels reset:  {$stats['lockout_levels_reset']}\n";
 echo "Access grants deleted: {$stats['access_grants_deleted']}\n";
 echo "Access picks deleted:  {$stats['access_attempts_deleted']}\n";
+echo "Account sessions:      {$stats['account_sessions_deleted']}\n";
+echo "Accounts deleted:      {$stats['accounts_deleted']}\n";
 
 if (!empty($stats['errors'])) {
     echo "\nErrors encountered:\n";

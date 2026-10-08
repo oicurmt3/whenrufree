@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <!-- Prevents leaking the calendar token in the Referer header -->
   <meta name="referrer" content="no-referrer">
-  <meta name="description" content="Complete guide for When RU Free - setup, usage, and troubleshooting for group availability calendars. No sign-up required.">
+  <meta name="description" content="Complete guide for When RU Free - setup, usage, and troubleshooting for group availability calendars. Private sign-in, no ads, no tracking.">
   <title>Guide & Help - When RU Free</title>
 
 
@@ -48,11 +48,27 @@
     <ol>
       <li><b>Create a calendar</b> - Set a title, date range, time slots, and status options</li>
       <li><b>Share the link</b> - Send the unique URL to your group</li>
-      <li><b>Add availability</b> - Each person adds their name, sets a PIN, and marks their slots</li>
+      <li><b>Add availability</b> - Each person signs in, joins the calendar, and marks their slots</li>
       <li><b>See results</b> - The "Best Match" section ranks optimal times</li>
     </ol>
     <p>
-      Creating a calendar takes less than 2 minutes. Once created, you'll get a unique link to share with your group. <b>Bookmark this link</b> -- it cannot be recovered if lost.
+      Creating a calendar takes less than 2 minutes. Once created, you'll get a unique link to share with your group. <b>Bookmark this link</b> -- it is also listed on your <a href="account.html">profile page</a> while you are signed in.
+    </p>
+
+    <!-- ACCOUNTS -->
+    <h2 id="accounts"><span class="material-symbols-outlined">account_circle</span> Signing in</h2>
+    <p>
+      Everyone needs a free account to open, join or create calendars and Hubs. There are no PINs to remember.
+    </p>
+    <ol>
+      <li><b>Sign in</b> with <b>Google</b>, <b>Facebook</b> or a <b>passkey</b> (fingerprint, face or screen lock). We never receive your email, name or photo &mdash; only a private ID we keep scrambled.</li>
+      <li><b>First time:</b> choose a private <b>username</b> (only you see it) and a <b>profile name</b> (what others see on calendars you join).</li>
+      <li><b>Profile page</b> (tap your name badge at the top of any page): change your profile name, see all your calendars and Hubs, add or remove sign-in methods, sign out, or delete your account.</li>
+      <li><b>Name per calendar:</b> your profile name is used when you join, but you can use a different name on any calendar. Changing your profile name updates every calendar where you kept the profile name.</li>
+      <li>You stay signed in for 30 days on each device, renewed while you use the site.</li>
+    </ol>
+    <p>
+      <b>Names and Hubs from before accounts</b> can be claimed once with their old PIN: on the calendar, tap <b>People</b> and your old name; on a Hub, tap <b>Claim this Hub</b>. The PIN is then deleted.
     </p>
 
     <!-- HUBS -->
@@ -61,13 +77,11 @@
       A <b>Hub</b> gives your group <strong>one link</strong> to find all related calendars &mdash; useful when you run multiple polls or events (e.g. training, social, AGM).
     </p>
     <ol>
-      <li><b>Create a Hub</b> from the home page or <a href="hub.html?create=1">Create a Hub</a> &mdash; set a name and organiser PIN, and optionally an <b>Access emoji</b> that visitors must pick before the Hub (and its calendars) open</li>
-      <li><b>Save your Hub link</b> when prompted (copy, download .txt, email, share, or poster). The link cannot be recovered if lost. Your organiser PIN is not included in the download.</li>
-      <li><b>Add calendars</b> &mdash; anyone with the Hub link can tap <b>Create new calendar in this Hub</b> (no Hub PIN needed). To attach an existing calendar, log in as that calendar's organiser and use <b>Add to Hub</b> on the calendar page.</li>
-      <li><b>Share the Hub link</b> with participants &mdash; they pick which calendar to open (each calendar still uses its own name + PIN)</li>
-      <li><b>Copy link or code</b> &mdash; on the Hub page, anyone can copy the Hub link or code. Share, Email, Poster, and Download require organiser login.</li>
-      <li><b>Organiser login</b> &mdash; enter your PIN to remove calendars from the Hub or use Share/Email/Poster/Download on the Hub page</li>
-      <li><b>Logout</b> on the Hub page when you finish on a shared computer &mdash; this clears organiser access on that browser</li>
+      <li><b>Create a Hub</b> from the home page or <a href="hub.html?create=1">Create a Hub</a> &mdash; set a name, and optionally an <b>Access emoji</b> that visitors must pick before the Hub (and its calendars) open. Your account is the organiser.</li>
+      <li><b>Save your Hub link</b> when prompted (copy, download .txt, email, share, or poster). It is also listed on your profile page.</li>
+      <li><b>Add calendars</b> &mdash; anyone signed in with the Hub link can tap <b>Create new calendar in this Hub</b>. To attach an existing calendar, open it with the account that created it and use <b>Add to Hub</b> on the calendar page.</li>
+      <li><b>Share the Hub link</b> with participants &mdash; they pick which calendar to open and join it there</li>
+      <li><b>Copy link or code</b> &mdash; on the Hub page, anyone can copy the Hub link or code. Share, Email, Poster, Download, Settings and removing calendars are only shown to the organiser's account.</li>
     </ol>
     <p>
       Hub URL format: <code>hub.html?g=Ab12Cd34</code>. Use the <a href="go/">Go page</a> to open a calendar or Hub by pasting a code or full link.
@@ -312,23 +326,13 @@
         As the organiser, you have special privileges. Set up your identity here.
       </p>
       
-      <h4>Organiser Name</h4>
+      <h4>Your name on this calendar</h4>
       <p>
-        Your display name. This will appear with "(organiser)" in the calendar and will be listed first in the user list.
+        Optional. Leave it blank to use your profile name. It appears with "(organiser)" in the calendar and is listed first in the People list.
       </p>
-      
-      <h4>4-Digit PIN</h4>
       <p>
-        Choose a memorable 4-digit PIN. You'll need this to:
+        The account that creates the calendar is its organiser &mdash; no PIN needed. Organiser-only features (Share, Settings, Reset All, removing people, Choose) appear whenever you open the calendar signed in to that account.
       </p>
-      <ul>
-        <li>Unlock your name to edit availability</li>
-        <li>Access organiser-only features (Share, Reset All, Delete Users)</li>
-      </ul>
-      
-      <div class="tip-box">
-        <b>Important:</b> Your PIN cannot be recovered if forgotten! Choose something memorable but not obvious (avoid 1234, 0000, etc.).
-      </div>
 
       <h4>People per Slot (booking)</h4>
       <p>
@@ -358,7 +362,7 @@
         </tr>
         <tr>
           <td><span class="material-symbols-outlined icon-inline">visibility</span> <b>Open</b></td>
-          <td>All choices from everyone (when logged in)</td>
+          <td>All choices from everyone (once joined)</td>
           <td>All choices from everyone</td>
         </tr>
         <tr>
@@ -374,8 +378,8 @@
       </table>
       
       <p>
-        <b>Important:</b> Users must be logged in to see other participants' individual choices in the rankings section. 
-        Unauthenticated visitors can only see aggregate counts (e.g., "3 Yes, 2 Maybe").
+        <b>Important:</b> You must join the calendar to see other participants' individual choices in the rankings section. 
+        Before joining you only see aggregate counts (e.g., "3 Yes, 2 Maybe").
         Privacy mode cannot be changed after the calendar is created.
       </p>
     </div>
@@ -397,7 +401,7 @@
       </li>
       <li>
         <b>Add your own availability</b><br>
-        Click on slots to set your availability first - this creates the coloured left borders that guide participants (visible to logged-in users only).
+        Click on slots to set your availability first - this creates the coloured left borders that guide participants (visible only to people who have joined).
       </li>
       <li>
         <b>Select your date filter</b> (if applicable)<br>
@@ -410,7 +414,7 @@
     </ol>
     
     <div class="tip-box">
-      <b>IMPORTANT:</b> Immediately copy and save your calendar link. If you lose it, you can't recover it back. 
+      <b>Tip:</b> Copy and save your calendar link to share it. You can also find it later on your profile page. 
     </div>
 
     <!-- FOR PARTICIPANTS -->
@@ -418,33 +422,33 @@
 
     <h3>Joining via a Hub</h3>
     <p>
-      If you received a Hub link, open it and pick the calendar you need from the list. Then add your name and PIN on that calendar page as usual.
+      If you received a Hub link, open it and pick the calendar you need from the list. Then join that calendar as usual.
     </p>
     
     <h3>Adding your availability</h3>
     <ol>
-      <li>Click the <span class="material-symbols-outlined icon-inline">person</span> person icon to open the user list</li>
-      <li>Click "Add Your Name" and enter your name + a 4-digit PIN</li>
+      <li>Sign in (Google, Facebook or passkey) and open the calendar link</li>
+      <li>Tap <b>Join</b> (or any slot). Your profile name is filled in; change it for this calendar if you like</li>
       <li>Click on time slots to cycle through status options (e.g., Yes -&gt; Maybe -&gt; No -&gt; blank)</li>
       <li>Your changes auto-save after a few seconds, or click <span class="material-symbols-outlined icon-inline">check</span> to save immediately</li>
     </ol>
     
-    <h3>Logging in and out</h3>
+    <h3>People, your name, and signing out</h3>
     <p>
-      To switch users or log out, click the <span class="material-symbols-outlined icon-inline">person</span> person icon. 
-      If you're logged in, you'll see a <span class="material-symbols-outlined icon-inline">logout</span> logout button 
-      next to your name. Clicking it will log you out and refresh the page.
+      Tap the <span class="material-symbols-outlined icon-inline">group</span> <b>People</b> button to see everyone on the calendar. Tap your own name (or the
+      <span class="material-symbols-outlined icon-inline">person_edit</span> button) to change the name you use on this calendar, or go back to your profile name.
+      To sign out, open your profile page from the name badge at the top and tap <b>Sign out</b>.
     </p>
     <p>
-      <b>Privacy note:</b> You must be logged in to see other participants' individual choices in the rankings. 
-      Visitors who are not logged in can only see aggregate counts (e.g., "3 Yes, 2 Maybe").
+      <b>Privacy note:</b> You must join the calendar to see other participants' individual choices in the rankings. 
+      Until then you only see aggregate counts (e.g., "3 Yes, 2 Maybe").
     </p>
     
     <h3>Understanding the slots</h3>
     <p>
       Each slot may show a <b>coloured left border</b>. This indicates the 
       <b>organiser's choice</b> for that slot, helping you see which times they prefer.
-      You must be logged in to see these indicators.
+      You must have joined the calendar to see these indicators.
     </p>
     
     <h3>Changing your responses</h3>
@@ -503,7 +507,7 @@
       <tr>
         <td><b>Sort Rankings</b></td>
         <td><span class="material-symbols-outlined icon-inline">trophy</span></td>
-        <td>Toggle between "By Match" (best scores first) and "By Date" (chronological). Available to all logged-in users. The organiser's choice is saved as the default for everyone.</td>
+        <td>Toggle between "By Match" (best scores first) and "By Date" (chronological). Available to everyone who has joined. The organiser's choice is saved as the default for everyone.</td>
       </tr>
       <tr>
         <td><b>Organiser Message</b></td>
@@ -558,7 +562,7 @@
     </p>
     
     <h3>Sorting Options</h3>
-    <p>All logged-in users can change how rankings are displayed using the toggle at the top of the rankings section:</p>
+    <p>Everyone who has joined can change how rankings are displayed using the toggle at the top of the rankings section:</p>
     <ul>
       <li><b>By Match</b> - Best scores first (default). Shows the most popular dates at the top.</li>
       <li><b>By Date</b> - Chronological order. Shows earliest dates first, regardless of score.</li>
@@ -583,7 +587,7 @@
     </p>
 
     <ol>
-      <li>Make sure you are logged in as the organiser</li>
+      <li>Make sure you are signed in to the account that created the calendar</li>
       <li>Expand a rank card by tapping <b>View</b></li>
       <li>Tap the green <b>Choose</b> button</li>
       <li>Confirm the choice in the dialog that appears</li>
@@ -596,7 +600,7 @@
       <li>All other slots are dimmed and cannot be clicked</li>
       <li>The save button is hidden -- no one can change their availability</li>
       <li>The chosen rank card is pinned to the top of the rankings with a green border</li>
-      <li>New participants can still add their name and PIN, but they cannot select slots</li>
+      <li>New participants can still join, but they cannot select slots</li>
     </ul>
 
     <h3>Reopening a calendar</h3>
@@ -645,49 +649,55 @@
     
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        What happens if I forget my PIN?
+        Why do I need to sign in?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Unfortunately, PINs cannot be recovered. You'll need to create a new name entry. 
-        Contact the organiser if you need your old entry removed.</p>
-      </div>
-    </div>
-    
-    <div class="faq-item">
-      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Can I change my PIN?
-        <span class="material-symbols-outlined faq-icon">expand_more</span>
-      </div>
-      <div class="faq-answer">
-        <p>Currently, PINs cannot be changed after creation. Choose a memorable 4-digit code when you first sign up.</p>
-      </div>
-    </div>
-    
-    <div class="faq-item">
-      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Why am I locked out after entering wrong PINs?
-        <span class="material-symbols-outlined faq-icon">expand_more</span>
-      </div>
-      <div class="faq-answer">
-        <p>For security, 5 wrong PINs in a row lock that name (or the Hub organiser) for 5 minutes.
-        If it keeps happening, each lock is longer: 15 minutes, then 2 hours, then 2 days.
-        The message tells you how long to wait.</p>
-        <p>Entering the correct PIN resets this. If you set up a passkey on your device, it still works while
-        you are locked out and also resets it. The site admin can unlock you too.</p>
+        <p>So only you can change your availability, without remembering a PIN for every calendar. Your profile page also lists all your calendars and Hubs, so a lost link is no longer lost.</p>
+        <p>Sign in with Google, Facebook or a passkey (fingerprint, face or screen lock). We never receive your email, name or photo from Google or Facebook &mdash; only a private ID that we keep scrambled. There are no ads and no tracking.</p>
       </div>
     </div>
 
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Can I use a passkey (fingerprint or face) instead of my PIN?
+        What is my username for?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Yes, on phones and computers with a fingerprint reader, face unlock, Windows Hello or a screen lock. After you log in with your PIN, tap <b>Set up passkey</b> when asked.
-        Next time, pick your name and tap <b>Use Passkey</b> (fingerprint, face or screen lock). Your PIN always still works.</p>
-        <p>It is set up per device and per calendar. To see or remove your passkeys (for example on a lost phone), open the name list and tap the fingerprint icon next to your name.
-        Hub organisers use the <b>Passkey</b> button on the Hub page. Your fingerprint or face never leaves your device.</p>
+        <p>It is private: only you (and the site admin) see it. It is used to confirm big actions such as deleting your account. Other people only see your <b>profile name</b>, or the name you chose for a particular calendar.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        I had a name with a PIN before accounts. What now?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Sign in, open the calendar, tap the <span class="material-symbols-outlined icon-inline">group</span> People button and tap your old name (it says <b>Tap to claim it</b>). Enter its old PIN once. The name and its availability then belong to your account and the PIN is deleted.</p>
+        <p>Old Hubs work the same way: open the Hub and tap <b>Claim this Hub</b>, then enter the old organiser PIN.</p>
+        <p>Five wrong PINs in a row lock that name for 5 minutes (then longer). The site admin can unlock it. If you forgot the PIN, join again with a new name and ask the organiser to remove the old one.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I use a passkey (fingerprint or face)?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>On the sign-in screen tap <b>Sign in with a passkey</b> to use one you already have, or <b>New here? Create an account with a passkey</b>. If you signed in another way, tap <b>Add a passkey</b> under <b>Ways to sign in</b> on your profile page.</p>
+        <p>Your fingerprint or face never leaves your device. You can remove a lost device's passkey on the profile page, as long as one sign-in method remains.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        How do I delete my account?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Open your <a href="account.html">profile page</a>, scroll to <b>Delete account</b>, type your username and confirm. This removes your account, your names on calendars, and every calendar and Hub you organise. See the <a href="privacy.html#delete-account">Privacy Policy</a> for details.</p>
       </div>
     </div>
 
@@ -754,9 +764,9 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>The calendar link acts like a password - anyone with the link can view and participate. 
-        Only share links with trusted participants. PINs protect individual entries from being 
-        modified by others. <b>Do not enter sensitive or private information.</b></p>
+        <p>The calendar link is the invite - anyone signed in who has the link can view and join. 
+        Only share links with trusted participants. Your name belongs to your account, so nobody else 
+        can change your availability. <b>Do not enter sensitive or private information.</b></p>
       </div>
     </div>
     
@@ -768,12 +778,12 @@
       <div class="faq-answer">
         <p>Organiser indicators (coloured left borders on slots) only appear when:</p>
         <ul>
-          <li>You are logged in (enter your PIN)</li>
+          <li>You have joined the calendar</li>
           <li>The organiser has set their availability for that slot</li>
           <li>You are NOT the organiser (you don't need to see your own preferences)</li>
           <li>The calendar is not in Blind mode</li>
         </ul>
-        <p>If you're not logged in, you won't see any individual user indicators for privacy reasons.</p>
+        <p>Until you join, you won't see any individual user indicators for privacy reasons.</p>
       </div>
     </div>
     
@@ -808,17 +818,17 @@
     
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        Why do I need to log in to see who responded?
+        Why do I need to join to see who responded?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>For privacy, individual responses are only shown to authenticated users. This prevents 
-        casual visitors from seeing who is available when. When you expand a ranking card:</p>
+        <p>For privacy, individual responses are only shown to people who have joined the calendar. This prevents 
+        casual visitors from seeing who is available when. On the ranking cards:</p>
         <ul>
-          <li><b>Not logged in:</b> You'll see "Log in to see who responded"</li>
-          <li><b>Logged in (Open mode):</b> You'll see the full roster with names and statuses</li>
-          <li><b>Logged in (Hidden mode):</b> Only the organiser sees the roster</li>
-          <li><b>Logged in (Blind mode):</b> No one sees individual responses</li>
+          <li><b>Not joined:</b> You only see the counts, with no names</li>
+          <li><b>Joined (Open mode):</b> You'll see the full roster with names and statuses</li>
+          <li><b>Joined (Hidden mode):</b> Only the organiser sees the roster</li>
+          <li><b>Joined (Blind mode):</b> No one sees individual responses</li>
         </ul>
         <p>Aggregate counts (e.g., "3 Yes, 2 Maybe") are always visible to everyone.</p>
       </div>
@@ -830,7 +840,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>A Hub is one private link that lists multiple calendars. Share the Hub once; participants pick which calendar to open. Each calendar still has its own organiser and participant PINs. See the <a href="#hubs">Calendar Hubs</a> section above.</p>
+        <p>A Hub is one private link that lists multiple calendars. Share the Hub once; participants pick which calendar to open. You join each calendar separately, using the same account. See the <a href="#hubs">Calendar Hubs</a> section above.</p>
       </div>
     </div>
 
@@ -846,13 +856,13 @@
 
     <div class="faq-item">
       <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-        How do I log out?
+        How do I sign out?
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Click the <span class="material-symbols-outlined icon-inline">person</span> person icon to open the user list. 
-        If you're logged in, you'll see a <span class="material-symbols-outlined icon-inline">logout</span> logout button 
-        next to your name. Clicking it will log you out and refresh the page to ensure a clean state.</p>
+        <p>Tap your name in the top corner to open your <a href="account.html">profile page</a>, then tap 
+        <b>Sign out</b>. Sign-ins last 30 days on each device unless you sign out. Signing out does not remove 
+        your names from any calendar.</p>
       </div>
     </div>
     
@@ -894,7 +904,7 @@
       <div class="faq-answer">
         <p>Once enough people have responded:</p>
         <ol>
-          <li>Log in as the organiser</li>
+          <li>Open the calendar signed in to the organiser account</li>
           <li>Expand a rank card by tapping "View"</li>
           <li>Tap the green <b>Choose</b> button</li>
           <li>Confirm your choice</li>
@@ -909,7 +919,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Any logged-in user can use the toggle buttons at the top of the rankings section:</p>
+        <p>Anyone who has joined can use the toggle buttons at the top of the rankings section:</p>
         <ul>
           <li><b>By Match</b> - Shows dates with the highest combined scores first (default)</li>
           <li><b>By Date</b> - Shows dates in chronological order (earliest first)</li>

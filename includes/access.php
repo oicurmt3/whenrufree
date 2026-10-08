@@ -4,9 +4,11 @@
  *
  * An organiser can pick one of ACCESS_EMOJI_COUNT emoji (stored as its position 0-34). Anyone
  * opening the link must pick the same emoji first. A calendar without its own emoji uses its
- * Hub's emoji. A correct pick returns a random grant token (stored only as a SHA-256 hash) that
- * the browser sends back in the X-Access-Grant header; a Hub grant also opens every calendar in
- * that Hub. Changing or removing an emoji deletes its grants.
+ * Hub's emoji. A correct pick is remembered for the signed-in account (account_access), so it
+ * is asked once per account on any device. It also returns a random grant token (stored only as
+ * a SHA-256 hash) that the browser sends back in the X-Access-Grant header; a Hub grant also
+ * opens every calendar in that Hub. Organisers and people who already have a name on the
+ * calendar are never asked. Changing or removing an emoji deletes its grants.
  *
  * Wrong picks are limited per IP address and subject (max_attempts, then an escalating lock
  * from schedule_minutes), per IP overall (global_per_hour), and requests for links that do not
@@ -230,6 +232,7 @@ function accessSetEmoji(PDO $pdo, string $kind, int $id, ?int $emoji): void {
     $pdo->prepare("UPDATE {$table} SET access_emoji = :e WHERE id = :id")
         ->execute([':e' => $emoji, ':id' => $id]);
     accessGrantRevoke($pdo, $kind, $id);
+    accountAccessRevoke($pdo, $kind, $id);
     $pdo->prepare("DELETE FROM access_attempts WHERE kind = :k AND subject_id = :sid")
         ->execute([':k' => $kind, ':sid' => $id]);
 }
@@ -422,7 +425,7 @@ function accessRespondRequired(string $targetKind, array $req): void {
  * Central gate, run before every action. Actions that name a calendar or Hub need a valid
  * grant when it has an emoji. A missing target is left for the action to report (404).
  * Exempt: access_check itself, super admin actions, and remove_calendar_from_group (it needs
- * the calendar or Hub organiser's PIN session and returns no calendar data).
+ * the calendar or Hub organiser's account and returns no calendar data).
  */
 function accessGate(PDO $pdo, array $config, string $action): void {
     static $exempt = ['csrf_token', 'diag', 'access_check', 'remove_calendar_from_group'];
@@ -433,8 +436,27 @@ function accessGate(PDO $pdo, array $config, string $action): void {
     if ($resolved === null) return;
     [$kind, $row, $req, $allowed] = $resolved;
     if ($row === null || $req === null) return;
+    if (accessAccountAllowed($pdo, $kind, $row, $allowed)) return;
     if (accessGrantValid($pdo, accessGrantTokensFromHeader(), $allowed)) return;
     accessRespondRequired($kind, $req);
+}
+
+/**
+ * True when the signed-in account needs no emoji here: it organises the calendar or Hub, has a
+ * name on the calendar, or picked the right emoji before.
+ */
+function accessAccountAllowed(PDO $pdo, string $kind, array $row, array $allowed): bool {
+    $acct = accountCurrent($pdo);
+    if ($acct === null || !accountsTablesReady($pdo)) return false;
+    $aid = $acct['id'];
+    $groupId = $kind === 'group' ? (int)$row['id'] : (int)($row['group_id'] ?? 0);
+    if ($kind === 'calendar' && accountCalendarUser($pdo, (int)$row['id'], $aid) !== null) return true;
+    if ($groupId > 0) {
+        $stmt = $pdo->prepare("SELECT 1 FROM `groups` WHERE id = :gid AND organiser_account_id = :aid LIMIT 1");
+        $stmt->execute([':gid' => $groupId, ':aid' => $aid]);
+        if ($stmt->fetchColumn()) return true;
+    }
+    return accountAccessValid($pdo, $aid, $allowed);
 }
 
 /** access_check: verify a picked emoji and issue a grant. CSRF is checked by the caller. */
@@ -500,6 +522,8 @@ function accessHandleCheck(PDO $pdo, array $config): void {
     }
 
     accessAttemptReset($pdo, $ip, $req['kind'], $req['id']);
+    $acct = accountCurrent($pdo);
+    if ($acct !== null) accountAccessGrant($pdo, $acct['id'], $req['kind'], $req['id']);
     $grant = accessGrantIssue($pdo, $req['kind'], $req['id'], $cfg['grant_days']);
     logSecurityEvent('ACCESS_GRANTED', $subject);
     respond(200, ['status' => 'success', 'kind' => $req['kind']] + $grant);

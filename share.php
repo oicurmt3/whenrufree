@@ -29,7 +29,7 @@ $ogUrl  = 'https://whenrufree.net/share.php?c='     . urlencode($token);
 
 // -- Defaults (used when DB lookup fails) -------------------------------------
 $ogTitle = 'When RU Free - Group Availability Calendar';
-$ogDesc  = 'Join this shared availability calendar. Mark when you\'re free and find the best time for your group. No sign-up required.';
+$ogDesc  = 'Join this shared availability calendar. Mark when you\'re free and find the best time for your group. No ads, no tracking.';
 
 // -- DB lookup -----------------------------------------------------------------
 try {

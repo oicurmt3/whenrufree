@@ -11,7 +11,8 @@
  *  - CSRF protection (session-based token)
  *  - Security headers
  *  - Basic per-IP rate limiting using api_rate_limit
- *  - PIN authentication with escalating lockout (includes/lockout.php)
+ *  - Accounts: sign in with Google, Facebook or a passkey (includes/accounts.php, oauth.php)
+ *  - Claiming old PIN names and Hubs once, with escalating lockout (includes/lockout.php)
  *  - Calendar and availability CRUD endpoints
  */
 
@@ -23,7 +24,7 @@ declare(strict_types=1);
 // This app is designed for same-origin use. We reply to OPTIONS for dev tooling.
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Access-Control-Allow-Methods: GET,POST,OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token, X-CSRF-Token, X-Group-Auth-Token, X-Access-Grant');
+    header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token, X-Access-Grant');
     header('Access-Control-Max-Age: 86400');
     http_response_code(204);
     exit;
@@ -51,6 +52,8 @@ require_once __DIR__ . '/includes/sessions.php';
 require_once __DIR__ . '/includes/hubs.php';
 require_once __DIR__ . '/includes/webauthn.php';
 require_once __DIR__ . '/includes/lockout.php';
+require_once __DIR__ . '/includes/accounts.php';
+require_once __DIR__ . '/includes/oauth.php';
 require_once __DIR__ . '/includes/access.php';
 require_once __DIR__ . '/includes/booking.php';
 
@@ -89,6 +92,9 @@ try {
     }
 }
 
+// Calendars and Hubs are for signed-in accounts only (includes/accounts.php)
+accountGate($pdo, $action);
+
 // Access emoji: calendars and Hubs with an emoji need a grant (includes/access.php)
 accessGate($pdo, $config, $action);
 
@@ -117,6 +123,210 @@ if ($action === 'diag' && $_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 // -------------------------
+// Accounts (includes/accounts.php, includes/oauth.php)
+// -------------------------
+
+// Who is signed in, and which sign-in methods this site offers. Works when signed out.
+if ($action === 'account_me' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $ready = accountsTablesReady($pdo);
+    $acct = $ready ? accountCurrent($pdo) : null;
+    respond(200, [
+        'status' => 'success',
+        'available' => $ready,
+        'signed_in' => $acct !== null,
+        'needs_setup' => $acct !== null && $acct['needs_setup'],
+        'username' => $acct['username'] ?? null,
+        'display_name' => $acct['display_name'] ?? null,
+        'methods' => [
+            'google' => oauthProviderEnabled($config, 'google'),
+            'facebook' => oauthProviderEnabled($config, 'facebook'),
+            'passkey' => $ready,
+        ],
+    ]);
+}
+
+// Choose or change the private username and/or the profile name used on calendars
+if ($action === 'account_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $acct = requireAccount($pdo, false);
+    enforceActionRateLimit($pdo, clientIp(), 'acu' . gmdate('YmdHi'), 20, 'Too many changes. Try again shortly.');
+
+    $username = null;
+    if (array_key_exists('username', $_POST)) {
+        $isAdmin = in_array($acct['id'], adminAccountIds($config), true);
+        $username = accountNormaliseUsername($_POST['username'], $isAdmin);
+        if ($username === null) {
+            if (is_string($_POST['username']) && accountUsernameReserved($_POST['username'])) {
+                respond(400, ['status' => 'error', 'code' => 'USERNAME_RESERVED', 'message' => 'That username is reserved. Please choose another.']);
+            }
+            respond(400, ['status' => 'error', 'code' => 'USERNAME_INVALID', 'message' => 'Usernames are 3-20 lowercase letters, numbers or _.']);
+        }
+        if ($username === $acct['username']) $username = null;
+    }
+    $displayName = null;
+    if (array_key_exists('display_name', $_POST)) {
+        $displayName = accountNormaliseName($_POST['display_name']);
+        if ($displayName === null) {
+            respond(400, ['status' => 'error', 'code' => 'NAME_INVALID', 'message' => "Names use letters, numbers, spaces, ' or - (up to 32)."]);
+        }
+        if ($displayName === $acct['display_name']) $displayName = null;
+    }
+    if (($acct['username'] === null && $username === null) || ($acct['display_name'] === null && $displayName === null)) {
+        respond(400, ['status' => 'error', 'message' => 'Choose a username and a name.']);
+    }
+
+    $result = accountUpdateProfile($pdo, $acct['id'], $username, $displayName);
+    $GLOBALS['_wruf_account_loaded'] = false;
+    $now = accountCurrent($pdo);
+    respond(200, [
+        'status' => 'success',
+        'username' => $now['username'] ?? null,
+        'display_name' => $now['display_name'] ?? null,
+        'renamed' => $result['renamed'],
+        'conflicts' => $result['conflicts'],
+    ]);
+}
+
+if ($action === 'account_logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    accountLogout($pdo);
+    respond(200, ['status' => 'success']);
+}
+
+// Sign-in methods on the account (Google, Facebook, passkeys)
+if ($action === 'account_methods' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $acct = requireAccount($pdo, false);
+    respond(200, ['status' => 'success', 'methods' => accountMethods($pdo, $acct['id'])]);
+}
+
+if ($action === 'account_remove_method' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $acct = requireAccount($pdo, false);
+    $type = (string)($_POST['type'] ?? '');
+    $removed = accountRemoveMethod($pdo, $acct['id'], $type, (string)($_POST['id'] ?? ''));
+    if ($removed) logSecurityEvent('ACCOUNT_METHOD_REMOVED', ['account_id' => $acct['id'], 'type' => $type]);
+    respond(200, ['status' => 'success', 'removed' => $removed, 'methods' => accountMethods($pdo, $acct['id'])]);
+}
+
+// Calendars and Hubs for the profile page
+if ($action === 'account_memberships' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $acct = requireAccount($pdo);
+    respond(200, ['status' => 'success'] + accountMemberships($pdo, $acct['id']));
+}
+
+// What deleting the account would remove
+if ($action === 'account_delete_preview' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $acct = requireAccount($pdo, false);
+    respond(200, ['status' => 'success'] + accountDeletionSummary($pdo, $acct['id']));
+}
+
+// Delete the account and everything it owns. Confirmed by typing the username.
+if ($action === 'account_delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $acct = requireAccount($pdo, false);
+    $typed = strtolower(trim((string)($_POST['confirm'] ?? '')));
+    if ($acct['username'] !== null && !hash_equals($acct['username'], $typed)) {
+        respond(400, ['status' => 'error', 'code' => 'CONFIRM_MISMATCH', 'message' => 'Type your username to confirm.']);
+    }
+    accountDelete($pdo, $acct['id']);
+    accountLogout($pdo);
+    logSecurityEvent('ACCOUNT_DELETED', ['account_id' => $acct['id']]);
+    respond(200, ['status' => 'success']);
+}
+
+// Passkeys: create an account with one (signup), add one to the signed-in account (add),
+// or sign in with one without typing anything (login).
+if (str_starts_with($action, 'account_passkey_') && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    accountRequireTables($pdo);
+    $ip = clientIp();
+    $minute = gmdate('YmdHi');
+
+    if ($action === 'account_passkey_signup_begin') {
+        enforceActionRateLimit($pdo, $ip, 'aps' . gmdate('YmdH'), 10, 'Too many new accounts from here. Try again later.');
+        startSecureSession();
+        $pending = (int)($_SESSION['wruf_pending_account'] ?? 0);
+        if ($pending <= 0 || !accountNeedsSetup($pdo, $pending) || accountMethods($pdo, $pending)) {
+            $pending = accountCreate($pdo);
+            $_SESSION['wruf_pending_account'] = $pending;
+        }
+        $subject = webauthnAccountSubject($pending, 'When RU Free account');
+        respond(200, ['status' => 'success', 'publicKey' => webauthnRegisterOptions($pdo, $config, $subject)]);
+    }
+
+    if ($action === 'account_passkey_signup_finish') {
+        enforceActionRateLimit($pdo, $ip, 'apr' . $minute, 20, 'Too many attempts. Try again shortly.');
+        startSecureSession();
+        $pending = (int)($_SESSION['wruf_pending_account'] ?? 0);
+        $cred = $_POST['credential'] ?? null;
+        if ($pending <= 0 || !is_array($cred)) respond(400, ['status' => 'error', 'message' => 'Request expired. Please try again.']);
+        webauthnRegisterFinish($pdo, $config, webauthnAccountSubject($pending), $cred, $_POST['device_label'] ?? null);
+        unset($_SESSION['wruf_pending_account']);
+        accountCreateSession($pdo, $pending);
+        logSecurityEvent('ACCOUNT_CREATED', ['account_id' => $pending, 'provider' => 'passkey']);
+        respond(200, ['status' => 'success', 'needs_setup' => true]);
+    }
+
+    if ($action === 'account_passkey_add_begin') {
+        $acct = requireAccount($pdo, false);
+        enforceActionRateLimit($pdo, $ip, 'apr' . $minute, 20, 'Too many attempts. Try again shortly.');
+        $subject = webauthnAccountSubject($acct['id'], (string)($acct['username'] ?? 'When RU Free account'));
+        respond(200, ['status' => 'success', 'publicKey' => webauthnRegisterOptions($pdo, $config, $subject)]);
+    }
+
+    if ($action === 'account_passkey_add_finish') {
+        $acct = requireAccount($pdo, false);
+        enforceActionRateLimit($pdo, $ip, 'apr' . $minute, 20, 'Too many attempts. Try again shortly.');
+        $cred = $_POST['credential'] ?? null;
+        if (!is_array($cred)) respond(400, ['status' => 'error', 'message' => 'Invalid request']);
+        webauthnRegisterFinish($pdo, $config, webauthnAccountSubject($acct['id']), $cred, $_POST['device_label'] ?? null);
+        logSecurityEvent('ACCOUNT_METHOD_LINKED', ['account_id' => $acct['id'], 'provider' => 'passkey']);
+        respond(200, ['status' => 'success', 'methods' => accountMethods($pdo, $acct['id'])]);
+    }
+
+    if ($action === 'account_passkey_login_begin') {
+        enforceActionRateLimit($pdo, $ip, 'apl' . $minute, 30, 'Too many attempts. Try again shortly.');
+        respond(200, ['status' => 'success', 'publicKey' => webauthnDiscoverOptions($config)]);
+    }
+
+    if ($action === 'account_passkey_login_finish') {
+        enforceActionRateLimit($pdo, $ip, 'apl' . $minute, 30, 'Too many attempts. Try again shortly.');
+        $cred = $_POST['credential'] ?? null;
+        if (!is_array($cred)) respond(400, ['status' => 'error', 'message' => 'Invalid request']);
+        $accountId = webauthnDiscoverFinish($pdo, $config, $cred);
+        accountCreateSession($pdo, $accountId);
+        logSecurityEvent('ACCOUNT_SIGNIN', ['account_id' => $accountId, 'provider' => 'passkey']);
+        respond(200, ['status' => 'success', 'needs_setup' => accountNeedsSetup($pdo, $accountId)]);
+    }
+}
+
+// Start Google / Facebook sign-in (mode=link adds it to the signed-in account). Browser navigation.
+if ($action === 'oauth_start' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $provider = (string)($_GET['provider'] ?? '');
+    $mode = (string)($_GET['mode'] ?? 'login') === 'link' ? 'link' : 'login';
+    $return = oauthCleanReturn($_GET['return'] ?? null);
+    if (!in_array($provider, OAUTH_PROVIDERS, true) || !oauthProviderEnabled($config, $provider) || !accountsTablesReady($pdo)) {
+        oauthFinish($return, 'unavailable');
+    }
+    enforceActionRateLimit($pdo, clientIp(), 'oas' . gmdate('YmdHi'), 20, 'Too many attempts. Try again shortly.');
+    if ($mode === 'link' && accountCurrent($pdo) === null) {
+        oauthFinish(oauthAccountPage($config), 'expired');
+    }
+    header('Cache-Control: no-store');
+    header('Location: ' . oauthAuthorizeUrl($config, $provider, $mode, $return), true, 302);
+    exit;
+}
+
+// Google / Facebook redirect back here
+if (($action === 'oauth_google' || $action === 'oauth_facebook') && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    accountRequireTables($pdo);
+    $provider = substr($action, 6);
+    if (!oauthProviderEnabled($config, $provider)) oauthFinish(oauthAccountPage($config), 'unavailable');
+    enforceActionRateLimit($pdo, clientIp(), 'oac' . gmdate('YmdHi'), 20, 'Too many attempts. Try again shortly.');
+    oauthHandleCallback($pdo, $config, $provider);
+}
+
+// -------------------------
 // Access emoji
 // -------------------------
 
@@ -127,8 +337,7 @@ if ($action === 'access_check' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /**
- * Organiser view of the emoji setting: the calendar organiser (?c=, X-Auth-Token) or the
- * Hub organiser (?g=, X-Group-Auth-Token).
+ * Organiser view of the emoji setting: the calendar organiser (?c=) or the Hub organiser (?g=).
  */
 if ($action === 'access_settings' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     if (!accessTablesReady($pdo)) {
@@ -254,11 +463,8 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $isPrivate = (int)($_POST['is_private'] ?? 0);
     if ($isPrivate < 0 || $isPrivate > 2) $isPrivate = 0;
 
-    $adminName = normaliseName($_POST['admin_name'] ?? null);
-    $pinHash = hashPin((string)($_POST['admin_pin'] ?? ''));
-    if ($adminName === null || $pinHash === null) {
-        respond(400, ['status' => 'error', 'message' => 'Organiser name or PIN invalid']);
-    }
+    $acct = requireAccount($pdo);
+    [$adminName, $adminNameCustom] = accountNameForCalendar($acct, $_POST['admin_name'] ?? null);
 
     $accessEmoji = accessEmojiValue($_POST['access_emoji'] ?? null);
     if ($accessEmoji === false) respond(400, ['status' => 'error', 'message' => 'Invalid emoji']);
@@ -344,10 +550,10 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $calId = (int)$pdo->lastInsertId();
 
             $stmtU = $pdo->prepare(
-                "INSERT INTO users (calendar_id, display_name, role, pin_hash, created_at)
-                 VALUES (:cid, :dn, 'admin', :ph, NOW())"
+                "INSERT INTO users (calendar_id, display_name, role, account_id, name_custom, created_at)
+                 VALUES (:cid, :dn, 'admin', :aid, :nc, NOW())"
             );
-            $stmtU->execute([':cid' => $calId, ':dn' => $adminName, ':ph' => $pinHash]);
+            $stmtU->execute([':cid' => $calId, ':dn' => $adminName, ':aid' => $acct['id'], ':nc' => $adminNameCustom ? 1 : 0]);
 
             if ($slotCapacity !== null) {
                 $pdo->prepare("UPDATE calendars SET slot_capacity = :cap, max_per_user = :per WHERE id = :id")
@@ -372,19 +578,12 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 touchGroupActivity($pdo, $groupId);
             }
 
-            $payload = ['status' => 'success', 'token' => $token];
-            if (accessTablesReady($pdo)) {
-                if ($accessEmoji !== null) {
-                    $pdo->prepare("UPDATE calendars SET access_emoji = :e WHERE id = :id")
-                        ->execute([':e' => $accessEmoji, ':id' => $calId]);
-                }
-                // The creator gets a grant for whichever emoji now guards the calendar (own or Hub's).
-                $req = accessRequirementForCalendar(accessCalendarRow($pdo, $token) ?? []);
-                if ($req !== null) {
-                    $payload += accessGrantIssue($pdo, $req['kind'], $req['id'], accessConfig($config)['grant_days']);
-                }
+            if ($accessEmoji !== null && accessTablesReady($pdo)) {
+                $pdo->prepare("UPDATE calendars SET access_emoji = :e WHERE id = :id")
+                    ->execute([':e' => $accessEmoji, ':id' => $calId]);
             }
-            respond(200, $payload);
+            logSecurityEvent('CALENDAR_CREATED', ['calendar_id' => $calId, 'account_id' => $acct['id']]);
+            respond(200, ['status' => 'success', 'token' => $token]);
         } catch (PDOException $e) {
             if ((string)$e->getCode() === '23000') {
                 // Token collision
@@ -404,11 +603,8 @@ if ($action === 'create_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = normaliseTitle($_POST['title'] ?? null);
     $titleForDb = $title === null ? '' : $title;
 
-    $organiserName = normaliseName($_POST['organiser_name'] ?? null);
-    $pinHash = hashPin((string)($_POST['organiser_pin'] ?? ''));
-    if ($organiserName === null || $pinHash === null) {
-        respond(400, ['status' => 'error', 'message' => 'Organiser name or PIN invalid']);
-    }
+    $acct = requireAccount($pdo);
+    [$organiserName] = accountNameForCalendar($acct, $_POST['organiser_name'] ?? null);
 
     $accessEmoji = accessEmojiValue($_POST['access_emoji'] ?? null);
     if ($accessEmoji === false) respond(400, ['status' => 'error', 'message' => 'Invalid emoji']);
@@ -421,29 +617,24 @@ if ($action === 'create_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare(
                 "INSERT INTO `groups`
-                    (token, title, organiser_name, organiser_pin_hash, created_at, last_activity)
+                    (token, title, organiser_name, organiser_account_id, created_at, last_activity)
                  VALUES
-                    (:t, :title, :oname, :ph, NOW(), NOW())"
+                    (:t, :title, :oname, :aid, NOW(), NOW())"
             );
             $stmt->execute([
                 ':t' => $token,
                 ':title' => $titleForDb,
                 ':oname' => $organiserName,
-                ':ph' => $pinHash,
+                ':aid' => $acct['id'],
             ]);
-
-            $payload = [
-                'status' => 'success',
-                'token' => $token,
-                'title' => $titleForDb,
-            ];
+            $groupId = (int)$pdo->lastInsertId();
+            accountTouchHub($pdo, $acct['id'], $groupId);
             if ($accessEmoji !== null) {
-                $groupId = (int)$pdo->lastInsertId();
                 $pdo->prepare("UPDATE `groups` SET access_emoji = :e WHERE id = :id")
                     ->execute([':e' => $accessEmoji, ':id' => $groupId]);
-                $payload += accessGrantIssue($pdo, 'group', $groupId, accessConfig($config)['grant_days']);
             }
-            respond(200, $payload);
+            logSecurityEvent('HUB_CREATED', ['group_id' => $groupId, 'account_id' => $acct['id']]);
+            respond(200, ['status' => 'success', 'token' => $token, 'title' => $titleForDb]);
         } catch (PDOException $e) {
             if ((string)$e->getCode() === '23000') {
                 continue;
@@ -487,57 +678,70 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         ];
     }
 
+    $acct = requireAccount($pdo);
+    accountTouchHub($pdo, $acct['id'], $groupId);
+    $ownerId = $grp['organiser_account_id'] !== null ? (int)$grp['organiser_account_id'] : null;
+
     respond(200, [
         'status' => 'success',
         'group' => [
             'title' => (string)($grp['title'] ?? ''),
             'token' => (string)$grp['token'],
             'calendar_count' => count($calendars),
-            'passkeys' => webauthnTablesReady($pdo),
+            'organiser_name' => (string)$grp['organiser_name'],
+            'is_organiser' => $ownerId === $acct['id'],
+            'claimable' => $ownerId === null && !empty($grp['organiser_pin_hash']),
             'access' => accessPublicInfo($pdo, accessRequirementForGroup(accessGroupRow($pdo, $token) ?? [])),
         ],
         'calendars' => $calendars,
     ]);
 }
 
-// Hub organiser auth
-if ($action === 'auth_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+// Claim an old Hub (created before accounts) with its organiser PIN, once. The PIN is then deleted.
+if ($action === 'claim_hub' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
+    $acct = requireAccount($pdo);
     $token = requireGroupTokenParam();
 
     $grp = getGroupByToken($pdo, $token);
     if (!$grp) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
     $groupId = (int)$grp['id'];
+    if ($grp['organiser_account_id'] !== null || empty($grp['organiser_pin_hash'])) {
+        respond(409, ['status' => 'error', 'code' => 'ALREADY_CLAIMED', 'message' => 'This Hub already belongs to an account.']);
+    }
 
     $pin = (string)($_POST['pin'] ?? '');
     if (!preg_match('/^\d{4}$/', $pin)) {
-        respond(400, ['status' => 'error', 'message' => 'Invalid request']);
+        respond(400, ['status' => 'error', 'message' => 'Enter the 4-digit organiser PIN.']);
     }
 
     checkGroupLockout($pdo, $groupId);
 
     if (!verifyPin($pin, (string)$grp['organiser_pin_hash'])) {
         $lockMins = recordGroupFailedAttempt($pdo, $groupId);
-        logSecurityEvent('GROUP_AUTH_FAILED', ['group_id' => $groupId]);
+        logSecurityEvent('HUB_CLAIM_FAILED', ['group_id' => $groupId, 'account_id' => $acct['id']]);
         if ($lockMins !== null) {
             logSecurityEvent('GROUP_LOCKED', ['group_id' => $groupId, 'minutes' => $lockMins]);
             pinLockoutRespondLocked('This Hub', $lockMins);
         }
-        respond(401, ['status' => 'error', 'message' => 'Invalid PIN']);
+        respond(401, ['status' => 'error', 'message' => 'Wrong PIN']);
     }
 
-    resetGroupFailedAttempts($pdo, $groupId);
-
-    $sessTok = createGroupSession($pdo, $groupId);
-
+    $upd = $pdo->prepare(
+        "UPDATE `groups` SET organiser_account_id = :aid, organiser_pin_hash = NULL,
+                failed_attempts = 0, locked_until = NULL, lockout_level = 0
+         WHERE id = :gid AND organiser_account_id IS NULL"
+    );
+    $upd->execute([':aid' => $acct['id'], ':gid' => $groupId]);
+    if ($upd->rowCount() === 0) {
+        respond(409, ['status' => 'error', 'code' => 'ALREADY_CLAIMED', 'message' => 'This Hub already belongs to an account.']);
+    }
+    legacyForgetGroup($pdo, $groupId);
+    accountTouchHub($pdo, $acct['id'], $groupId);
     touchGroupActivity($pdo, $groupId);
+    logSecurityEvent('HUB_CLAIMED', ['group_id' => $groupId, 'account_id' => $acct['id']]);
 
-    respond(200, [
-        'status' => 'success',
-        'auth_token' => $sessTok,
-        'role' => 'admin',
-        'organiser_name' => (string)$grp['organiser_name'],
-    ]);
+    respond(200, ['status' => 'success', 'organiser_name' => (string)$grp['organiser_name']]);
 }
 
 // Attach calendar to hub (calendar organiser only)
@@ -570,7 +774,9 @@ if ($action === 'add_calendar_to_group' && $_SERVER['REQUEST_METHOD'] === 'POST'
     $groupId = (int)$grp['id'];
 
     $hubReq = accessTablesReady($pdo) ? accessRequirementForGroup(accessGroupRow($pdo, $groupTokenPost) ?? []) : null;
-    if ($hubReq !== null && !accessGrantValid($pdo, accessGrantTokensFromHeader(), [['group', $groupId]])) {
+    if ($hubReq !== null
+        && !accessAccountAllowed($pdo, 'group', ['id' => $groupId], [['group', $groupId]])
+        && !accessGrantValid($pdo, accessGrantTokensFromHeader(), [['group', $groupId]])) {
         respond(403, [
             'status' => 'error',
             'code' => 'HUB_ACCESS_REQUIRED',
@@ -734,10 +940,20 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
 
     unset($cal['group_id'], $cal['group_token'], $cal['group_title']);
 
-    $cal['passkeys'] = webauthnTablesReady($pdo);
     $cal['access'] = accessPublicInfo($pdo, accessRequirementForCalendar(accessCalendarRow($pdo, $token) ?? []));
 
-    respond(200, ['status' => 'success', 'calendar' => $cal]);
+    // Who the signed-in account is here (null until it joins), and whether old PIN names are left to claim
+    $acct = requireAccount($pdo);
+    $me = accountCalendarUser($pdo, (int)$cal['id'], $acct['id']);
+    $stmtCl = $pdo->prepare("SELECT 1 FROM users WHERE calendar_id = :cid AND account_id IS NULL AND pin_hash IS NOT NULL LIMIT 1");
+    $stmtCl->execute([':cid' => (int)$cal['id']]);
+    $account = [
+        'profile_name' => (string)$acct['display_name'],
+        'me' => $me,
+        'claimable' => (bool)$stmtCl->fetchColumn(),
+    ];
+
+    respond(200, ['status' => 'success', 'calendar' => $cal, 'account' => $account]);
 }
 
 // Save date filter dates (admin only)
@@ -860,7 +1076,8 @@ if ($action === 'save_organiser_message' && $_SERVER['REQUEST_METHOD'] === 'POST
     respond(200, ['status' => 'success', 'organiser_message' => $msg]);
 }
 
-// List users
+// List users. mine: the signed-in account's name. claimable: an old name (from before accounts)
+// that can be claimed once with its PIN.
 if ($action === 'users' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $token = requireToken();
     $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
@@ -868,17 +1085,31 @@ if ($action === 'users' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $cal = $stmtC->fetch();
     if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
     $calId = (int)$cal['id'];
+    $acct = requireAccount($pdo);
 
-    $stmtU = $pdo->prepare("SELECT id, display_name, role FROM users WHERE calendar_id = :cid ORDER BY created_at ASC, id ASC");
+    $stmtU = $pdo->prepare(
+        "SELECT id, display_name, role, account_id, (account_id IS NULL AND pin_hash IS NOT NULL) AS claimable
+         FROM users WHERE calendar_id = :cid ORDER BY created_at ASC, id ASC"
+    );
     $stmtU->execute([':cid' => $calId]);
-    $users = $stmtU->fetchAll();
+    $users = [];
+    foreach ($stmtU->fetchAll() as $u) {
+        $users[] = [
+            'id' => (int)$u['id'],
+            'display_name' => (string)$u['display_name'],
+            'role' => (string)$u['role'],
+            'mine' => $u['account_id'] !== null && (int)$u['account_id'] === $acct['id'],
+            'claimable' => (int)$u['claimable'] === 1,
+        ];
+    }
 
     respond(200, ['status' => 'success', 'users' => $users]);
 }
 
-// Add user
-if ($action === 'add_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+// Join a calendar as the signed-in account: its profile name, or a name just for this calendar
+if ($action === 'join_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
+    $acct = requireAccount($pdo);
     $token = requireToken();
 
     $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
@@ -887,40 +1118,36 @@ if ($action === 'add_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
     $calId = (int)$cal['id'];
 
-    $name = normaliseName($_POST['display_name'] ?? ($_POST['name'] ?? null));
-    $pinHash = hashPin((string)($_POST['pin'] ?? ''));
-    if ($name === null || $pinHash === null) respond(400, ['status' => 'error', 'message' => 'Invalid name or PIN']);
+    if (accountCalendarUser($pdo, $calId, $acct['id']) !== null) {
+        respond(409, ['status' => 'error', 'code' => 'ALREADY_JOINED', 'message' => 'You have already joined this calendar.']);
+    }
+    [$name, $custom] = accountNameForCalendar($acct, $_POST['display_name'] ?? null);
 
     try {
-        $stmt = $pdo->prepare(
-            "INSERT INTO users (calendar_id, display_name, role, pin_hash, created_at)
-             VALUES (:cid, :dn, 'member', :ph, NOW())"
-        );
-        $stmt->execute([':cid' => $calId, ':dn' => $name, ':ph' => $pinHash]);
+        $pdo->prepare(
+            "INSERT INTO users (calendar_id, display_name, role, account_id, name_custom, created_at)
+             VALUES (:cid, :dn, 'member', :aid, :nc, NOW())"
+        )->execute([':cid' => $calId, ':dn' => $name, ':aid' => $acct['id'], ':nc' => $custom ? 1 : 0]);
     } catch (PDOException $e) {
         if ((string)$e->getCode() === '23000') {
+            if (accountCalendarUser($pdo, $calId, $acct['id']) !== null) {
+                respond(409, ['status' => 'error', 'code' => 'ALREADY_JOINED', 'message' => 'You have already joined this calendar.']);
+            }
             respondDuplicateName();
         }
-        respond(500, ['status' => 'error', 'message' => 'Failed to add user']);
+        respond(500, ['status' => 'error', 'message' => 'Failed to join']);
     }
-
-    // IMPORTANT: Get lastInsertId immediately after INSERT, before any other queries
     $newId = (int)$pdo->lastInsertId();
 
     $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
 
     respond(200, [
         'status' => 'success',
-        'user_id' => $newId,
-        'user' => [
-            'id' => $newId,
-            'display_name' => $name,
-            'role' => 'member',
-        ],
+        'user' => ['id' => $newId, 'display_name' => $name, 'role' => 'member', 'name_custom' => $custom],
     ]);
 }
 
-// Rename user (self or admin)
+// Rename: your own name on this calendar (use_profile = back to the profile name), or anyone's (organiser)
 if ($action === 'rename_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     $token = requireToken();
@@ -932,18 +1159,27 @@ if ($action === 'rename_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $calId = (int)$cal['id'];
 
     $session = requireSession($pdo, $calId);
+    $acct = requireAccount($pdo);
 
-    $targetId = (int)($_POST['user_id'] ?? 0);
-    $newName = normaliseName($_POST['display_name'] ?? ($_POST['name'] ?? null));
-    if ($targetId <= 0 || $newName === null) respond(400, ['status' => 'error', 'message' => 'Invalid request']);
-
-    if ($session['role'] !== 'admin' && $session['user_id'] !== $targetId) {
+    $targetId = (int)($_POST['user_id'] ?? $session['user_id']);
+    $self = $targetId === $session['user_id'];
+    if (!$self && $session['role'] !== 'admin') {
         respond(403, ['status' => 'error', 'message' => 'Not permitted']);
+    }
+    if ($self && !empty($_POST['use_profile'])) {
+        $newName = (string)$acct['display_name'];
+        $custom = false;
+    } else {
+        $newName = accountNormaliseName($_POST['display_name'] ?? null);
+        if ($targetId <= 0 || $newName === null) {
+            respond(400, ['status' => 'error', 'message' => "Use letters, numbers, spaces, ' or - (up to 32)."]);
+        }
+        $custom = !$self || $newName !== (string)$acct['display_name'];
     }
 
     try {
-        $stmt = $pdo->prepare("UPDATE users SET display_name = :dn WHERE id = :uid AND calendar_id = :cid");
-        $stmt->execute([':dn' => $newName, ':uid' => $targetId, ':cid' => $calId]);
+        $stmt = $pdo->prepare("UPDATE users SET display_name = :dn, name_custom = :nc WHERE id = :uid AND calendar_id = :cid");
+        $stmt->execute([':dn' => $newName, ':nc' => $custom ? 1 : 0, ':uid' => $targetId, ':cid' => $calId]);
     } catch (PDOException $e) {
         if ((string)$e->getCode() === '23000') {
             respondDuplicateName();
@@ -953,18 +1189,19 @@ if ($action === 'rename_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
 
-    respond(200, ['status' => 'success']);
+    respond(200, ['status' => 'success', 'display_name' => $newName, 'name_custom' => $custom]);
 }
 
-// Authenticate user by PIN
-if ($action === 'auth_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+// Claim an old name (from before accounts) with its PIN, once. The PIN is then deleted.
+if ($action === 'claim_name' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
+    $acct = requireAccount($pdo);
     $token = requireToken();
 
     $userId = (int)($_POST['user_id'] ?? 0);
     $pin = (string)($_POST['pin'] ?? '');
     if ($userId <= 0 || !preg_match('/^\d{4}$/', $pin)) {
-        respond(400, ['status' => 'error', 'message' => 'Invalid request']);
+        respond(400, ['status' => 'error', 'message' => 'Enter the 4-digit PIN for that name.']);
     }
 
     $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
@@ -973,117 +1210,55 @@ if ($action === 'auth_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
     $calId = (int)$cal['id'];
 
-    $stmtU = $pdo->prepare("SELECT id, pin_hash, role FROM users WHERE id = :uid AND calendar_id = :cid");
+    if (accountCalendarUser($pdo, $calId, $acct['id']) !== null) {
+        respond(409, ['status' => 'error', 'code' => 'ALREADY_JOINED', 'message' => 'You already have a name on this calendar.']);
+    }
+
+    $stmtU = $pdo->prepare("SELECT id, display_name, role, pin_hash, account_id FROM users WHERE id = :uid AND calendar_id = :cid");
     $stmtU->execute([':uid' => $userId, ':cid' => $calId]);
     $user = $stmtU->fetch();
     if (!$user) respond(404, ['status' => 'error', 'message' => 'User not found']);
+    if ($user['account_id'] !== null || empty($user['pin_hash'])) {
+        respond(409, ['status' => 'error', 'code' => 'ALREADY_CLAIMED', 'message' => 'That name already belongs to an account.']);
+    }
 
     checkAccountLockout($pdo, $userId);
 
     if (!verifyPin($pin, (string)$user['pin_hash'])) {
         $lockMins = recordFailedAttempt($pdo, $userId);
-        logSecurityEvent('AUTH_FAILED', ['user_id' => $userId, 'calendar_id' => $calId]);
-
+        logSecurityEvent('NAME_CLAIM_FAILED', ['user_id' => $userId, 'calendar_id' => $calId, 'account_id' => $acct['id']]);
         if ($lockMins !== null) {
             logSecurityEvent('ACCOUNT_LOCKED', ['user_id' => $userId, 'calendar_id' => $calId, 'minutes' => $lockMins]);
             pinLockoutRespondLocked('This name', $lockMins);
         }
-
-        respond(401, ['status' => 'error', 'message' => 'Invalid PIN']);
+        respond(401, ['status' => 'error', 'message' => 'Wrong PIN']);
     }
 
-    resetFailedAttempts($pdo, $userId);
-
-    $tok = createUserSession($pdo, $calId, $userId);
-
-    $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
-
-    respond(200, ['status' => 'success', 'auth_token' => $tok, 'role' => (string)$user['role'], 'user_id' => $userId]);
-}
-
-// -------------------------
-// Passkeys: fingerprint / face / device screen lock login (PIN stays as backup)
-// Every action takes ?c=<calendar token> (calendar user) or ?g=<hub token> (Hub organiser).
-// -------------------------
-if (str_starts_with($action, 'passkey_') && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    requireCsrf();
-    webauthnRequireTables($pdo);
-    $ip = clientIp();
-    $minute = gmdate('YmdHi');
-
-    // Start enrolling this device (must already be logged in with PIN)
-    if ($action === 'passkey_register_begin') {
-        $subject = resolvePasskeySubject($pdo, true);
-        enforceActionRateLimit($pdo, $ip, 'pkr' . $minute, 20, 'Too many attempts. Try again shortly.');
-        respond(200, ['status' => 'success', 'publicKey' => webauthnRegisterOptions($pdo, $config, $subject)]);
-    }
-
-    if ($action === 'passkey_register_finish') {
-        $subject = resolvePasskeySubject($pdo, true);
-        enforceActionRateLimit($pdo, $ip, 'pkr' . $minute, 20, 'Too many attempts. Try again shortly.');
-        $cred = $_POST['credential'] ?? null;
-        if (!is_array($cred)) respond(400, ['status' => 'error', 'message' => 'Invalid request']);
-
-        $credentialId = webauthnRegisterFinish($pdo, $config, $subject, $cred, $_POST['device_label'] ?? null);
-        logSecurityEvent('PASSKEY_ADDED', ['subject' => webauthnSubjectKey($subject)]);
-        respond(200, ['status' => 'success', 'credential_id' => $credentialId]);
-    }
-
-    // Start a passkey login for a chosen name (calendar: POST user_id) or the Hub organiser
-    if ($action === 'passkey_login_begin') {
-        $subject = resolvePasskeySubject($pdo, false);
-        enforceActionRateLimit($pdo, $ip, 'pkl' . $minute, 30, 'Too many attempts. Try again shortly.');
-        respond(200, ['status' => 'success', 'publicKey' => webauthnLoginOptions($pdo, $config, $subject)]);
-    }
-
-    if ($action === 'passkey_login_finish') {
-        $subject = resolvePasskeySubject($pdo, false);
-        enforceActionRateLimit($pdo, $ip, 'pkl' . $minute, 30, 'Too many attempts. Try again shortly.');
-        $cred = $_POST['credential'] ?? null;
-        if (!is_array($cred)) respond(400, ['status' => 'error', 'message' => 'Invalid request']);
-
-        webauthnLoginFinish($pdo, $config, $subject, $cred);
-        logSecurityEvent('PASSKEY_LOGIN', ['subject' => webauthnSubjectKey($subject)]);
-
-        // A verified passkey is stronger than a PIN, so it also clears any PIN lockout.
-        if ($subject['kind'] === 'group') {
-            resetGroupFailedAttempts($pdo, $subject['id']);
-            $sessTok = createGroupSession($pdo, $subject['id']);
-            touchGroupActivity($pdo, $subject['id']);
-            respond(200, [
-                'status' => 'success',
-                'auth_token' => $sessTok,
-                'role' => 'admin',
-                'organiser_name' => $subject['name'],
-            ]);
+    $name = (string)$user['display_name'];
+    try {
+        $upd = $pdo->prepare(
+            "UPDATE users SET account_id = :aid, pin_hash = NULL, name_custom = :nc,
+                    failed_attempts = 0, locked_until = NULL, lockout_level = 0
+             WHERE id = :uid AND calendar_id = :cid AND account_id IS NULL"
+        );
+        $upd->execute([':aid' => $acct['id'], ':nc' => $name !== (string)$acct['display_name'] ? 1 : 0, ':uid' => $userId, ':cid' => $calId]);
+    } catch (PDOException $e) {
+        if ((string)$e->getCode() === '23000') {
+            respond(409, ['status' => 'error', 'code' => 'ALREADY_JOINED', 'message' => 'You already have a name on this calendar.']);
         }
-
-        resetFailedAttempts($pdo, $subject['id']);
-        $tok = createUserSession($pdo, $subject['calendar_id'], $subject['id']);
-        $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")
-            ->execute([':cid' => $subject['calendar_id']]);
-        respond(200, [
-            'status' => 'success',
-            'auth_token' => $tok,
-            'role' => $subject['role'],
-            'user_id' => $subject['id'],
-        ]);
+        throw $e;
     }
-
-    // Devices with fingerprint / face unlock for the logged-in user or Hub organiser
-    if ($action === 'passkey_list') {
-        $subject = resolvePasskeySubject($pdo, true);
-        respond(200, ['status' => 'success', 'credentials' => webauthnList($pdo, $subject)]);
+    if ($upd->rowCount() === 0) {
+        respond(409, ['status' => 'error', 'code' => 'ALREADY_CLAIMED', 'message' => 'That name already belongs to an account.']);
     }
+    legacyForgetUser($pdo, $userId);
+    $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
+    logSecurityEvent('NAME_CLAIMED', ['user_id' => $userId, 'calendar_id' => $calId, 'account_id' => $acct['id']]);
 
-    // Turn off fingerprint / face unlock for one device (owner only, from any of their devices)
-    if ($action === 'passkey_remove') {
-        $subject = resolvePasskeySubject($pdo, true);
-        $credentialId = (string)($_POST['credential_id'] ?? '');
-        $removed = webauthnDelete($pdo, $subject, $credentialId);
-        if ($removed) logSecurityEvent('PASSKEY_REMOVED', ['subject' => webauthnSubjectKey($subject)]);
-        respond(200, ['status' => 'success', 'removed' => $removed, 'credentials' => webauthnList($pdo, $subject)]);
-    }
+    respond(200, [
+        'status' => 'success',
+        'user' => ['id' => $userId, 'display_name' => $name, 'role' => (string)$user['role'], 'name_custom' => $name !== (string)$acct['display_name']],
+    ]);
 }
 
 // Availability fetch (read-only)
@@ -1395,19 +1570,35 @@ if ($action === 'admin_login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     resetAdminLoginAttempts($pdo);
 
-    // Generate admin session token (stored in PHP session)
-    startSecureSession();
-    $adminToken = bin2hex(random_bytes(32));
-    $_SESSION['admin_token'] = $adminToken;
-    $_SESSION['admin_token_expires'] = time() + 3600; // 1 hour expiry
+    logSecurityEvent('ADMIN_LOGIN_SUCCESS', ['method' => 'password']);
 
-    logSecurityEvent('ADMIN_LOGIN_SUCCESS', []);
+    respond(200, ['status' => 'success'] + adminIssueSession());
+}
 
-    respond(200, [
-        'status' => 'success',
-        'admin_token' => $adminToken,
-        'csrf_token' => generateCsrfToken()
-    ]);
+/**
+ * Open the admin panel with the signed-in account when its id is listed in
+ * config.php admin.account_ids. The password login above stays as a fallback.
+ */
+if ($action === 'admin_login_account' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+
+    $allowed = adminAccountIds($config);
+    if (!$allowed || !accountsTablesReady($pdo)) {
+        respond(403, ['status' => 'error', 'code' => 'ADMIN_ACCOUNT_OFF', 'message' => 'Admin sign-in with an account is not set up.']);
+    }
+
+    $acct = accountCurrent($pdo);
+    if ($acct === null) {
+        respond(401, ['status' => 'error', 'code' => 'ACCOUNT_REQUIRED', 'message' => 'Sign in to When RU Free first.']);
+    }
+    if (!in_array($acct['id'], $allowed, true)) {
+        logSecurityEvent('ADMIN_ACCOUNT_DENIED', ['account_id' => $acct['id']]);
+        respond(403, ['status' => 'error', 'code' => 'NOT_ADMIN', 'message' => 'This account is not an admin.']);
+    }
+
+    logSecurityEvent('ADMIN_LOGIN_SUCCESS', ['method' => 'account', 'account_id' => $acct['id']]);
+
+    respond(200, ['status' => 'success'] + adminIssueSession());
 }
 
 /**
@@ -1684,14 +1875,16 @@ if ($action === 'admin_list_users' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
     }
 
+    $accountCol = accountsTablesReady($pdo) ? ', (account_id IS NOT NULL) AS has_account' : ', 0 AS has_account';
     $stmtU = $pdo->prepare(
-        "SELECT id, display_name, role, locked_until FROM users WHERE calendar_id = :cid ORDER BY role DESC, created_at ASC"
+        "SELECT id, display_name, role, locked_until{$accountCol} FROM users WHERE calendar_id = :cid ORDER BY role DESC, created_at ASC"
     );
     $stmtU->execute([':cid' => $calendarId]);
     $users = $stmtU->fetchAll();
 
     foreach ($users as &$u) {
         $u['locked_seconds'] = pinLockoutRemaining($u['locked_until'] ?? null);
+        $u['has_account'] = (int)$u['has_account'] === 1;
         unset($u['locked_until']);
     }
     unset($u);
@@ -1815,6 +2008,80 @@ if ($action === 'admin_delete_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'role' => $user['role']
     ]);
 
+    respond(200, ['status' => 'success']);
+}
+
+/**
+ * Accounts overview (super admin only): totals, which sign-in methods are configured, and the
+ * 100 most recently seen accounts (optionally filtered by username prefix).
+ */
+if ($action === 'admin_accounts' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    requireAdminSession();
+    $methods = [
+        'google' => oauthProviderEnabled($config, 'google'),
+        'facebook' => oauthProviderEnabled($config, 'facebook'),
+        'passkey' => true,
+    ];
+    if (!accountsTablesReady($pdo)) {
+        respond(200, ['status' => 'success', 'available' => false, 'methods' => $methods, 'totals' => null, 'accounts' => []]);
+    }
+
+    $totals = [
+        'accounts' => (int)$pdo->query("SELECT COUNT(*) FROM accounts")->fetchColumn(),
+        'active_30d' => (int)$pdo->query("SELECT COUNT(*) FROM accounts WHERE last_seen_at > DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetchColumn(),
+        'google' => (int)$pdo->query("SELECT COUNT(*) FROM account_identities WHERE provider = 'google'")->fetchColumn(),
+        'facebook' => (int)$pdo->query("SELECT COUNT(*) FROM account_identities WHERE provider = 'facebook'")->fetchColumn(),
+        'passkeys' => (int)$pdo->query("SELECT COUNT(*) FROM account_passkeys")->fetchColumn(),
+        'unclaimed_names' => (int)$pdo->query("SELECT COUNT(*) FROM users WHERE account_id IS NULL AND pin_hash IS NOT NULL")->fetchColumn(),
+        'unclaimed_hubs' => (int)$pdo->query("SELECT COUNT(*) FROM `groups` WHERE organiser_account_id IS NULL AND organiser_pin_hash IS NOT NULL")->fetchColumn(),
+    ];
+
+    $q = strtolower(trim((string)($_GET['q'] ?? '')));
+    $where = '';
+    $params = [];
+    if ($q !== '') {
+        if (!preg_match('/^[a-z0-9_]{1,20}$/', $q)) respond(400, ['status' => 'error', 'message' => 'Invalid search']);
+        $where = 'WHERE a.username LIKE :q';
+        $params[':q'] = $q . '%';
+    }
+    $stmt = $pdo->prepare(
+        "SELECT a.id, a.username, a.display_name, a.created_at, a.last_seen_at,
+                (SELECT COUNT(*) FROM users u WHERE u.account_id = a.id) AS calendar_count,
+                (SELECT COUNT(*) FROM `groups` g WHERE g.organiser_account_id = a.id) AS hub_count
+         FROM accounts a {$where}
+         ORDER BY a.last_seen_at DESC LIMIT 100"
+    );
+    $stmt->execute($params);
+    $accounts = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $accounts[] = [
+            'id' => (int)$r['id'],
+            'username' => $r['username'],
+            'display_name' => $r['display_name'],
+            'created_at' => (string)$r['created_at'],
+            'last_seen_at' => (string)$r['last_seen_at'],
+            'calendar_count' => (int)$r['calendar_count'],
+            'hub_count' => (int)$r['hub_count'],
+        ];
+    }
+    respond(200, ['status' => 'success', 'available' => true, 'methods' => $methods, 'totals' => $totals, 'accounts' => $accounts]);
+}
+
+/**
+ * Delete an account (super admin only): same as the person deleting it themselves - calendars
+ * and Hubs it organises, its names on other calendars, and all its sign-in data.
+ */
+if ($action === 'admin_delete_account' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAdminSession();
+    requireCsrf();
+    accountRequireTables($pdo);
+    $accountId = (int)($_POST['account_id'] ?? 0);
+    if ($accountId <= 0) respond(400, ['status' => 'error', 'message' => 'Invalid account ID']);
+    $stmt = $pdo->prepare("SELECT 1 FROM accounts WHERE id = :id");
+    $stmt->execute([':id' => $accountId]);
+    if (!$stmt->fetchColumn()) respond(404, ['status' => 'error', 'message' => 'Account not found']);
+    accountDelete($pdo, $accountId);
+    logSecurityEvent('ADMIN_DELETE_ACCOUNT', ['account_id' => $accountId]);
     respond(200, ['status' => 'success']);
 }
 
@@ -2003,6 +2270,7 @@ if ($action === 'get_site_config' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         'booking' => bookingColumnsReady($pdo),
         'booking_total' => bookingColumnsReady($pdo) && bookingTotalColumnReady($pdo),
         'booking_styles' => bookingColumnsReady($pdo) && bookingStyleColumnsReady($pdo),
+        'accounts' => accountsTablesReady($pdo),
     ];
     try {
         $stmt = $pdo->query("SELECT config_json FROM site_config WHERE id = 1 LIMIT 1");

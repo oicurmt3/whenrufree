@@ -1,6 +1,6 @@
 /**
  * calendar-booking.js - Calendar page booking mode: booking cells, caps, instant save queue, Bookings card and polling.
- * Classic script sharing global scope. Load order: passkey.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
+ * Classic script sharing global scope. Load order: passkey.js, account-core.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
  */
 'use strict';
 
@@ -213,11 +213,7 @@ function bookingLimitMessage(){
  */
 function onBookingSlotClick(dateStr, slotId){
   if(isBookingClosed() && !isAuthedOrganiser()){ showToast('Bookings are closed.'); return false; }
-  if(!state.currentUserId){ openUserSelectModal(); return false; }
-  if(!state.auth.get(state.currentUserId)){
-    openPinModal(state.currentUserId, state.users.find(x => x.id === state.currentUserId));
-    return false;
-  }
+  if(!state.currentUserId || !state.auth.get(state.currentUserId)){ promptJoin(); return false; }
   const info = bookingInfo(dateStr, slotId);
   if(!info.mine){
     if(info.full){ showToast('This slot is taken'); return false; }
@@ -290,17 +286,15 @@ function queueBooking(userId, dateStr, slotId, status){
   return bookingChain;
 }
 
+/** Your name was removed from the calendar (or you were signed out elsewhere): start again. */
 function handleExpiredSession(){
-  const uid = state.currentUserId;
-  state.auth.delete(uid);
-  try{ localStorage.removeItem(cacheKey(uid)); }catch(e){}
-  updateUserUI();
-  openPinModal(uid, state.users.find(x => x.id === uid));
+  showToast('Your name is no longer on this calendar.');
+  setTimeout(() => location.reload(), 1500);
 }
 
 async function sendBooking(userId, dateStr, slotId, status){
   const auth = state.auth.get(state.currentUserId || -1);
-  if(!auth){ showToast('Please unlock your name first.'); return; }
+  if(!auth){ showToast('Join this calendar first.'); return; }
   let res;
   try{
     res = await apiPost('save', { user_id: userId, changes: { [dateStr]: { [slotId]: status } } }, auth.token);
@@ -318,7 +312,7 @@ async function sendBooking(userId, dateStr, slotId, status){
     state.booking.closed = true;
     updateBookingClosedBanner();
     showToast('Bookings are closed.');
-  } else if(res && /session|auth required/i.test(res.message || '')){
+  } else if(res && res.code === 'NOT_JOINED'){
     handleExpiredSession();
     return;
   } else {

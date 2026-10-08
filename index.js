@@ -79,9 +79,11 @@ async function accessFetch(url, opts = {}) {
     const grants = (window.AccessEmoji && hubContext.token) ? AccessEmoji.grantHeader([`g_${hubContext.token}`]) : '';
     if (grants) headers['X-Access-Grant'] = grants;
     const resp = await fetch(url, { ...opts, headers });
-    if (resp.status !== 403 || tries >= 2 || !window.AccessEmoji || !hubContext.token) return resp;
+    if (resp.status !== 401 && resp.status !== 403) return resp;
     let data = null;
     try { data = await resp.clone().json(); } catch (e) { data = null; }
+    if (data && window.Account && Account.handleApiError(data)) return new Promise(() => {});
+    if (resp.status !== 403 || tries >= 2 || !window.AccessEmoji || !hubContext.token) return resp;
     if (!data || data.code !== 'ACCESS_REQUIRED') return resp;
     await requireHubAccess();
   }
@@ -213,13 +215,12 @@ const calendarSaveKit = {
       '',
       'INSTRUCTIONS',
       meta.booking
-        ? '- Share the calendar link with participants so they can add their name and book a slot.'
-        : '- Share the calendar link with participants so they can add their name and mark availability.',
-      '- Bookmark this link - it cannot be recovered if lost.',
-      '- Your organiser PIN is NOT stored here. Remember it separately.',
+        ? '- Share the calendar link with participants so they can sign in, join and book a slot.'
+        : '- Share the calendar link with participants so they can sign in, join and mark availability.',
+      '- Bookmark this link. While signed in, you can also find it on your profile page.',
       emojiLine
-        ? '- People need the link and the emoji to open this calendar.'
-        : '- Anyone with the link can view and participate in this calendar.',
+        ? '- People need to sign in, have the link and pick the emoji to open this calendar.'
+        : '- Anyone who signs in with the link can view and join this calendar.',
       '',
       window.location.origin
     );
@@ -267,7 +268,7 @@ const calendarSaveKit = {
       'If you lose the full link, enter the code on the Go page:',
       goUrl,
       '',
-      'Remember your organiser PIN separately - it is not included here.',
+      'Sign in with the same account to manage the calendar.',
       '',
       meta.booking
         ? 'Share this link with participants so they can book a slot.'
@@ -513,13 +514,6 @@ function showSaveCalendarPanel(meta) {
   continueBtn.onclick = () => {
     if (!ack.checked) return;
     overlay.classList.add('hideme');
-    try {
-      sessionStorage.setItem('creator_auth', JSON.stringify({
-        token: meta.token,
-        admin_name: meta.admin_name || '',
-        admin_pin: meta.admin_pin || ''
-      }));
-    } catch (e) { /* ignore */ }
     window.location.href = `calendar.html?c=${encodeURIComponent(meta.token)}`;
   };
 }
@@ -1389,63 +1383,24 @@ function validateRangeUI(){
 startDate.addEventListener('change', ()=>{ updateRangeSummary(); validateRangeUI(); });
 endDate.addEventListener('change',   ()=>{ updateRangeSummary(); validateRangeUI(); });
 
-/************** ADMIN VALIDATION **************/
+/************** ORGANISER NAME (optional; blank = profile name) **************/
 const adminName   = document.getElementById('adminName');
-const adminPin    = document.getElementById('adminPin');
-const adminPin2   = document.getElementById('adminPin2');
 const adminNameErr= document.getElementById('adminNameErr');
-const adminPinErr = document.getElementById('adminPinErr');
-const adminPin2Err= document.getElementById('adminPin2Err');
+
+function adminNameValue(){
+  return (adminName.value??'').trim().replace(/\s+/g,' ');
+}
 
 function validateAdmin(){
   adminNameErr.style.display='none';
-  adminPinErr.style.display='none';
-  adminPin2Err.style.display='none';
-
-  const name = (adminName.value??'').trim().replace(/\s+/g,' ');
-  const pin  = (adminPin.value??'').trim();
-  const pin2 = (adminPin2.value??'').trim();
-
-  if (!name){
-    adminNameErr.textContent='Required.';
+  const name = adminNameValue();
+  if (name && (name.length>32 || !/^[A-Za-z0-9][A-Za-z0-9'\- ]*$/.test(name))){
+    adminNameErr.textContent="Use letters, numbers, spaces, apostrophes and hyphens only (max 32).";
     adminNameErr.style.display='block';
-    return false;
-  }
-  if (name.length>40 || !/^[A-Za-z0-9][A-Za-z0-9'\- ]*$/.test(name)){
-    adminNameErr.textContent="Use letters, numbers, spaces, apostrophes and hyphens only (max 40).";
-    adminNameErr.style.display='block';
-    return false;
-  }
-  if (!/^\d{4}$/.test(pin)){
-    adminPinErr.textContent='Must be 4 digits.';
-    adminPinErr.style.display='block';
-    return false;
-  }
-  if (!/^\d{4}$/.test(pin2)){
-    adminPin2Err.textContent='Confirm PIN.';
-    adminPin2Err.style.display='block';
-    return false;
-  }
-  if (pin !== pin2){
-    adminPin2Err.textContent='PINs do not match.';
-    adminPin2Err.style.display='block';
     return false;
   }
   return true;
 }
-
-// Eye toggles for PIN fields
-function wirePinToggle(inputEl, btnEl){
-  const icon = btnEl.querySelector('.material-symbols-outlined');
-  btnEl.addEventListener('click', () => {
-    const nowText = inputEl.type === 'password';
-    inputEl.type = nowText ? 'text' : 'password';
-    icon.textContent = nowText ? 'visibility_off' : 'visibility';
-    btnEl.setAttribute('aria-label', nowText ? 'Hide PIN' : 'Show PIN');
-  });
-}
-wirePinToggle(adminPin,  document.getElementById('toggleAdminPin'));
-wirePinToggle(adminPin2, document.getElementById('toggleAdminPin2'));
 
 /************** PRIVACY MODE TOGGLE **************/
 // Privacy mode: 'open' (0), 'hidden' (1), or 'blind' (2)
@@ -1819,8 +1774,7 @@ async function createCalendar(){
         exclude_weekends: excludeWeekendsEl.checked ? 1 : 0,
         date_filter_mode: getDateFilterMode(),
         is_private: getPrivacyValue(),
-        admin_name: (adminName.value??'').trim().replace(/\s+/g,' '),
-        admin_pin:  (adminPin.value??'').trim()
+        admin_name: adminNameValue()
     };
     if (hubContext.token) body.group_token = hubContext.token;
     const accessEmoji = accessField ? accessField.value : null;
@@ -1846,17 +1800,12 @@ async function createCalendar(){
       body: JSON.stringify(body)
     });
     const data = await resp.json();
+    if (window.Account && Account.handleApiError(data)) return;
     if (data.status!=='success') throw new Error(data.message || 'Create failed');
-    if (data.access_grant) AccessEmoji.saveGrant(`c_${data.token}`, data.access_grant, data.expires_at);
-
-    const adminNameVal = (adminName.value ?? '').trim().replace(/\s+/g, ' ');
-    const adminPinVal = (adminPin.value ?? '').trim();
 
     showSaveCalendarPanel({
       token: data.token,
       title: title || 'When RU Free',
-      admin_name: adminNameVal,
-      admin_pin: adminPinVal,
       hub_title: hubContext.title || null,
       access_emoji: accessEmoji,
       access_hub: accessEmoji === null && !!hubContext.token && hubContext.accessEnabled,
@@ -2084,6 +2033,11 @@ function showTemplateBanner() {
 (async function initPage() {
   'use strict';
 
+  // 0. Creating a calendar needs a signed-in account (the sign-in panel shows otherwise)
+  const me = await Account.require();
+  Account.renderBadge(me, document.getElementById('accountBadge'));
+  if (me.display_name) adminName.placeholder = me.display_name;
+
   // 1. Apply default limits immediately so hints show correct values before config loads
   applyMaxLimits(MAX_SLOTS, MAX_STATUSES, MAX_RANGE_DAYS);
 
@@ -2136,8 +2090,6 @@ function showTemplateBanner() {
   // 5. Wire live validation
   createBtn.addEventListener('click', createCalendar);
   adminName.addEventListener('input', validateAll);
-  adminPin.addEventListener('input', validateAll);
-  adminPin2.addEventListener('input', validateAll);
 
   // 6. Hub context when creating inside a Hub
   await initHubContext();

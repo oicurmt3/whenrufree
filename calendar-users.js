@@ -1,6 +1,6 @@
 /**
- * calendar-users.js - Calendar page people and access: meta load, users, user-select modal, submit/user UI, Hub bar, settings, add/rename, PIN, passkeys, auth cache.
- * Classic script sharing global scope. Load order: passkey.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
+ * calendar-users.js - Calendar page people: meta load, your name (signed-in account), people modal, submit/user UI, Hub bar, settings, join/rename, claiming an old PIN name.
+ * Classic script sharing global scope. Load order: passkey.js, account-core.js, emoji.js, calendar-core.js, calendar-users.js, calendar-grid.js, calendar-rank.js, calendar-booking.js, calendar-main.js.
  */
 'use strict';
 
@@ -20,10 +20,8 @@ async function loadCalendarMeta(){
     state.calendarTitle=t;
     state.calendarCategories=parseCategories(cat);
     state.accessAvailable = meta.calendar.access?.available === true;
-    state.passkeysEnabled = meta.calendar.passkeys === true;
-    if(state.passkeysEnabled && window.Passkey){
-      Passkey.platformAvailable().then(v => { state.platformPasskey = v; });
-    }
+    state.account = meta.account || { profile_name: '', me: null, claimable: false };
+    applyMe(state.account.me);
     setCalendarHeading(t, cat);
     const slots = Array.isArray(meta.calendar.slots) ? meta.calendar.slots : null;
     if(slots && slots.length){ TIME_SLOTS = slots.map(s=>({id:s, label:s})); }
@@ -107,11 +105,40 @@ async function loadCalendarMeta(){
   }
 }
 
+/**
+ * Makes the signed-in account's name on this calendar the current user (or clears it).
+ * @param {{id:number, display_name:string, role:string, name_custom:boolean}|null} me
+ */
+function applyMe(me){
+  state.auth = new Map();
+  if(!me){
+    state.currentUserId = null;
+    state.currentUserName = '';
+    state.currentUserRole = null;
+    state.nameCustom = false;
+    return;
+  }
+  const id = Number(me.id);
+  state.currentUserId = id;
+  state.currentUserName = me.role === 'admin' ? `${me.display_name} (organiser)` : me.display_name;
+  state.currentUserRole = me.role;
+  state.nameCustom = me.name_custom === true;
+  state.auth.set(id, { token: true, role: me.role });
+}
+
+/** Opens the Join window when you have no name on this calendar yet. */
+function promptJoin(){
+  if(state.currentUserId) return;
+  openUserModal('add');
+}
+
 /*** Users include role; admin first with "(admin)" */
 async function loadUsers(){
   const data = await apiGet('users');
   if(data.status!=='success') throw new Error('Failed to load users');
-  state.users = (data.users??[]).map(u => ({ id:Number(u.id), display_name:u.display_name, role:(u.role??'member') }));
+  state.users = (data.users??[]).map(u => ({
+    id:Number(u.id), display_name:u.display_name, role:(u.role??'member'), mine:u.mine === true, claimable:u.claimable === true
+  }));
   // admin first
   state.users.sort((a,b)=> (a.role==='admin'? -1:0) + (b.role==='admin'? 1:0));
   // Cache admin user ID for organiser dots
@@ -135,129 +162,93 @@ function updateCurrentUserDisplay(){
     els.currentUserDisplay.textContent = '';
     els.currentUserDisplay.classList.remove('visible', 'is-admin');
     els.userSelectBtn.classList.remove('has-user');
-    els.userSelectBtn.title = 'Select user';
+    els.userSelectBtn.title = 'People';
   }
-  // Show/hide name banner
-  els.nameBanner.style.display = state.users.length === 0 ? '' : 'none';
+  // Join banner until you have a name here
+  els.nameBanner.style.display = state.currentUserId ? 'none' : '';
 }
 
-/*** User Select Modal - populate and show */
+/*** People modal: everyone on the calendar, your name first */
 function populateUserSelectModal(){
   els.userSelectList.innerHTML = '';
-  
+  els.userSelectAddLink.style.display = state.currentUserId ? 'none' : '';
+
   if(state.users.length === 0){
     const empty = document.createElement('div');
     empty.className = 'user-select-empty';
-    empty.textContent = 'No users yet. Add your name to get started!';
+    empty.textContent = 'Nobody has joined yet.';
     els.userSelectList.appendChild(empty);
     return;
   }
-  
+
   const isOrganiser = isCurrentUserOrganiser();
-  
-  // Sort users: logged-in user first, then organiser, then alphabetical
+  const canClaim = !state.currentUserId;
+
+  // You first, then the organiser, then alphabetical
   const sortedUsers = [...state.users].sort((a, b) => {
-    // Logged-in user always first
-    const aIsLoggedIn = a.id === state.currentUserId && state.auth.get(a.id);
-    const bIsLoggedIn = b.id === state.currentUserId && state.auth.get(b.id);
-    if(aIsLoggedIn && !bIsLoggedIn) return -1;
-    if(!aIsLoggedIn && bIsLoggedIn) return 1;
-    // Then organiser (admin)
+    if(a.mine !== b.mine) return a.mine ? -1 : 1;
     if(a.role === 'admin' && b.role !== 'admin') return -1;
     if(a.role !== 'admin' && b.role === 'admin') return 1;
-    // Then alphabetical
     return (a.display_name || '').localeCompare(b.display_name || '');
   });
-  
+
   for(const u of sortedUsers){
     const item = document.createElement('div');
     item.className = 'user-select-item';
-    const isSelected = u.id === state.currentUserId;
-    const isAuthenticated = isSelected && state.auth.get(u.id);
-    if(isSelected) item.classList.add('selected');
+    if(u.mine) item.classList.add('selected');
     item.dataset.userId = u.id;
-    
-    // Avatar with first letter
+
     const avatar = document.createElement('div');
     avatar.className = 'user-select-avatar';
     if(u.role === 'admin') avatar.classList.add('admin');
     avatar.textContent = (u.display_name || '?').charAt(0).toUpperCase();
-    
-    // Info (name + role)
+
     const info = document.createElement('div');
     info.className = 'user-select-info';
-    
     const name = document.createElement('div');
     name.className = 'user-select-name';
-    name.textContent = u.display_name;
-    
+    name.textContent = u.mine ? `${u.display_name} (you)` : u.display_name;
     info.appendChild(name);
-    
-    if(u.role === 'admin'){
+
+    const roleText = u.role === 'admin' ? 'Organiser' : '';
+    const claimText = canClaim && u.claimable ? 'Yours from before? Tap to claim it' : '';
+    if(roleText || claimText){
       const role = document.createElement('div');
       role.className = 'user-select-role';
-      role.textContent = 'Organiser';
+      role.textContent = [roleText, claimText].filter(Boolean).join(' - ');
       info.appendChild(role);
     }
-    
+
     item.appendChild(avatar);
     item.appendChild(info);
-    
-    // Checkmark for selected user
-    if(isSelected){
+
+    if(u.mine){
       const check = document.createElement('span');
       check.className = 'material-symbols-outlined user-select-check';
       check.textContent = 'check_circle';
       item.appendChild(check);
     }
-    
-    // Fingerprint / face unlock devices for the authenticated selected user
-    if(isAuthenticated && passkeysUsable()){
-      const pkOn = !!Passkey.deviceCredential(passkeyId(u.id));
-      const pkBtn = document.createElement('button');
-      pkBtn.className = 'user-select-passkey' + (pkOn ? ' on' : '');
-      pkBtn.type = 'button';
-      pkBtn.title = pkOn ? 'Passkey is on for this device - manage passkeys' : 'Passkeys';
-      pkBtn.setAttribute('aria-label', pkBtn.title);
-      pkBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">fingerprint</span>';
-      pkBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // prevent selecting this user
-        openPasskeyWindow(u.id);
-      });
-      item.appendChild(pkBtn);
-    }
 
-    // Logout button for authenticated selected user
-    if(isAuthenticated){
-      const logoutBtn = document.createElement('button');
-      logoutBtn.className = 'user-select-logout';
-      logoutBtn.type = 'button';
-      logoutBtn.title = 'Log out';
-      logoutBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">logout</span>';
-      logoutBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // prevent selecting this user
-        logoutCurrentUser();
-      });
-      item.appendChild(logoutBtn);
-    }
-    
-    // Delete icon: organiser can delete non-admin users (not themselves)
+    // Organiser can remove other people (not themselves)
     if(isOrganiser && u.role !== 'admin'){
       const delBtn = document.createElement('button');
       delBtn.className = 'user-select-delete';
       delBtn.type = 'button';
       delBtn.title = 'Delete ' + u.display_name;
+      delBtn.setAttribute('aria-label', delBtn.title);
       delBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span>';
       delBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // prevent selecting this user
+        e.stopPropagation();
         confirmDeleteCalendarUser(u.id, u.display_name);
       });
       item.appendChild(delBtn);
     }
-    
-    // Click handler (selects user)
-    item.addEventListener('click', () => onUserSelectItemClick(u.id));
-    
+
+    if(u.mine || (canClaim && u.claimable)){
+      item.classList.add('is-clickable');
+      item.addEventListener('click', () => onUserSelectItemClick(u.id));
+    }
+
     els.userSelectList.appendChild(item);
   }
 }
@@ -272,29 +263,6 @@ function closeUserSelectModal(){
 }
 
 /**
- * Logs out the current user by clearing their auth token and reloading the page.
- * This ensures they cannot view other users' choices without re-authenticating.
- */
-function logoutCurrentUser(){
-  if(!state.currentUserId) return;
-  
-  const userId = state.currentUserId;
-  
-  // Clear auth from memory and localStorage
-  state.auth.delete(userId);
-  try{ localStorage.removeItem(cacheKey(userId)); }catch(e){}
-  
-  // Close modal before reload
-  closeUserSelectModal();
-  
-  // Reload page to ensure completely clean state
-  showToast('Logging out...');
-  setTimeout(() => {
-    window.location.reload();
-  }, 300);
-}
-
-/**
  * Prompts the organiser to confirm deletion of a user from the calendar.
  * On confirmation, calls the delete_user API, reloads the user list,
  * and refreshes the calendar display.
@@ -304,25 +272,12 @@ function logoutCurrentUser(){
 async function confirmDeleteCalendarUser(userId, displayName){
   const ok = confirm('Delete "' + displayName + '" and all their availability data?\n\nThis cannot be undone.');
   if(!ok) return;
-  
-  if(!state.adminUserId) return;
-  const auth = state.auth.get(state.adminUserId);
-  if(!auth || !auth.token){ showToast('Authentication required'); return; }
-  
+  if(!isCurrentUserOrganiser()) return;
+
   try{
-    const res = await apiPost('delete_user', { user_id: userId }, auth.token);
+    const res = await apiPost('delete_user', { user_id: userId });
     if(res.status === 'success'){
       showToast(displayName + ' deleted');
-      // If the deleted user was the currently selected user, deselect
-      if(state.currentUserId === userId){
-        state.currentUserId = null;
-        state.currentUserName = '';
-        state.currentUserRole = null;
-        state.pending = {};
-        updateCurrentUserDisplay();
-        updateUserUI();
-      }
-      // Reload users and refresh display
       await loadUsers();
       populateUserSelectModal();
       await ensureDateRangeLoaded();
@@ -338,45 +293,16 @@ async function confirmDeleteCalendarUser(userId, displayName){
   }
 }
 
-/*** Handle user selection from modal */
-async function onUserSelectItemClick(userId){
+/*** People modal: tap your name to change it, or an old name to claim it */
+function onUserSelectItemClick(userId){
+  const uid = Number(userId);
+  const u = state.users.find(x => x.id === uid);
+  if(!u) return;
   closeUserSelectModal();
-  try{
-    // Cancel any pending autosave for the current user
-    cancelAutosave();
-    
-    // Persist any unsaved changes for the current user so nothing is lost on switch
-    if(Object.keys(state.pending).length){
-      persistPendingNow();
-    }
-
-    const uid = Number(userId);
-    const u = state.users.find(x => x.id === uid);
-    
-    // Check if user is already authenticated (cached auth)
-    const cached = getCachedAuth(uid);
-    if(cached){
-      // User is authenticated - safe to switch
-      state.auth.set(uid, cached);
-      state.currentUserId = uid;
-      state.currentUserName = u ? (u.role === 'admin' ? `${u.display_name} (organiser)` : u.display_name) : '';
-      state.currentUserRole = u ? u.role : null;
-      state.pending = restorePendingForUser(uid);
-      
-      updateCurrentUserDisplay();
-      updateUserUI();
-      await reloadAvailability();
-      renderDateRangeSkeleton();
-      updateDateFilterBanner();
-      await ensureCalendarLoadedAllDates();
-    } else {
-      // User needs to authenticate - open PIN modal WITHOUT changing currentUserId
-      // This prevents showing another user's choices before auth
-      openPinModal(uid, u);
-    }
-  } catch(e){
-    console.error('Error switching user:', e);
-    showToast('Failed to switch user. Please try again.');
+  if(u.mine){
+    openUserModal('rename');
+  } else if(!state.currentUserId && u.claimable){
+    openClaimModal(u);
   }
 }
 
@@ -437,9 +363,9 @@ function updateUserUI(){
   const showSubmit = isAuthenticated && !isCalendarFrozen() && !(isBookingClosed() && !isAdmin);
   els.submitBtn.style.display = showSubmit ? 'inline-flex' : 'none';
   
-  // Edit name and Share are admin-only
-  els.renameBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-  els.renameBtn.disabled = !isAdmin;
+  // Your name on this calendar: anyone who has joined. Share: organiser only
+  els.renameBtn.style.display = isAuthenticated ? 'inline-flex' : 'none';
+  els.renameBtn.disabled = !isAuthenticated;
   els.shareBtn.style.display = isAdmin ? 'inline-flex' : 'none';
   els.settingsBtn.style.display = (isAdmin && state.accessAvailable && window.AccessEmoji) ? 'inline-flex' : 'none';
   if(isAdmin && state.accessAvailable && !state.accessEmojiLoaded) loadAccessEmoji();
@@ -636,30 +562,29 @@ function hideSettingsModal(){
   els.settingsModal.classList.remove('active');
 }
 
-/*** Add / Rename user (with PIN + confirm on Add) */
+/*** Join / change your name on this calendar (your profile name is the default) */
 function openUserModal(mode){
+  if(mode === 'add' && state.currentUserId) mode = 'rename';
+  if(mode === 'rename' && !state.currentUserId) mode = 'add';
+  const profileName = state.account?.profile_name || '';
   els.userModalError.style.display='none';
   els.userNameErr.style.display='none';
-  els.userPinErr.style.display='none';
-  els.userPin2Err.style.display='none';
-  els.userNameInput.value='';
-  els.userPinInput.value='';
-  els.userPin2Input.value='';
+  els.userModalConfirm.dataset.mode = mode;
   if(mode==='add'){
-    els.userModalTitle.textContent='Add your name';
-    els.userModalText.textContent='Enter your name and a 4-digit PIN (keep it secret).';
-    els.userModalConfirm.textContent='Save';
-    els.userModalConfirm.dataset.mode='add';
-    els.userPinWrap.style.display='';
-    els.userPin2Wrap.style.display='';
+    els.userModalTitle.textContent='Join this calendar';
+    els.userModalText.textContent='This is the name others will see on this calendar. It starts as your profile name; change it here if you like.';
+    els.userModalConfirm.textContent='Join';
+    els.userNameInput.value = profileName;
+    els.userUseProfileBtn.hidden = true;
+    els.userClaimHint.hidden = !state.account?.claimable;
   } else {
-    els.userModalTitle.textContent='Rename';
-    els.userModalText.textContent='Update your display name (does not affect saved availability).';
-    els.userModalConfirm.textContent='Rename';
-    els.userModalConfirm.dataset.mode='rename';
-    els.userNameInput.value = state.currentUserName.replace(/\s+\(admin\)$/,'') || '';
-    els.userPinWrap.style.display='none';
-    els.userPin2Wrap.style.display='none';
+    const current = state.users.find(u => u.id === state.currentUserId);
+    els.userModalTitle.textContent='Your name on this calendar';
+    els.userModalText.textContent='Only changes your name here. Your saved availability stays the same.';
+    els.userModalConfirm.textContent='Save';
+    els.userNameInput.value = current ? current.display_name : '';
+    els.userUseProfileBtn.hidden = !state.nameCustom || !profileName;
+    els.userClaimHint.hidden = true;
   }
   els.userModal.classList.add('active');
   setTimeout(()=> els.userNameInput.focus(), 50);
@@ -667,378 +592,142 @@ function openUserModal(mode){
 function closeUserModal(){ els.userModal.classList.remove('active'); }
 function validateName(name){
   if(!name) return {ok:false, msg:'Name is required.'};
-  if(name.length>40) return {ok:false, msg:'Max 40 characters.'};
+  if(name.length>32) return {ok:false, msg:'Max 32 characters.'};
   if(!/^[A-Za-z0-9][A-Za-z0-9'\- ]*$/.test(name)) return {ok:false, msg:"Use letters, numbers, spaces, apostrophes and hyphens only."};
   return {ok:true, name};
 }
 function validatePin4(s){ return /^\d{4}$/.test(s); }
-els.userModalCancel.addEventListener('click', ()=> els.userModal.classList.remove('active'));
-els.userModalConfirm.addEventListener('click', async ()=>{
-  const mode=els.userModalConfirm.dataset.mode;
-  const vRaw=(els.userNameInput.value??'').trim().replace(/\s+/g,' ');
-  const nv=validateName(vRaw);
-  els.userNameErr.style.display='none';
-  els.userPinErr.style.display='none';
-  els.userPin2Err.style.display='none';
-  els.userModalError.style.display='none';
-  if(!nv.ok){
-    els.userNameErr.textContent = nv.msg;
+
+/** Shows a join/rename API error under the name field or the whole form. */
+function showUserModalError(res, fallback){
+  if(res.code === 'NAME_TAKEN'){
+    els.userNameErr.textContent = res.message || 'Someone on this calendar already uses that name.';
     els.userNameErr.style.display='block';
     return;
   }
+  els.userModalError.textContent = res.message || fallback;
+  els.userModalError.style.display='block';
+}
+
+/** Reloads people and availability after your name on this calendar changes. */
+async function afterMyNameChanged(){
+  await loadUsers();
+  updateCurrentUserDisplay();
+  updateUserUI();
+  await ensureDateRangeLoaded();
+  renderDateRangeSkeleton();
+  updateDateFilterBanner();
+  refreshCalendarValues();
+  await ensureCalendarLoadedAllDates();
+  renderRankings();
+}
+
+/** Called after joining or claiming a name. */
+async function becomeUser(user){
+  applyMe(user);
+  state.account = { ...state.account, me: user, claimable: false };
+  state.pending = restorePendingForUser(state.currentUserId);
+  updateSubmitButtonState();
+  await afterMyNameChanged();
+}
+
+async function saveMyName(useProfile){
+  const mode = els.userModalConfirm.dataset.mode;
+  els.userNameErr.style.display='none';
+  els.userModalError.style.display='none';
+  let name = '';
+  if(!useProfile){
+    const nv = validateName((els.userNameInput.value??'').trim().replace(/\s+/g,' '));
+    if(!nv.ok){
+      els.userNameErr.textContent = nv.msg;
+      els.userNameErr.style.display='block';
+      return;
+    }
+    name = nv.name;
+  }
+  const profileName = state.account?.profile_name || '';
+  els.userModalConfirm.disabled = true;
   try{
     if(mode==='add'){
-      const pin = (els.userPinInput.value??'').trim();
-      const pin2 = (els.userPin2Input.value??'').trim();
-      if(!validatePin4(pin)){
-        els.userPinErr.textContent='PIN must be 4 numbers.';
-        els.userPinErr.style.display='block';
-        return;
-      }
-      if(!validatePin4(pin2)){
-        els.userPin2Err.textContent='Confirm PIN must be exactly 4 numbers.';
-        els.userPin2Err.style.display='block';
-        return;
-      }
-      if(pin !== pin2){
-        els.userPin2Err.textContent='PINs do not match.';
-        els.userPin2Err.style.display='block';
-        return;
-      }
-      
-      // Step 1: Create the user
-      const res = await apiPost('add_user', {display_name:nv.name, pin});
+      const res = await apiPost('join_calendar', { display_name: name === profileName ? '' : name });
       if(res.status!=='success'){
-        if(res.code==='NAME_TAKEN'){
-          els.userNameErr.textContent="name taken, choose another name or add a number after your name to make it unique";
-          els.userNameErr.style.display='block';
-          return;
-        }
-        els.userModalError.textContent = res.message || 'Failed to add name.';
-        els.userModalError.style.display='block';
+        if(res.code === 'ALREADY_JOINED'){ closeUserModal(); location.reload(); return; }
+        showUserModalError(res, 'Could not join this calendar.');
         return;
       }
-      
-      // Step 2: Refresh user list
-      try {
-        await loadUsers();
-      } catch(loadErr) {
-        console.error('loadUsers failed:', loadErr);
-        // Continue anyway - user was created
-      }
-      
-      // Step 3: Authenticate as the new user
-      // Debug: log what we're sending
-      console.log('add_user response:', JSON.stringify(res));
-      console.log('res.user:', res.user);
-      console.log('res.user.id:', res.user?.id, 'type:', typeof res.user?.id);
-      
-      const authPayload = {user_id: res.user.id, pin};
-      console.log('auth_user payload:', JSON.stringify(authPayload));
-      
-      const auth = await apiPost('auth_user', authPayload);
-      if(auth.status!=='success'){
-        // User was created but auth failed
-        console.error('auth_user failed:', auth);
-        if(auth.debug) console.error('auth_user debug:', auth.debug);
-        
-        // Show error but DON'T close modal - let user see the message
-        els.userModalError.textContent = 'Name added! ' + (auth.message || 'Please close and select your name to unlock.');
-        els.userModalError.style.display='block';
-        
-        // Refresh user list so new user appears
-        await loadUsers();
-        updateCurrentUserDisplay();
-        // Don't close modal - user needs to see the message and manually close or try again
-        return;
-      }
-      
-      // Success - complete setup
-      state.currentUserId = Number(res.user.id);
-      state.currentUserName = res.user.display_name;
-      cacheAuth(state.currentUserId, auth.auth_token, auth.role, 86400);
-
-      // New user: load any locally queued pending edits for this user (usually none)
-      state.pending = restorePendingForUser(state.currentUserId);
-      updateSubmitButtonState();
-
-      updateCurrentUserDisplay();
       closeUserModal();
-      updateUserUI();
-      maybeOfferPasskey(state.currentUserId);
-      await ensureDateRangeLoaded();
-      renderDateRangeSkeleton();
-      updateDateFilterBanner();
-      refreshCalendarValues();
-      await ensureCalendarLoadedAllDates();
-      renderRankings();
-      showToast('Name added');
+      await becomeUser(res.user);
+      showToast('Joined');
     } else {
-      const auth=await ensureAuthedForUser(state.currentUserId);
-      const res = await apiPost('rename_user', {user_id: state.currentUserId, display_name: nv.name}, auth.token);
+      const body = useProfile ? { use_profile: 1 } : { display_name: name };
+      const res = await apiPost('rename_user', { user_id: state.currentUserId, ...body });
       if(res.status!=='success'){
-        els.userModalError.textContent = res.message || 'Rename failed.';
-        els.userModalError.style.display='block';
+        showUserModalError(res, 'Could not change your name.');
         return;
       }
-      await loadUsers();
-      state.currentUserName = nv.name;
-      updateCurrentUserDisplay();
+      state.nameCustom = res.name_custom === true;
+      state.currentUserName = state.currentUserRole === 'admin' ? `${res.display_name} (organiser)` : res.display_name;
       closeUserModal();
-      updateUserUI();
-      await ensureCalendarLoadedAllDates();
-      renderRankings();
-      showToast('Renamed');
+      await afterMyNameChanged();
+      showToast('Name updated');
     }
   }catch(e){
     console.error('User modal error:', e);
     els.userModalError.textContent = e.message || 'An error occurred. Try again.';
     els.userModalError.style.display='block';
+  }finally{
+    els.userModalConfirm.disabled = false;
   }
+}
+els.userModalCancel.addEventListener('click', closeUserModal);
+els.userModalConfirm.addEventListener('click', () => saveMyName(false));
+els.userUseProfileBtn.addEventListener('click', () => saveMyName(true));
+els.userNameInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') saveMyName(false); });
+els.userClaimLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  closeUserModal();
+  openUserSelectModal();
 });
 
-/*** PIN modal for unlocking a selected user */
-function openPinModal(userId, userObj){
-  // Store pending auth info - DO NOT set currentUserId yet
-  state._pendingAuthUserId = userId;
-  state._pendingAuthUserObj = userObj || state.users.find(x => x.id === userId);
-  
+/*** Claim an old name (from before sign-in accounts) with its PIN, once */
+function openClaimModal(user){
   els.pinModalError.style.display='none';
   els.pinInput.value='';
+  els.pinModalTitle.textContent = `Claim "${user.display_name}"`;
   els.pinModal.classList.add('active');
+  setTimeout(() => els.pinInput.focus(), 50);
 
-  const hasPasskey = passkeysUsable() && !!Passkey.deviceCredential(passkeyId(userId));
-  els.pinPasskeyWrap.hidden = !hasPasskey;
-  els.pinPasskeyBtn.onclick = () => unlockWithPasskey(userId);
-  // The device prompt only opens when the button is pressed (Enter works: the button gets focus).
-  setTimeout(() => (hasPasskey ? els.pinPasskeyBtn : els.pinInput).focus(), 50);
-
-  els.pinConfirm.onclick = async ()=>{
-    const pin=(els.pinInput.value??'').trim();
+  const submit = async () => {
+    const pin = (els.pinInput.value??'').trim();
     if(!validatePin4(pin)){
       els.pinModalError.textContent='PIN must be exactly 4 digits.';
       els.pinModalError.style.display='block';
       return;
     }
+    els.pinConfirm.disabled = true;
     try{
-      const res=await apiPost('auth_user', {user_id: userId, pin});
+      const res = await apiPost('claim_name', { user_id: user.id, pin });
       if(res.status!=='success'){
-        // Handle lockout explicitly
-        if(res.code==='ACCOUNT_LOCKED' && res.message){
-          els.pinModalError.textContent = res.message;
-        } else {
-          els.pinModalError.textContent='Invalid PIN. Please try again.';
-        }
+        els.pinModalError.textContent = res.message || 'Could not claim that name.';
         els.pinModalError.style.display='block';
         return;
       }
-      
-      await finishUnlock(userId, res);
-      maybeOfferPasskey(userId);
+      els.pinModal.classList.remove('active');
+      await becomeUser(res.user);
+      showToast('Name claimed - it now belongs to your account');
     }catch(e){
-      els.pinModalError.textContent='Auth failed. Try again.';
+      els.pinModalError.textContent='Could not claim that name. Try again.';
       els.pinModalError.style.display='block';
+    }finally{
+      els.pinConfirm.disabled = false;
     }
   };
+  els.pinConfirm.onclick = submit;
+  els.pinInput.onkeydown = (e) => { if(e.key === 'Enter') submit(); };
 }
+els.pinCancel.addEventListener('click', () => els.pinModal.classList.remove('active'));
 
-/** Switches to the user after a successful PIN or passkey login. */
-async function finishUnlock(userId, res){
-  cacheAuth(userId, res.auth_token, res.role, 86400);
-  const u = state._pendingAuthUserObj || state.users.find(x => x.id === userId);
-  state.currentUserId = userId;
-  state.currentUserName = u ? (u.role === 'admin' ? `${u.display_name} (organiser)` : u.display_name) : '';
-  state.currentUserRole = u ? u.role : null;
-  state.pending = restorePendingForUser(userId);
-
-  state._pendingAuthUserId = null;
-  state._pendingAuthUserObj = null;
-
-  els.pinModal.classList.remove('active');
-  updateCurrentUserDisplay();
-  updateUserUI();
-  await reloadAvailability();
-  renderDateRangeSkeleton();
-  updateDateFilterBanner();
-  showToast('Unlocked');
-}
-
-/*** Passkeys: fingerprint / face / device screen lock unlock (PIN stays as backup) */
-function passkeyId(userId){ return `cal_${state.token}_${userId}`; }
-function passkeysUsable(){ return state.passkeysEnabled && !!window.Passkey && Passkey.supported(); }
-
-async function unlockWithPasskey(userId){
-  const id = passkeyId(userId);
-  els.pinModalError.style.display='none';
-  els.pinPasskeyBtn.disabled = true;
-  try{
-    const begin = await apiPost('passkey_login_begin', {user_id: userId});
-    if(begin.status !== 'success'){
-      if(begin.code === 'NO_PASSKEY'){ Passkey.forgetDevice(id); els.pinPasskeyWrap.hidden = true; }
-      throw new Error(begin.message || 'Passkey sign-in failed. Use your PIN.');
-    }
-    const credential = await Passkey.get(begin.publicKey);
-    const res = await apiPost('passkey_login_finish', {user_id: userId, credential});
-    if(res.status !== 'success'){
-      if(res.code === 'NO_PASSKEY'){ Passkey.forgetDevice(id); els.pinPasskeyWrap.hidden = true; }
-      throw new Error(res.message || 'Passkey sign-in failed. Use your PIN.');
-    }
-    Passkey.rememberDevice(id, credential.rawId);
-    await finishUnlock(userId, res);
-  }catch(e){
-    if(Passkey.isCancel(e)){
-      els.pinInput.focus();
-      return;
-    }
-    els.pinModalError.textContent = e.message || 'Passkey sign-in failed. Use your PIN.';
-    els.pinModalError.style.display='block';
-  }finally{
-    els.pinPasskeyBtn.disabled = false;
-  }
-}
-
-/** After a PIN login, offers fingerprint / face unlock once per name on capable devices. */
-async function maybeOfferPasskey(userId){
-  if(!passkeysUsable()) return;
-  const id = passkeyId(userId);
-  if(Passkey.deviceCredential(id) || Passkey.wasDismissed(id)) return;
-  if(!(await Passkey.platformAvailable())) return;
-  openPasskeyWindow(userId, true);
-}
-
-/** Registers this device for a logged-in user. Returns true when fingerprint unlock is on. */
-async function enrolPasskey(userId, errorEl, btn){
-  const auth = state.auth.get(userId) || getCachedAuth(userId);
-  if(!auth?.token) return false;
-  const id = passkeyId(userId);
-  const fail = (msg) => {
-    if(errorEl){ errorEl.textContent = msg; errorEl.style.display='block'; }
-    else showToast(msg);
-  };
-
-  if(btn) btn.disabled = true;
-  if(errorEl) errorEl.style.display='none';
-  try{
-    const begin = await apiPost('passkey_register_begin', {}, auth.token);
-    if(begin.status !== 'success'){
-      fail(begin.message || 'Could not add a passkey.');
-      return false;
-    }
-    const credential = await Passkey.create(begin.publicKey);
-    const res = await apiPost('passkey_register_finish', {credential, device_label: Passkey.deviceLabel()}, auth.token);
-    if(res.status !== 'success' && res.code !== 'PASSKEY_EXISTS'){
-      fail(res.message || 'Could not add a passkey.');
-      return false;
-    }
-    Passkey.rememberDevice(id, res.credential_id || credential.rawId);
-    showToast('Passkey added on this device');
-    return true;
-  }catch(e){
-    if(Passkey.isDuplicate(e)){
-      Passkey.rememberDevice(id, null);
-      showToast('Passkey added on this device');
-      return true;
-    }
-    if(!Passkey.isCancel(e)) fail('Could not add a passkey.');
-    return false;
-  }finally{
-    if(btn) btn.disabled = false;
-  }
-}
-
-/**
- * The Passkeys window for a logged-in name. On a device without a passkey it shows the
- * setup prompt, plus any passkeys on other devices so a lost phone can still be removed.
- * Once this device has one, it lists every device.
- * silent: opened automatically after a PIN login, so list errors are not shown.
- */
-async function openPasskeyWindow(userId, silent = false){
-  const auth = state.auth.get(userId) || getCachedAuth(userId);
-  if(!auth?.token) return;
-  const id = passkeyId(userId);
-  let credentials = [];
-  let loaded = false;
-
-  const showError = (msg) => {
-    els.passkeyError.textContent = msg;
-    els.passkeyError.style.display = msg ? 'block' : 'none';
-  };
-
-  const render = () => {
-    const mine = loaded ? Passkey.syncDevice(id, credentials) : Passkey.deviceCredential(id);
-    const setup = !mine;
-    els.passkeyModal.classList.toggle('is-setup', setup);
-    els.passkeySetup.hidden = !setup;
-    els.passkeyManageHead.hidden = setup;
-    els.passkeyOthersTitle.hidden = !(loaded && setup && credentials.length);
-    els.passkeyList.hidden = !loaded || (setup && !credentials.length);
-    if(loaded) Passkey.renderList(els.passkeyList, credentials, mine, removeDevice);
-    els.passkeyAdd.hidden = !setup;
-    els.passkeyClose.textContent = setup ? 'Not now' : 'Close';
-  };
-
-  const close = () => {
-    if(!Passkey.deviceCredential(id)) Passkey.dismiss(id);
-    els.passkeyModal.classList.remove('active');
-  };
-
-  const removeDevice = async (cred, btn) => {
-    const isThis = cred.credential_id === Passkey.deviceCredential(id);
-    const what = isThis ? 'this device' : (cred.device_label || 'this device');
-    if(!confirm(`Remove the passkey from ${what}? The PIN still works.`)) return;
-    btn.disabled = true;
-    showError('');
-    const res = await apiPost('passkey_remove', {credential_id: cred.credential_id}, auth.token);
-    if(res.status !== 'success'){
-      btn.disabled = false;
-      showError(res.message || 'Could not remove this device.');
-      return;
-    }
-    if(isThis) Passkey.forgetDevice(id);
-    Passkey.signalRemoved(cred.credential_id);
-    credentials = Array.isArray(res.credentials) ? res.credentials : [];
-    render();
-    populateUserSelectModal();
-    showToast('Passkey removed');
-  };
-
-  showError('');
-  render();
-  els.passkeyModal.classList.add('active');
-  els.passkeyClose.onclick = close;
-  els.passkeyAdd.onclick = async () => {
-    if(await enrolPasskey(userId, els.passkeyError, els.passkeyAdd)){
-      els.passkeyModal.classList.remove('active');
-      populateUserSelectModal();
-    }
-  };
-
-  try{
-    const res = await apiPost('passkey_list', {}, auth.token);
-    if(res.status !== 'success'){
-      if(!silent) showError(res.message || 'Could not load devices.');
-      return;
-    }
-    credentials = Array.isArray(res.credentials) ? res.credentials : [];
-    loaded = true;
-    render();
-  }catch(e){
-    if(!silent) showError('Could not load devices. Check your connection.');
-  }
-}
-
-/**
- * PIN modal cancel handler.
- * Since we don't set currentUserId until auth succeeds, 
- * cancel simply closes the modal without any state changes.
- */
-els.pinCancel.addEventListener('click', ()=> {
-  els.pinModal.classList.remove('active');
-  state._pendingAuthUserId = null;
-  state._pendingAuthUserObj = null;
-});
-
-/*** Eye toggles for PIN inputs */
+/*** Eye toggle for the claim PIN */
 function wirePinToggle(inputEl, btnEl){
   const icon = btnEl.querySelector('.material-symbols-outlined');
   btnEl.addEventListener('click', ()=>{
@@ -1048,30 +737,15 @@ function wirePinToggle(inputEl, btnEl){
     btnEl.setAttribute('aria-label', nowText ? 'Hide PIN' : 'Show PIN');
   });
 }
-wirePinToggle(els.userPinInput, els.toggleUserPin);
-wirePinToggle(els.userPin2Input, els.toggleUserPin2);
 wirePinToggle(els.pinInput, els.toggleUnlockPin);
 
-/*** Auth cache */
-function cacheKey(userId){ return `auth_${state.token}_${userId}`; }
-function cacheAuth(userId, token, role, ttlSec){
-  const exp = Date.now()+ttlSec*1000;
-  const obj={token, role, exp};
-  state.auth.set(userId, obj);
-  try{ localStorage.setItem(cacheKey(userId), JSON.stringify(obj)); }catch(e){}
-}
-function getCachedAuth(userId){
-  try{
-    const raw=localStorage.getItem(cacheKey(userId)); if(!raw) return null;
-    const obj=JSON.parse(raw); if(!obj || !obj.token || !obj.exp) return null;
-    if(obj.exp < Date.now()) { localStorage.removeItem(cacheKey(userId)); return null; }
-    return obj;
-  }catch(e){ return null; }
-}
+/**
+ * Returns your calendar auth when userId is your own name. Otherwise opens the Join
+ * window (if you have no name yet) and throws, so callers stop.
+ */
 async function ensureAuthedForUser(userId){
-  let auth = state.auth.get(userId) || getCachedAuth(userId);
-  if(auth){ state.auth.set(userId, auth); return auth; }
-  const u = state.users.find(x => x.id === userId);
-  openPinModal(userId, u);
-  throw new Error('Auth required');
+  const auth = state.auth.get(userId);
+  if(auth) return auth;
+  promptJoin();
+  throw new Error('Join this calendar first');
 }
