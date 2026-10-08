@@ -4,6 +4,18 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
+## 2026-10-08
+
+### Added
+- **Admin sign-in with your account:** accounts listed in `config.php` `admin.account_ids` open the admin panel without the password. `admin.html` tries it silently on load (not again in a tab after **Logout**) and has a **Use my When RU Free account** button. The password login stays as a fallback. API: new `admin_login_account` (403 `ADMIN_ACCOUNT_OFF` / `NOT_ADMIN`, 401 `ACCOUNT_REQUIRED`); security log `ADMIN_ACCOUNT_DENIED`, and `ADMIN_LOGIN_SUCCESS` records `method`
+
+### Changed
+- **Reserved usernames** (`admin`, `whenrufree`, `wruf` and others) now get their own message, "That username is reserved" (400 `USERNAME_RESERVED`), instead of the general format error. Admin accounts may use them
+- **Profile page:** **Add sign-in with Google / Facebook** is hidden once that provider is linked and comes back if it's removed. **Add a passkey on this device** always shows, since each device can have its own (the browser refuses a second one on the same device)
+- **Deployment guide:** sample `admin` config uses `password` (as the code does, not `user` / `pass`) and documents `account_ids`; the Facebook steps now cover the Login settings, skipping Meta's JavaScript SDK quick-start, and the Basic settings Meta checks before going Live
+
+---
+
 ## 2026-09-27
 
 ### Added

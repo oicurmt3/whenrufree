@@ -80,10 +80,12 @@ return [
         'hub_inactive_days' => 40,
     ],
     'admin' => [
-        'user' => 'your_admin_username',
-        'pass' => 'your_admin_password_hash',
+        'password' => 'your_admin_password_or_bcrypt_hash',
         'max_attempts' => 5,
         'lockout_minutes' => 15,
+        // Optional. Account ids (Admin > Accounts > ID) that open the admin panel
+        // without the password and may use reserved usernames. The password still works.
+        'account_ids' => [],
     ],
     // Required. Sign-in accounts. pepper: 64+ hex characters, generated once with
     //   php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
@@ -139,10 +141,16 @@ Both are optional; with neither, people sign in with passkeys only. The redirect
 3. Copy the client ID and secret into `accounts.google`.
 
 **Facebook** (Meta for Developers):
-1. Create an app (Consumer) and add **Facebook Login**. Keep only the default `public_profile` permission; the app reads nothing but the user ID.
-2. Facebook Login > Settings > Valid OAuth Redirect URIs: the `oauth_facebook` URL above.
-3. App settings > Basic: privacy policy `https://whenrufree.net/privacy.html`, terms `https://whenrufree.net/terms.html`, **User data deletion** > Data deletion instructions URL `https://whenrufree.net/privacy.html#delete-account`.
-4. Copy the app ID and secret into `accounts.facebook`, then switch the app to Live.
+1. Create an app and add **Facebook Login** (the "Authenticate and request data from users" use case). Keep only the default `public_profile` permission and don't add `email`; the app reads nothing but the user ID, so no App Review is needed.
+2. Facebook Login > Settings: Client OAuth login **Yes**, Web OAuth login **Yes**, Enforce HTTPS **Yes**, Use Strict Mode for redirect URIs **Yes**, Login with the JavaScript SDK **No**. Valid OAuth Redirect URIs: the `oauth_facebook` URL above (exact match, no trailing slash). Check it with **Redirect URI to check**.
+3. Skip the web quick-start's SDK snippet, **Check Login Status** and **Login Button** steps. They load Facebook's JavaScript SDK (which tracks page views); the site uses its own button and a server-side redirect instead.
+4. App settings > Basic: App domains `whenrufree.net`, privacy policy `https://whenrufree.net/privacy.html`, terms `https://whenrufree.net/terms.html`, **User data deletion** > Data deletion instructions URL `https://whenrufree.net/privacy.html#delete-account`, a 1024 x 1024 app icon and a category.
+5. Copy the app ID and secret into `accounts.facebook` (never into chat or screenshots; use **Reset** if the secret leaks), then switch the app to Live. Until then only people with a role on the app can sign in.
+6. Ignore access tokens shown by Meta's tools: the site never stores one, it only needs the app ID and secret.
+
+### 2b. Admin sign-in with your account
+
+After signing in on the site, find your account's ID in **Admin > Accounts** and add it to `admin.account_ids` (e.g. `'account_ids' => [1]`), then run `php -l` on `config.php`. `admin.html` then opens without the password while you're signed in, and the **Use my When RU Free account** button does the same. That account may also use reserved usernames such as `whenrufree`. The admin password keeps working as a fallback.
 
 ### 3. File Upload
 

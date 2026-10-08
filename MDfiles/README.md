@@ -29,6 +29,7 @@ An organiser signs in, creates a calendar with custom time slots, date ranges, a
 - Automatic cleanup of inactive calendars, Hubs and accounts (configurable retention)
 - Up to 17 category icons (Material Symbols Outlined)
 - **Calendar Hubs:** one private link lists multiple calendars; open create-in-Hub; managed by the account that created it
+- Super admin panel: opens with the admin password, or straight away for accounts listed in `config.php` `admin.account_ids`
 
 ## Tech Stack
 

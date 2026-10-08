@@ -22,7 +22,8 @@ We never receive your email, real name or photo from Google or Facebook - only a
 Tap your name in the top corner of any page to open your profile (`account.html`). There you can:
 
 - Change your username or profile name. A new profile name updates every calendar where you use it (not the ones where you chose a different name). If that name is already taken on a calendar, you are told which one keeps the old name.
-- Manage **Ways to sign in**: add Google, Facebook or a passkey for this device, or remove one (you always keep at least one).
+- Manage **Ways to sign in**: add Google, Facebook or a passkey for this device, or remove one (you always keep at least one). The Google and Facebook buttons disappear once linked; you can add a passkey on each device you use.
+- Usernames are 3-20 lowercase letters, numbers or `_`. A few, such as `admin` and `whenrufree`, are reserved.
 - See all your **calendars** and **Hubs** - handy if you lose a link.
 - **Sign out** of this device.
 - **Delete your account**: shows what will be removed (the calendars and Hubs you organise, and your names on other calendars), then asks you to type your username.

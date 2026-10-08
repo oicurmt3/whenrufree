@@ -198,11 +198,13 @@ function renderMethods(methods) {
     del.addEventListener('click', () => removeMethod(m, del));
     list.appendChild(listItem(m.type === 'passkey' ? 'fingerprint' : Account.brandLogo(m.type), name, sub, del));
   });
+  renderAddButtons(new Set(methods.map((m) => m.type)));
 }
 
 async function loadMethods() {
   const r = await Account.getJson('account_methods');
   if (r.ok) renderMethods(r.data.methods);
+  else renderAddButtons();
 }
 
 async function removeMethod(m, btn) {
@@ -237,7 +239,8 @@ async function addPasskey() {
   }
 }
 
-function renderAddButtons() {
+/** Google and Facebook are offered once each; passkeys can be added per device. */
+function renderAddButtons(linked = new Set()) {
   const wrap = $('addMethods');
   wrap.textContent = '';
   const add = (cls, iconNode, label, onClick) => {
@@ -252,8 +255,8 @@ function renderAddButtons() {
     b.addEventListener('click', onClick);
     wrap.appendChild(b);
   };
-  if (info.methods.google) wrap.appendChild(Account.googleButton('Add sign-in with Google', () => Account.startOAuth('google', 'link')));
-  if (info.methods.facebook) add('acct-btn-facebook', Account.brandLogo('facebook'), 'Add sign-in with Facebook', () => Account.startOAuth('facebook', 'link'));
+  if (info.methods.google && !linked.has('google')) wrap.appendChild(Account.googleButton('Add sign-in with Google', () => Account.startOAuth('google', 'link')));
+  if (info.methods.facebook && !linked.has('facebook')) add('acct-btn-facebook', Account.brandLogo('facebook'), 'Add sign-in with Facebook', () => Account.startOAuth('facebook', 'link'));
   if (info.methods.passkey && Passkey.supported()) add('acct-btn-secondary', makeIcon('fingerprint'), 'Add a passkey on this device', addPasskey);
 }
 
@@ -333,7 +336,6 @@ async function init() {
 
   show('signedIn', true);
   initProfile();
-  renderAddButtons();
   initSignOutAndDelete();
   if (signinResult === 'linked' || signinResult === 'taken') {
     $('methodStatus').textContent = Account.SIGNIN_MESSAGES[signinResult];

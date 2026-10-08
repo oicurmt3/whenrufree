@@ -46,7 +46,7 @@ All requests are rate-limited per IP address. Default: 120 requests per minute. 
 
 Client IP is taken from `REMOTE_ADDR` by default. `X-Forwarded-For` is honoured only when the direct connection comes from an IP listed in `config.php` `trusted_proxies` (empty by default).
 
-If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `claim_name`, `claim_hub`, `create_calendar`, `create_group`, `save`, `join_calendar`, `account_update`, `account_remove_method`, `account_delete`, the six `account_passkey_*` actions, `access_check`, `set_access_emoji`, `set_group_access_emoji` and `set_bookings_closed`) return HTTP 503 instead of running unthrottled.
+If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `admin_login_account`, `claim_name`, `claim_hub`, `create_calendar`, `create_group`, `save`, `join_calendar`, `account_update`, `account_remove_method`, `account_delete`, the six `account_passkey_*` actions, `access_check`, `set_access_emoji`, `set_group_access_emoji` and `set_bookings_closed`) return HTTP 503 instead of running unthrottled.
 
 Exceeding the limit returns HTTP 429:
 ```json
@@ -143,7 +143,9 @@ Works when signed out. **Response:** `{ status, available, signed_in, needs_setu
 
 CSRF. Signed in (setup not required). Body: `username` and/or `display_name`. Both must be set before the account can be used.
 
-**Response:** `{ status, username, display_name, renamed, conflicts }` - a new profile name is copied to every calendar name that follows it (`name_custom = 0`); `renamed` counts them and `conflicts` lists calendar titles where that name was already taken (those keep the old name). Errors: 400 `USERNAME_INVALID`, 400 `NAME_INVALID`, 409 `USERNAME_TAKEN`.
+Reserved usernames (`admin`, `administrator`, `root`, `support`, `help`, `owner`, `organiser`, `organizer`, `system`, `moderator`, `staff`, `whenrufree`, `wruf`, `null`, `undefined`, `guest`) are refused, except for accounts listed in `config.php` `admin.account_ids`.
+
+**Response:** `{ status, username, display_name, renamed, conflicts }` - a new profile name is copied to every calendar name that follows it (`name_custom = 0`); `renamed` counts them and `conflicts` lists calendar titles where that name was already taken (those keep the old name). Errors: 400 `USERNAME_INVALID`, 400 `USERNAME_RESERVED`, 400 `NAME_INVALID`, 409 `USERNAME_TAKEN`.
 
 ### POST account_logout
 
@@ -492,11 +494,19 @@ Closes or reopens bookings on a booking calendar. Organiser only; sensitive POST
 
 ## Super Admin Endpoints
 
-These require a separate admin session via `admin_login`. Not exposed to calendar users, and not affected by the account gate.
+These require a separate admin session via `admin_login` or `admin_login_account`. Not exposed to calendar users, and not affected by the account gate.
 
 ### POST admin_login
 
-Authenticates as super admin using credentials from `config.php`.
+Authenticates as super admin using the password in `config.php` (`admin.password`, plain or bcrypt), with a per-IP lockout (`admin.max_attempts` / `admin.lockout_minutes`).
+
+**Response:** `{ status, admin_token, csrf_token }` - a 1-hour admin session. Send `admin_token` as the `X-Admin-Token` header on admin actions.
+
+### POST admin_login_account
+
+CSRF. Opens the same 1-hour admin session for the signed-in account when its id is listed in `config.php` `admin.account_ids` (e.g. `'account_ids' => [1]`). The password login stays as a fallback. `admin.html` tries this silently on load (unless the tab has logged out) and from its **Use my When RU Free account** button.
+
+**Response:** `{ status, admin_token, csrf_token }`. Errors: 403 `ADMIN_ACCOUNT_OFF` (no `account_ids` or accounts tables missing), 401 `ACCOUNT_REQUIRED` (not signed in), 403 `NOT_ADMIN` (account not listed; logged as `ADMIN_ACCOUNT_DENIED`).
 
 ### GET admin_calendars
 
@@ -610,4 +620,5 @@ All security-relevant actions are logged to `grape_private/logs/security_YYYY-MM
 | RATE_LIMIT_ERROR | Rate-limit table unavailable |
 | ADMIN_LOGIN_FAILED | Invalid admin password |
 | ADMIN_LOGIN_LOCKED | Admin login lockout triggered (per IP) |
-| ADMIN_LOGIN_SUCCESS | Successful admin login |
+| ADMIN_LOGIN_SUCCESS | Successful admin login (`method`: `password` or `account`, with `account_id`) |
+| ADMIN_ACCOUNT_DENIED | Signed-in account not in `admin.account_ids` tried to open the admin panel (`account_id`) |

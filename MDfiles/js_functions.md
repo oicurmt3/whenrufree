@@ -439,12 +439,12 @@ Profile page (`account.html`).
 | `initSetup()` | 99 | First-time setup form: username + profile name, then back to the page the person came from. |
 | `initProfile()` | 117 | Profile form (name and private username). |
 | `loadMemberships()` | 144 | GET `account_memberships`: calendars (role, name, Hub) and Hubs (organiser or opened). |
-| `renderMethods(methods)` / `loadMethods()` | 182 | **Ways to sign in** list with Remove (disabled when only one is left). |
-| `removeMethod(m, btn)` | 208 | POST `account_remove_method`. |
-| `addPasskey()` | 223 | `account_passkey_add_begin` -> create -> `account_passkey_add_finish`. |
-| `renderAddButtons()` | 240 | **Add sign-in with Google** / **Add sign-in with Facebook** (`oauth_start` with `mode=link`) / **Add a passkey**. |
-| `initSignOutAndDelete()` | 261 | Sign out; delete account (GET `account_delete_preview`, type the username, POST `account_delete`). |
-| `init()` | 311 | Handles `?signin=`, then setup or profile. |
+| `renderMethods(methods)` / `loadMethods()` | 182 / 204 | **Ways to sign in** list with Remove (disabled when only one is left), then redraws the Add buttons. |
+| `removeMethod(m, btn)` | 210 | POST `account_remove_method`. |
+| `addPasskey()` | 225 | `account_passkey_add_begin` -> create -> `account_passkey_add_finish`; "already has a passkey" when the device refuses a duplicate. |
+| `renderAddButtons(linked)` | 243 | **Add sign-in with Google** / **Add sign-in with Facebook** (`oauth_start` with `mode=link`), each hidden when already in `linked`; **Add a passkey on this device** always. |
+| `initSignOutAndDelete()` | 267 | Sign out; delete account (GET `account_delete_preview`, type the username, POST `account_delete`). |
+| `init()` | 317 | Handles `?signin=`, then setup or profile. |
 
 ---
 
@@ -488,7 +488,7 @@ Admin panel logic, split like the calendar page into classic scripts sharing glo
 
 | File | Contents |
 |------|----------|
-| `admin-core.js` | Tokens, `apiRequest(action, method, body, params)`, `formatDate()`, `truncateToken()`, `escapeHtml()`, login / logout, `checkExistingSession()` (runs on `DOMContentLoaded`), `emojiBadge()`, `clearAccessEmoji()`, Escape-key handler, `switchTab()` (loads Accounts the first time its tab opens) |
+| `admin-core.js` | Tokens, `apiRequest(action, method, body, params)`, `formatDate()`, `truncateToken()`, `escapeHtml()`, password login (`handleLogin()`), account login (`handleAccountLogin(silent)`, POST `admin_login_account`), `startAdminSession()`, logout (stops the automatic account login for the tab), `checkExistingSession()` (runs on `DOMContentLoaded`; tries the account login silently when there is no admin token), `emojiBadge()`, `clearAccessEmoji()`, Escape-key handler, `switchTab()` (loads Accounts the first time its tab opens) |
 | `admin-calendars.js` | Calendars tab: `loadCalendars()`, filters, sort, `renderTable()`, selection, `handleTogglePermanent()`, `executeDelete()`, bulk delete, pagination, Users expander (`toggleUsersExpand()`, `executeDeleteUser()`) |
 | `admin-hubs.js` | Hubs tab: `loadHubs()`, filters, sort, `renderHubTable()`, selection, delete, bulk delete, pagination, calendars expander |
 | `admin-accounts.js` | Accounts tab: `loadAccounts()` (GET `admin_accounts`, optional `q` username prefix, debounced search), `renderAccountStats()` (Google / Facebook / passkey on or off, totals, unclaimed old names and Hubs), `renderAccountTable()`, `deleteAdminAccount()` (type the username, or DELETE for an account without one; POST `admin_delete_account`), `calendarsNeedReload()` |

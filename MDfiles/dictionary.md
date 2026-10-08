@@ -9,7 +9,7 @@ One row per person. Created by `migrations/007_accounts.sql`. No email, real nam
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
 | id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
-| username | VARCHAR(20) | NULL | Private unique username: 3-20 lowercase letters, numbers or `_`, not reserved. NULL until setup is finished |
+| username | VARCHAR(20) | NULL | Private unique username: 3-20 lowercase letters, numbers or `_`, not reserved (admin accounts in `admin.account_ids` may use reserved names). NULL until setup is finished |
 | display_name | VARCHAR(40) | NULL | Profile name used on calendars by default (app limit 32). NULL until setup is finished |
 | created_at | DATETIME | - | Created |
 | last_seen_at | DATETIME | - | Last use (updated at most once a day with the session renewal) |

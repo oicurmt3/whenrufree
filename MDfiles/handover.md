@@ -39,7 +39,9 @@ Everyone signs in (Google, Facebook or a passkey) before they can open, join or 
 - **Claiming:** names and Hubs from before accounts keep their PIN hash (`account_id` / `organiser_account_id` NULL) until someone claims them once with `claim_name` / `claim_hub`; the PIN hash is then set to NULL. `migrations/008_drop_pins.sql` (about 90 days after launch) removes the rest.
 - **Sessions:** 64-hex cookie, SHA-256 in `account_sessions`, 30 days, renewed at most once a day (`accountCurrent()`), SameSite=Lax so the provider redirect back keeps it.
 - **OAuth:** `includes/oauth.php`. `oauth_start` sets the signed `wruf_oauth` cookie (10 minutes: state, OIDC nonce, PKCE verifier, mode, return path) and redirects; `oauth_google` / `oauth_facebook` verify it, exchange the code with cURL, and sign in or link. Results come back as `?signin=` (see `Account.SIGNIN_MESSAGES`).
-- **Passkeys:** discoverable credentials in `account_passkeys` (`residentKey: 'required'`, user handle `webauthnAccountUserHandle()`), so sign-in needs no username (`webauthnDiscoverOptions()` / `webauthnDiscoverFinish()`).
+- **Passkeys:** discoverable credentials in `account_passkeys` (`residentKey: 'required'`, user handle `webauthnAccountUserHandle()`), so sign-in needs no username (`webauthnDiscoverOptions()` / `webauthnDiscoverFinish()`). Adding one sends the account's existing passkeys as `excludeCredentials`, so a device that already has one refuses (`Passkey.isDuplicate()`); that's why the profile page always shows **Add a passkey on this device** but hides **Add sign-in with Google / Facebook** once linked.
+- **Usernames:** 3-20 of `a-z0-9_`, not in `ACCOUNT_USERNAME_RESERVED` (`accountNormaliseUsername()`, `accountUsernameReserved()`); admin accounts may use reserved names.
+- **Admin by account:** `admin.account_ids` in `config.php` lists account ids (Admin > Accounts > ID) that may open the admin panel. `admin_login_account` checks the signed-in account against `adminAccountIds()` and starts the same 1-hour admin session as the password (`adminIssueSession()`, which also regenerates the PHP session id). `admin-core.js` tries it silently on load unless the tab has logged out (`sessionStorage.adminNoAutoAccount`).
 
 ### Split scripts (no modules, no build step)
 
@@ -83,7 +85,7 @@ When an organiser locks in a date+slot, the calendar enters a "frozen" state. Th
 |------|----------|
 | `includes/http.php` | `respond()`, `readJsonBody()`, `requireAction()`, `requireToken()`, `requireConfig()`, trusted proxies and `clientIp()`, `startSecureSession()`, CSRF (`generateCsrfToken()`, `requireCsrf()`) |
 | `includes/data.php` | `normaliseTitle()`, `normaliseName()`, `validateSlotsArray()`, `validateStatusesArray()`, `dateRangeOk()`, `MESSAGE_MAX_LEN`, `respondDuplicateName()`, `buildAvailabilitySummary()` |
-| `includes/security.php` | `pdo()`, `logSecurityEvent()`, rate limiting (`enforceRateLimit()`, `enforceActionRateLimit()`, `rateLimitKey()`, `isSensitivePostAction()`), admin login lockout, `requireAdminSession()`, claim lockout wrappers, `verifyPin()` (old PINs are only checked when claiming), `createToken()` |
+| `includes/security.php` | `pdo()`, `logSecurityEvent()`, rate limiting (`enforceRateLimit()`, `enforceActionRateLimit()`, `rateLimitKey()`, `isSensitivePostAction()`), admin login lockout, `adminAccountIds()`, `adminIssueSession()`, `requireAdminSession()`, claim lockout wrappers, `verifyPin()` (old PINs are only checked when claiming), `createToken()` |
 | `includes/sessions.php` | `getOptionalSession()` / `requireSession()` (the account's name on a calendar; 403 `NOT_JOINED`), `getOptionalGroupSession()` / `requireGroupOrganiserSession()` (the account organises the Hub) |
 | `includes/hubs.php` | Hub limits (`HUB_*`, `hubLimitsConfig()`, `prepareHubCalendarAdd()`), `requireGroupTokenParam()`, `getGroupByToken()`, `touchGroupActivity()`, Hub claim lockout wrappers, `resolveGroupTokenFromPost()` |
 | `includes/accounts.php` | Account config, sessions and cookie, `accountGate()`, `requireAccount()`, identities, username / name rules, `accountNameForCalendar()`, `accountUpdateProfile()`, methods, memberships, deletion, per-account emoji picks, legacy clean-up after a claim |
@@ -120,7 +122,7 @@ Function-by-function locations are in `js_functions.md`.
 
 ### admin-*.js (~2,700 lines, 5 files)
 
-Loaded by `admin.html` in this order: `admin-core.js` (login, API helper, utilities, tabs), `admin-calendars.js` (Calendars tab and Users expander; unclaimed old names show dashed with "not claimed"), `admin-hubs.js` (Hubs tab), `admin-accounts.js` (Accounts tab: provider status, totals incl. unclaimed names / Hubs, username search, delete account), `admin-setup.js` (Setup tab).
+Loaded by `admin.html` in this order: `admin-core.js` (password or account login, API helper, utilities, tabs), `admin-calendars.js` (Calendars tab and Users expander; unclaimed old names show dashed with "not claimed"), `admin-hubs.js` (Hubs tab), `admin-accounts.js` (Accounts tab: provider status, totals incl. unclaimed names / Hubs, username search, delete account), `admin-setup.js` (Setup tab).
 
 ### account-core.js, account.js (~620 lines)
 

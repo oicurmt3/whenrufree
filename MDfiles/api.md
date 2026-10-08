@@ -58,6 +58,7 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `unchoose_slot` | POST | Account | organiser | Reopen frozen calendar |
 | `set_bookings_closed` | POST | Account | organiser | Close (`closed` 1) or reopen (0) bookings on a booking calendar |
 | `admin_login` | POST | CSRF | - | Super admin login |
+| `admin_login_account` | POST | CSRF + account | - | Super admin session for an account listed in `admin.account_ids` |
 | `admin_calendars` | GET | Admin | super | List all calendars (includes optional Hub fields) |
 | `admin_set_permanent` | POST | Admin | super | Toggle never_expires |
 | `admin_delete_calendar` | POST | Admin | super | Delete calendar |
@@ -80,9 +81,9 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | Code | Meaning |
 |------|---------|
 | 200 | Success |
-| 400 | Validation error (`USERNAME_INVALID`, `NAME_INVALID`, `CONFIRM_MISMATCH`) |
+| 400 | Validation error (`USERNAME_INVALID`, `USERNAME_RESERVED`, `NAME_INVALID`, `CONFIRM_MISMATCH`) |
 | 401 | Not signed in (`ACCOUNT_REQUIRED`), wrong old PIN when claiming, or wrong access emoji (`ACCESS_WRONG`, with `attempts_left`) |
-| 403 | Account setup unfinished (`ACCOUNT_SETUP`), not joined (`NOT_JOINED`), CSRF failure or insufficient role, calendar frozen, bookings closed (`BOOKINGS_CLOSED`), or access emoji needed (`ACCESS_REQUIRED`, `HUB_ACCESS_REQUIRED`) |
+| 403 | Account setup unfinished (`ACCOUNT_SETUP`), not joined (`NOT_JOINED`), account admin sign-in off or not allowed (`ADMIN_ACCOUNT_OFF`, `NOT_ADMIN`), CSRF failure or insufficient role, calendar frozen, bookings closed (`BOOKINGS_CLOSED`), or access emoji needed (`ACCESS_REQUIRED`, `HUB_ACCESS_REQUIRED`) |
 | 404 | Calendar/user/action not found, or passkey not linked to any account (`NO_PASSKEY`) |
 | 409 | `ALREADY_JOINED`, `NAME_TAKEN`, `USERNAME_TAKEN`, `ALREADY_CLAIMED`, `LAST_METHOD`, `PASSKEY_EXISTS`, `PASSKEY_LIMIT` |
 | 429 | Rate limited, old name / Hub locked after wrong PINs (`ACCOUNT_LOCKED`), too many wrong emoji picks (`ACCESS_LOCKED`) or too many unknown codes |
