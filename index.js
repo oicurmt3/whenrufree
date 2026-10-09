@@ -1903,7 +1903,9 @@ async function createCalendar(){
  *   cap       - Booking: people per slot (1-20); omit for a normal availability poll
  *   per       - Booking: bookings per person (0 = no limit, 1-20; default 1), counted per day
  *   total     - Booking: 1 = count per across the whole calendar instead of per day
+ *   privacy   - "open", "hidden" or "blind" (booking calendars fall back from blind to hidden)
  *   names     - "hidden": Hidden privacy with Hide names too ticked
+ *   join      - "invite": Who can join = Invite only
  */
 function parseTemplateParams() {
   const params = new URLSearchParams(window.location.search);
@@ -2045,10 +2047,24 @@ function parseTemplateParams() {
     }
   }
 
+  // privacy = open | hidden | blind (set before cap so booking can drop blind)
+  const privacyParam = params.get('privacy');
+  if (['open', 'hidden', 'blind'].includes(privacyParam)) {
+    setPrivacyMode(privacyParam);
+    applied = true;
+  }
+
   // names=hidden: Hidden privacy with "Hide names too" ticked (ignored until migrations/009)
   if (params.get('names') === 'hidden' && inviteSupported) {
     setPrivacyMode('hidden');
     document.getElementById('hideNames').checked = true;
+    applied = true;
+  }
+
+  // join=invite: Who can join = Invite only (ignored until migrations/009; a Hub's setting wins)
+  if (params.get('join') === 'invite' && inviteSupported) {
+    joinMode = 'invite';
+    renderJoinMode();
     applied = true;
   }
 
