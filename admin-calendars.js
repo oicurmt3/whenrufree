@@ -385,6 +385,7 @@ function renderTable() {
                 </span>
                 ${emojiBadge(cal.access_emoji, cal.access_emoji === null && cal.group_access_emoji !== null)}
                 ${cal.slot_capacity ? `<span class="booking-badge" title="Booking: up to ${Number(cal.slot_capacity)} per slot">Booking</span>` : ''}
+                ${inviteBadge(cal.invite_only, cal.pending_requests)}
             </td>
             <td class="col-hub">${hubCell}</td>
             <td class="col-token">
@@ -652,6 +653,7 @@ function renderUserPills(calendarId) {
             var isAdmin = u.role === 'admin';
             var label = isAdmin ? u.display_name + ' (organiser)' : u.display_name;
             if (!u.has_account) label += ' - not claimed';
+            if (u.blocked) label += ' - Blocked';
             var btn = document.createElement('button');
             btn.className = 'user-pill' + (isAdmin ? ' is-admin' : '') + (u.has_account ? '' : ' is-unclaimed');
             btn.title = 'Click to delete ' + label;

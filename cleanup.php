@@ -26,6 +26,7 @@
  * 10) Accounts: delete expired account sessions, passkey sign-ups abandoned before finishing,
  *     emoji picks for deleted calendars/Hubs, and accounts unused for accounts.inactive_days
  *     (default 730) that no longer have any calendar name or Hub
+ * 11) Invite only: delete pending requests after 30 days, and requests for deleted calendars/Hubs
  *
  * Steps 3 and 6 clean the old PIN session tables and are skipped once migration 008 drops them.
  *
@@ -185,6 +186,7 @@ $stats = [
     'access_attempts_deleted' => 0,
     'account_sessions_deleted' => 0,
     'accounts_deleted' => 0,
+    'access_requests_deleted' => 0,
     'errors' => [],
 ];
 
@@ -459,6 +461,34 @@ try {
     echo "[10] ERROR cleaning accounts: " . $e->getMessage() . "\n";
 }
 
+// 11. Invite only requests
+// -----------------------------------------------------------------------------
+// Requests are written with PHP time by includes/members.php. Pending requests expire after
+// 30 days (the person can ask again); requests for deleted calendars/Hubs go straight away.
+try {
+    $requestsReady = true;
+    try {
+        $pdo->query("SELECT status FROM access_requests LIMIT 0");
+    } catch (PDOException $e) {
+        $requestsReady = false;
+        echo "[11] Invite only requests: skipped - run migrations/009_invite_only.sql\n";
+    }
+    if ($requestsReady) {
+        $stmt = $pdo->prepare("DELETE FROM access_requests WHERE status = 'pending' AND created_at < :cutoff");
+        $stmt->execute([':cutoff' => date('Y-m-d H:i:s', time() - 30 * 86400)]);
+        $stats['access_requests_deleted'] = $stmt->rowCount();
+        $stats['access_requests_deleted'] += $pdo->exec("
+            DELETE FROM access_requests
+            WHERE (kind = 'calendar' AND NOT EXISTS (SELECT 1 FROM calendars c WHERE c.id = access_requests.subject_id))
+               OR (kind = 'group' AND NOT EXISTS (SELECT 1 FROM `groups` g WHERE g.id = access_requests.subject_id))
+        ");
+        echo "[11] Invite only requests deleted (pending >30 days or orphaned): {$stats['access_requests_deleted']}\n";
+    }
+} catch (Throwable $e) {
+    $stats['errors'][] = "Invite only requests: " . $e->getMessage();
+    echo "[11] ERROR cleaning requests: " . $e->getMessage() . "\n";
+}
+
 // -------------------------------------------------------------------------
 // Summary
 // -------------------------------------------------------------------------
@@ -474,6 +504,7 @@ echo "Access grants deleted: {$stats['access_grants_deleted']}\n";
 echo "Access picks deleted:  {$stats['access_attempts_deleted']}\n";
 echo "Account sessions:      {$stats['account_sessions_deleted']}\n";
 echo "Accounts deleted:      {$stats['accounts_deleted']}\n";
+echo "Requests deleted:      {$stats['access_requests_deleted']}\n";
 
 if (!empty($stats['errors'])) {
     echo "\nErrors encountered:\n";

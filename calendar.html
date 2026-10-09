@@ -34,9 +34,9 @@
     }
   </style>
   <!-- App styles -->
-  <link rel="stylesheet" href="calendar.css?v=20260927a">
+  <link rel="stylesheet" href="calendar.css?v=20261009b">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
-  <link rel="stylesheet" href="account.css?v=20260927c">
+  <link rel="stylesheet" href="account.css?v=20261009a">
 </head>
 <body>
 <header>
@@ -53,6 +53,7 @@
     <!-- People on this calendar (opens modal) -->
     <button id="userSelectBtn" class="btn btn-ghost icon-btn" type="button" title="People" aria-label="People on this calendar" aria-haspopup="dialog">
       <span class="material-symbols-outlined" aria-hidden="true">group</span>
+      <span id="peopleBadge" class="people-badge" hidden></span>
     </button>
     <!-- Your name on this calendar (after joining) -->
     <button id="renameBtn" class="btn btn-ghost icon-btn" type="button" disabled title="Your name on this calendar" aria-label="Your name on this calendar" style="display:none;">
@@ -158,6 +159,14 @@
     </div>
     <!-- Legend - sticky on all views -->
     <div class="legend-wrap" id="legendWrapContainer">
+      <!-- Someone else's calendar, read only (tap a name in People) -->
+      <div id="viewBar" class="view-bar" role="status" hidden>
+        <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+        <span id="viewBarText" class="view-bar-text"></span>
+        <button type="button" id="viewBarClose" class="view-bar-close" title="Back to your calendar" aria-label="Back to your calendar">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
       <div class="legend" id="legendWrap"></div>
     </div>
     <div class="calendar-grid" id="calendarGrid"></div>
@@ -182,7 +191,9 @@
 <div class="modal-overlay" id="userSelectModal">
   <div class="modal">
     <h2>People</h2>
-    <p id="userSelectIntro">Everyone on this calendar. <a href="#" id="userSelectAddLink" class="add-name-link">Join</a></p>
+    <p id="userSelectIntro"><span id="userSelectIntroText">Everyone on this calendar.</span> <a href="#" id="userSelectAddLink" class="add-name-link">Join</a></p>
+    <!-- Invite only: requests waiting (organiser) -->
+    <div id="userRequestsWrap" class="user-requests" hidden></div>
     <div class="user-select-list" id="userSelectList">
       <!-- Users will be populated here by JS -->
     </div>
@@ -266,6 +277,14 @@
 <div class="modal-overlay" id="settingsModal">
   <div class="modal">
     <h2><span class="material-symbols-outlined settings-title-icon" aria-hidden="true">settings</span> Calendar settings</h2>
+    <!-- Open calendars (migrations/010): the organiser's answers as a coloured slot edge -->
+    <div id="settingsMarksField" class="settings-marks" hidden>
+      <label class="settings-check" for="organiserMarksInput">
+        <input id="organiserMarksInput" type="checkbox">
+        <span>Show my answers on everyone's calendar</span>
+      </label>
+      <p class="settings-hint">A coloured edge on each time slot shows what you picked. Turn it off if you don't want to steer people's choices. People can still see your answers in Best Match and the People list.</p>
+    </div>
     <div id="settingsAccessField"></div>
     <div class="error" id="settingsError"></div>
     <div class="modal-actions">
@@ -278,13 +297,13 @@
 
 <!-- App script -->
 <script src="passkey.js?v=20260927a"></script>
-<script src="account-core.js?v=20260927c"></script>
-<script src="emoji.js?v=20260926b"></script>
-<script src="calendar-core.js?v=20260927b"></script>
-<script src="calendar-users.js?v=20260927b"></script>
-<script src="calendar-grid.js?v=20260927b"></script>
+<script src="account-core.js?v=20261009a"></script>
+<script src="emoji.js?v=20261008b"></script>
+<script src="calendar-core.js?v=20261009b"></script>
+<script src="calendar-users.js?v=20261009c"></script>
+<script src="calendar-grid.js?v=20261009a"></script>
 <script src="calendar-rank.js?v=20260927b"></script>
 <script src="calendar-booking.js?v=20260927b"></script>
-<script src="calendar-main.js?v=20260927b"></script>
+<script src="calendar-main.js?v=20261009b"></script>
 </body>
 </html>

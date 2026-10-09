@@ -4,9 +4,35 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
+## 2026-10-09
+
+### Added
+- **See someone's calendar (read only):** tap a name in the **People** list ("Tap to see") to show their answers in the grid. A bar above the calendar reads "Viewing NAME (read only)"; its close button or Escape goes back to yours. Taps on slots only show a message, your own unsaved changes are kept, and the organiser's coloured edge still shows unless you are viewing the organiser. Follows the Best Match names rule: joined people on Open calendars, the organiser on Hidden calendars, nobody on Blind calendars. Not on booking calendars or for blocked people. No server change: the page only draws answers the server already sends
+- **Organiser's coloured edge is optional:** on Open calendars the organiser can untick **Show my answers on everyone's calendar** in Calendar settings (gear) so people aren't steered towards their choices. On by default. API: new `set_organiser_marks`; `calendar_meta` adds `organiser_marks` and `organiser_marks_available`. New `migrations/010_organiser_marks.sql` adds `calendars.show_organiser_marks`; until it runs the edge always shows and the setting is hidden. The gear now shows for organisers of Open calendars even without the access emoji
+- **Home page while signed out:** the create page is visible instead of hidden behind the sign-in panel. The header shows a **Sign in** button, and tapping anything in the form opens the sign-in panel, which can now be closed (X, Escape or tapping outside). Hub links (`?g=`) and unfinished account set-up still go straight to the sign-in panel. Creating still needs an account on the server
+
+### Changed
+- **Home page wording:** new intro ("...or create a bookings calendar... plan events and take bookings. Sign in with Google, Facebook or a passkey."). Sign-in panel: "You need a free account to open, join or create calendars and Hubs." Organiser name hint: "Leave blank to use your profile name. You manage the calendar from this account." Private names hint: "People only see their own name, organiser name (yours), and how many have joined."
+- **Save-your-link warnings:** removed the home page "cannot be recovered if lost" warning. The Hub save panel and Hub text file now say the link is the invite and that the Hub is also listed on your profile page
+- **Inactivity default is 40 days everywhere:** admin Setup and the `admin_save_config` fallback used 30 while `cleanup.php` used 40. Saved site settings are unchanged
+- Organiser's coloured edge: documented as Open calendars only (on Hidden calendars members never receive the organiser's answers, so it only ever showed there for the organiser)
+
+---
+
 ## 2026-10-08
 
 ### Added
+- **Invite only:** a new **Who can join** setting on the create page and Hub create page: **Direct link** (default, as before) or **Invite only**. Set only when creating; it can't be changed later
+  - People with the link see a **Request access** panel (after the access emoji, if there is one). The organiser approves or declines in the **People** list (count badge on the People button; **Approve all**; a collapsed Declined list) or, for Hubs, on the Hub page (Requests, Approved and Declined lists). Approved people then join with their own name as usual and skip the emoji
+  - Invite only Hubs: one approval opens every calendar in the Hub, calendars created inside it are always Invite only (the create page shows a note instead of the toggle), and requests go to the Hub organiser
+  - Declined people can't ask again, but can still be approved later. Pending requests expire after 30 days. No notifications: counts show on the People button, Hub page, profile page ("N requests waiting") and admin panel
+  - Profile page: a **Waiting for approval** list of your own pending and declined requests
+  - Link previews (`share.php`) are unchanged
+- **Block:** organisers can pause anyone on a calendar from the People list (`block` icon; **undo** restores). They see "The organiser has paused your access"; their answers are left out of the calendar, Best Match and totals, but bookings still hold their places. Nothing is deleted. On Invite only Hubs the organiser can also block an approved person Hub-wide. Admin shows " - Blocked" on their name
+- **Hide names too:** Hidden calendars can also keep names private (checkbox under Privacy Mode; template `names=hidden`). Blind calendars now always keep names private. Members then see only themselves, the organisers and "Names are private on this calendar. N people have joined." The organiser still sees everyone
+- API: new `request_access`, `cancel_access_request`, `access_requests`, `decide_access_request`, `set_user_blocked`; 403 `INVITE_ONLY`, `BLOCKED`, `REQUEST_DECLINED`. `create_calendar` takes `invite_only` / `hide_names`, `create_group` takes `invite_only`; `calendar_meta` adds `invite_only`, `invite_via_hub`, `hide_names`, `names_private`, `pending_requests`; `group_meta` adds `invite_only`, `pending_requests`; `users` adds `blocked` (organiser), `total`, `names_hidden`; `account_memberships` adds `blocked`, `pending_requests` and `requests`; `get_site_config` adds `features.invite_only`. Security log: `ACCESS_REQUESTED`, `ACCESS_REQUEST_DECIDED`, `USER_BLOCKED`
+- New files: `includes/members.php`, `migrations/009_invite_only.sql` (adds `calendars.invite_only`, `calendars.hide_names`, `groups.invite_only`, `users.blocked` and the `access_requests` table). cleanup.php step 11 deletes expired and orphaned requests
+- FAQ, guide and privacy policy cover Invite only, blocking and private names
 - **Admin sign-in with your account:** accounts listed in `config.php` `admin.account_ids` open the admin panel without the password. `admin.html` tries it silently on load (not again in a tab after **Logout**) and has a **Use my When RU Free account** button. The password login stays as a fallback. API: new `admin_login_account` (403 `ADMIN_ACCOUNT_OFF` / `NOT_ADMIN`, 401 `ACCOUNT_REQUIRED`); security log `ADMIN_ACCOUNT_DENIED`, and `ADMIN_LOGIN_SUCCESS` records `method`
 
 ### Changed

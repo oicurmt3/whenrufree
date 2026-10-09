@@ -39,9 +39,9 @@
     </style>
 
   <!-- Page styles -->
-  <link rel="stylesheet" href="index.css?v=20260926g">
+  <link rel="stylesheet" href="index.css?v=20261008b">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
-  <link rel="stylesheet" href="account.css?v=20260927c">
+  <link rel="stylesheet" href="account.css?v=20261009a">
 </head>
 <body>
   <div class="card">
@@ -49,7 +49,7 @@
       <h1><span class="material-symbols-outlined" style="vertical-align:middle;padding-bottom:5px;">calendar_month</span> When RU Free?</h1>
       <span id="accountBadge"></span>
     </div>
-    <p class="sub"><strong>When RU Free</strong> helps your group arrange a time when everyone is available. Create free shared calendars, schedule availability, and plan events. Sign in with Google, Facebook or a passkey &mdash; we never see or store your email, and there are no ads or tracking.</p>
+    <p class="sub"><strong>When RU Free</strong> helps your group arrange a time when everyone is available or create a bookings calendar. Create free shared calendars, schedule availability, plan events and take bookings. Sign in with Google, Facebook or a passkey.</p>
     
     <div class="info-box">
       Use <a href="https://whenrufree.net/ideas.html">these templates</a> to get started quickly, or create your own calendar from scratch below.
@@ -341,9 +341,29 @@ celebration
       <div class="field" style="max-width:320px;">
         <label for="adminName">Your name on this calendar</label>
         <input id="adminName" type="text" maxlength="32" placeholder="Your profile name" autocomplete="off" />
-        <p class="hint">Leave blank to use your profile name. You manage the calendar from this account &mdash; no PIN needed.</p>
+        <p class="hint">Leave blank to use your profile name. You manage the calendar from this account.</p>
         <div id="adminNameErr" class="error"></div>
       </div>
+
+      <!-- Who can join (shown once migrations/009 has run). Chosen here only; it can't be changed later. -->
+      <div class="field hideme" id="joinModeField">
+        <label id="joinModeLabel">Who can join</label>
+        <div class="privacy-toggle" id="joinModeToggle" role="group" aria-labelledby="joinModeLabel">
+          <button type="button" class="priv-btn active" data-join="link" aria-pressed="true">
+            <span class="material-symbols-outlined" aria-hidden="true">link</span>
+            <span>Direct link</span>
+          </button>
+          <button type="button" class="priv-btn" data-join="invite" aria-pressed="false">
+            <span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span>
+            <span>Invite only</span>
+          </button>
+        </div>
+        <p class="hint" id="joinModeHint">Anyone with the link can join.</p>
+      </div>
+      <p class="info-box hideme" id="joinModeHubNote">
+        <span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span>
+        This Hub is invite only: people request access and the Hub organiser approves them.
+      </p>
 
       <!-- Access emoji (optional; shown once migrations/003 has run) -->
       <div class="field hideme" id="accessEmojiWrap" style="max-width:420px;">
@@ -368,6 +388,12 @@ celebration
           </button>
         </div>
         <p class="hint" id="privacyHint">All users can see each other's availability choices.</p>
+        <!-- Hidden only (migrations/009): the People list shows each person only themselves and you -->
+        <label class="weekend-label hideme" id="hideNamesRow" for="hideNames">
+          <input id="hideNames" type="checkbox" />
+          Hide names too
+        </label>
+        <p class="hint hideme" id="hideNamesHint">People only see their own name, organiser name (yours), and how many have joined.</p>
       </div>
     </div>
 
@@ -378,10 +404,7 @@ celebration
 
     <div class="section-t">
       <div class="warn">
-        After you click <strong>Create New Calendar</strong>, you must save your private calendar link before continuing. It cannot be recovered if lost.
-      </div>
-      <div class="warn">
-        Calendars are auto deleted if there is no <b>Submit/Save for <span class="js-retention-days" data-default="30">30</span> days</b>.
+        Calendars are auto deleted if there is no <b>Submit/Save for <span class="js-retention-days" data-default="40">40</span> days</b>.
         (Viewing does not count as activity.)
       </div>
     </div>
@@ -428,6 +451,8 @@ celebration
         <p class="hint">Use this emoji to access the calendar.</p>
       </div>
 
+      <p id="saveCalInvite" class="code-line hideme"><strong>Invite only:</strong> people request access and you approve them in the People list.</p>
+
       <div id="clipboardFailMsg" class="clipboard-fail hideme">
         Auto-copy may have failed &mdash; please use <strong>Copy calendar link</strong> below.
       </div>
@@ -453,8 +478,8 @@ celebration
 
   <!-- Page script -->
   <script src="passkey.js?v=20260927a" defer></script>
-  <script src="account-core.js?v=20260927c" defer></script>
-  <script src="emoji.js?v=20260926b" defer></script>
-  <script src="index.js?v=20260927a" defer></script>
+  <script src="account-core.js?v=20261009a" defer></script>
+  <script src="emoji.js?v=20261008b" defer></script>
+  <script src="index.js?v=20261009a" defer></script>
 </body>
 </html>

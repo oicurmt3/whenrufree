@@ -263,7 +263,7 @@
    * On/off switch with the chosen emoji and a Change button, built inside container.
    * Switching on or pressing Change opens the fullscreen picker. onChange(next) may be async
    * and return false to keep the current value (e.g. a failed save).
-   * Returns { get value, set(v), setOffHint(text) }.
+   * Returns { get value, set(v), setOffHint(text), setOnHint(text) }.
    */
   function field(container, opts = {}) {
     const {
@@ -277,6 +277,7 @@
     } = opts;
     let current = valid(value) ? value : null;
     let off = offHint;
+    let onText = onHint;
     let busy = false;
 
     container.innerHTML = '';
@@ -307,7 +308,7 @@
       chosen.classList.toggle('hideme-ae', !on);
       glyph.textContent = on ? LIST[current].e : '';
       nameEl.textContent = on ? LIST[current].n : '';
-      note.textContent = on ? onHint : off;
+      note.textContent = on ? onText : off;
     };
 
     const apply = async next => {
@@ -340,7 +341,8 @@
     return {
       get value() { return current; },
       set(v) { current = valid(v) ? v : null; paint(); },
-      setOffHint(text) { off = text; paint(); }
+      setOffHint(text) { off = text; paint(); },
+      setOnHint(text) { onText = text; paint(); }
     };
   }
 

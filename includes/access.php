@@ -443,7 +443,7 @@ function accessGate(PDO $pdo, array $config, string $action): void {
 
 /**
  * True when the signed-in account needs no emoji here: it organises the calendar or Hub, has a
- * name on the calendar, or picked the right emoji before.
+ * name on the calendar, was approved for it (Invite only), or picked the right emoji before.
  */
 function accessAccountAllowed(PDO $pdo, string $kind, array $row, array $allowed): bool {
     $acct = accountCurrent($pdo);
@@ -455,6 +455,10 @@ function accessAccountAllowed(PDO $pdo, string $kind, array $row, array $allowed
         $stmt = $pdo->prepare("SELECT 1 FROM `groups` WHERE id = :gid AND organiser_account_id = :aid LIMIT 1");
         $stmt->execute([':gid' => $groupId, ':aid' => $aid]);
         if ($stmt->fetchColumn()) return true;
+    }
+    if (function_exists('membersTablesReady') && membersTablesReady($pdo)) {
+        if ($kind === 'calendar' && membersRequestStatus($pdo, 'calendar', (int)$row['id'], $aid) === 'approved') return true;
+        if ($groupId > 0 && membersRequestStatus($pdo, 'group', $groupId, $aid) === 'approved') return true;
     }
     return accountAccessValid($pdo, $aid, $allowed);
 }

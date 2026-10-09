@@ -32,7 +32,7 @@ There is no SPA routing, no state management library, no component framework. Th
 
 ### Accounts (no PINs)
 
-Everyone signs in (Google, Facebook or a passkey) before they can open, join or create anything. `accountGate()` in `includes/accounts.php` runs before every action and returns 401 `ACCOUNT_REQUIRED` / 403 `ACCOUNT_SETUP`; every page starts with `await Account.require()` (from `account-core.js`), which shows a sign-in panel that cannot be dismissed. There are no auth headers or per-calendar tokens: the HttpOnly `wruf_account` cookie identifies the account, and a calendar role comes from `users.account_id` + `users.role`. The unique link is the invite; the optional access emoji is an invite confirmation remembered per account.
+Everyone signs in (Google, Facebook or a passkey) before they can open, join or create anything. `accountGate()` in `includes/accounts.php` runs before every action and returns 401 `ACCOUNT_REQUIRED` / 403 `ACCOUNT_SETUP`; every page starts with `await Account.require()` (from `account-core.js`), which shows a sign-in panel that cannot be dismissed. The one exception is the home page (`index.html`): signed out, it shows the create form as a preview with a **Sign in** button (`Account.renderSignInBadge()`), and tapping anything in the form opens a closable sign-in panel (`Account.showSignIn(me, {dismissible: true})`, wired by `guardFormUntilSignedIn()` in `index.js`). Hub links (`?g=`) and unfinished set-up still call `Account.require()`, and `create_calendar` is refused by `accountGate()` anyway. There are no auth headers or per-calendar tokens: the HttpOnly `wruf_account` cookie identifies the account, and a calendar role comes from `users.account_id` + `users.role`. The unique link is the invite; the optional access emoji is an invite confirmation remembered per account. Invite only calendars and Hubs also need the organiser's approval (see "Built: Invite only and Block").
 
 - **Data kept:** private username, profile name, HMAC-SHA-256 (with `accounts.pepper`) of each Google `sub` / Facebook app-scoped `id`, passkey public keys, memberships. Never an email, real name or photo. Google is asked only for `openid`; Facebook only for `public_profile` (its minimum), and only the `id` is read.
 - **Names:** `users.name_custom = 0` means the name follows the profile name (updated by `accountUpdateProfile()` when the profile name changes); 1 means a per-calendar override. One name per account per calendar (`ux_users_cal_account`).
@@ -68,8 +68,9 @@ The `CATEGORY_META` object in `calendar-core.js` is the allowlist of valid categ
 ### Privacy enforcement split
 
 Privacy mode (open/hidden/blind) is enforced on both client and server:
-- **Client:** `shouldShowRoster()` and `shouldShowOrganiserDots()` gate UI rendering
-- **Server:** The `availability` endpoint returns all data regardless of privacy mode. Privacy is a display concern, not a data access concern. This is intentional -- the data is "available" (pun intended) to any signed-in account with the link that reads the API directly. The privacy modes are social contracts, not security boundaries.
+- **Client:** `shouldShowRoster()` and `shouldShowOrganiserDots()` gate UI rendering. `canViewUser()` (the People list's read-only "Tap to see" view) uses the same rule as `shouldShowRoster()`, and skips booking calendars and blocked people. The organiser's coloured slot edge shows only on Open calendars (Hidden members never receive the organiser's rows) and only while `calendars.show_organiser_marks` is 1
+- **Server:** `availability` returns every row on Open calendars and to the organiser of a Hidden one; Hidden members and Blind (any role) get only their own rows plus the anonymous `summary`. Blocked people's rows are left out of both on non-booking calendars.
+- **Names:** when `membersNamesHidden()` is true (Blind, or Hidden with `calendars.hide_names`), `users` returns only the caller, the organisers and claimable old names, plus a `total`; the organiser still gets everyone.
 
 ### Chosen/frozen state
 
@@ -84,13 +85,14 @@ When an organiser locks in a date+slot, the calendar enters a "frozen" state. Th
 | File | Contents |
 |------|----------|
 | `includes/http.php` | `respond()`, `readJsonBody()`, `requireAction()`, `requireToken()`, `requireConfig()`, trusted proxies and `clientIp()`, `startSecureSession()`, CSRF (`generateCsrfToken()`, `requireCsrf()`) |
-| `includes/data.php` | `normaliseTitle()`, `normaliseName()`, `validateSlotsArray()`, `validateStatusesArray()`, `dateRangeOk()`, `MESSAGE_MAX_LEN`, `respondDuplicateName()`, `buildAvailabilitySummary()` |
+| `includes/data.php` | `normaliseTitle()`, `normaliseName()`, `validateSlotsArray()`, `validateStatusesArray()`, `dateRangeOk()`, `MESSAGE_MAX_LEN`, `respondDuplicateName()`, `buildAvailabilitySummary()`, `organiserMarksColumnReady()` (migration 010) |
 | `includes/security.php` | `pdo()`, `logSecurityEvent()`, rate limiting (`enforceRateLimit()`, `enforceActionRateLimit()`, `rateLimitKey()`, `isSensitivePostAction()`), admin login lockout, `adminAccountIds()`, `adminIssueSession()`, `requireAdminSession()`, claim lockout wrappers, `verifyPin()` (old PINs are only checked when claiming), `createToken()` |
 | `includes/sessions.php` | `getOptionalSession()` / `requireSession()` (the account's name on a calendar; 403 `NOT_JOINED`), `getOptionalGroupSession()` / `requireGroupOrganiserSession()` (the account organises the Hub) |
 | `includes/hubs.php` | Hub limits (`HUB_*`, `hubLimitsConfig()`, `prepareHubCalendarAdd()`), `requireGroupTokenParam()`, `getGroupByToken()`, `touchGroupActivity()`, Hub claim lockout wrappers, `resolveGroupTokenFromPost()` |
 | `includes/accounts.php` | Account config, sessions and cookie, `accountGate()`, `requireAccount()`, identities, username / name rules, `accountNameForCalendar()`, `accountUpdateProfile()`, methods, memberships, deletion, per-account emoji picks, legacy clean-up after a claim |
 | `includes/oauth.php` | Google / Facebook sign-in: provider config, signed state cookie, authorize URL, code exchange, callback |
 | `includes/webauthn.php`, `lockout.php`, `access.php`, `booking.php` | Account passkeys, escalating claim lockout, access emoji, booking rules (see below) |
+| `includes/members.php` | Invite only and Block: `membersGate()`, `membersDecide()`, requests, organiser checks, private names (see below) |
 
 Each include declares `strict_types=1`, like `api.php`. `logSecurityEvent()` writes to `grape_private/logs/` next to the webroot (the path is relative to `includes/`, so it uses `dirname(__DIR__)`).
 
@@ -112,7 +114,7 @@ The claim lockout lives in `includes/lockout.php` (`pinLockoutCheck`, `pinLockou
 The largest and most complex part. Loaded by `calendar.html` after `passkey.js`, `account-core.js` and `emoji.js`, in this order (see "Split scripts" above):
 
 1. **calendar-core.js**: constants and config (TIME_SLOTS, STATUS_OPTIONS, CATEGORY_META, strength palette), utilities, pending changes queue and autosave, date helpers, the `els` object (caches all querySelector calls), the single `state` object, CSRF, access emoji gate and account errors (`accessFetch`), `apiGet` / `apiPost`
-2. **calendar-users.js**: `loadCalendarMeta` (+ `applyMe`), `loadUsers`, People modal (your name first, claimable old names), delete, submit and user UI, Hub bar, organiser Settings, join / rename modal (`openUserModal`, `saveMyName`), claim modal (`openClaimModal`), `promptJoin`, `ensureAuthedForUser`
+2. **calendar-users.js**: `loadCalendarMeta` (+ `applyMe`), `loadUsers`, People modal (your name first, claimable old names, "Tap to see" someone's calendar read only via `openUserView` / `closeUserView`), delete, submit and user UI, Hub bar, organiser Settings (access emoji, organiser marks), join / rename modal (`openUserModal`, `saveMyName`), claim modal (`openClaimModal`), `promptJoin`, `ensureAuthedForUser`
 3. **calendar-grid.js**: availability loading, slot status, date filter, `renderDateRangeSkeleton`, past dates, `refreshCalendarValues`, `cycleStatus`, `onSlotClick`, `savePending` and reset operations
 4. **calendar-rank.js**: calendar links, share, `buildRankScores`, sort / limit toggles, organiser message, chosen / frozen state, `renderRankings`, `debouncedRank`
 5. **calendar-booking.js**: booking mode (cells, caps, Bookings card, close / reopen, polling)
@@ -126,7 +128,7 @@ Loaded by `admin.html` in this order: `admin-core.js` (password or account login
 
 ### account-core.js, account.js (~620 lines)
 
-`account-core.js` (`window.Account`) loads on every page after `passkey.js`: `require()` (resolves with `account_me` once signed in and set up, otherwise shows the sign-in panel or goes to `account.html`), `handleApiError()` (for `ACCOUNT_REQUIRED` / `ACCOUNT_SETUP` from any call), `renderBadge()` (name link to the profile page), `showSignIn()`, `toast()`, `logout()`. `account.js` runs `account.html`: first-time setup (username + profile name), profile edit, calendars and Hubs lists, sign-in methods (add / remove), sign out, delete account. `checkExistingSession()` runs on `DOMContentLoaded` so every tab file is loaded first.
+`account-core.js` (`window.Account`) loads on every page after `passkey.js`: `require()` (resolves with `account_me` once signed in and set up, otherwise shows the sign-in panel or goes to `account.html`), `handleApiError()` (for `ACCOUNT_REQUIRED` / `ACCOUNT_SETUP` from any call), `renderBadge()` (name link to the profile page), `renderSignInBadge()` (signed-out **Sign in** button, home page), `showSignIn(info, opts)` (`opts.dismissible` adds a close button, Escape and backdrop close), `toast()`, `logout()`. `account.js` runs `account.html`: first-time setup (username + profile name), profile edit, calendars and Hubs lists, sign-in methods (add / remove), sign out, delete account. `checkExistingSession()` runs on `DOMContentLoaded` so every tab file is loaded first.
 
 ### calendar.css (~1,650 lines)
 
@@ -141,7 +143,7 @@ Organised in sections:
 
 ### index.js (~2,100 lines)
 
-Calendar creation form logic. Manages slots repeater, status repeater, date range picker, category toggles, and template URL parsing. Starts with `Account.require()`; the optional organiser name defaults to the profile name. Sends `create_calendar` and redirects to calendar.html. When opened with `?g=TOKEN`, loads Hub context via `group_meta` and passes `group_token` on create (no Hub organiser needed).
+Calendar creation form logic. Manages slots repeater, status repeater, date range picker, category toggles, and template URL parsing. Signed in, it shows the account badge and the optional organiser name defaults to the profile name; signed out, the form is a preview and `guardFormUntilSignedIn()` opens the closable sign-in panel on any tap (Hub links and unfinished set-up use `Account.require()`). Sends `create_calendar` and redirects to calendar.html. When opened with `?g=TOKEN`, loads Hub context via `group_meta` and passes `group_token` on create (no Hub organiser needed).
 
 ### hub.js (~960 lines)
 
@@ -160,6 +162,9 @@ CLI-only cron script. Operations include:
 8. Reset `lockout_level` after `pin_lockout.reset_after_days` (default 30) without a lockout; skipped until migration 002 is applied
 9. Delete expired / orphaned `access_grants` and `access_attempts` rows unlocked and idle for `access_emoji.attempts_keep_days` (default 30); skipped until migration 003 is applied
 10. Accounts: delete expired `account_sessions`, passkey sign-ups abandoned before finishing, `account_access` rows for deleted calendars/Hubs, and accounts unused for `accounts.inactive_days` (default 730) that have no names and no Hubs; skipped until migration 007 is applied
+11. Invite only: delete pending `access_requests` older than 30 days and requests for deleted calendars/Hubs; skipped until migration 009 is applied
+
+The inactivity default is 40 days everywhere (cleanup.php, admin Setup and `admin_save_config`); a value saved in Admin > Setup wins.
 
 ## Common Tasks
 
@@ -256,13 +261,31 @@ See the "Adding a Category" Word document. Two files: `CATEGORY_META` in calenda
 ## Built: Booking Mode
 
 - A calendar with `calendars.slot_capacity` set (1-20) is a booking form: each slot can be taken by that many people, first come, first served. `max_per_user` (1-20 or NULL) caps bookings per person per day (counted with `AND day = :day` in `bookingApplyChanges()`), or across the whole calendar when `per_user_total` = 1 (the day filter is dropped); `bookings_closed` locks it. All four are set only in `create_calendar` - there is no endpoint to change them later.
-- Bookings are ordinary `availability` rows with status 1. The calendar has exactly one status (the booking label, default "Booked"); Blind privacy is rejected because nobody could see which slots are free.
+- Bookings are ordinary `availability` rows with status 1. The calendar has exactly one status (the booking label, default "Booked"); Blind privacy is rejected because the organiser must see who booked.
 - Server rules live in `includes/booking.php`: `bookingColumnsReady()` (migration check), `bookingLimitValue()`, `bookingSettingsFromRow()`, `bookingLockCalendar()` (`SELECT ... FOR UPDATE` on the calendar row - this is what makes two simultaneous taps on the last place safe) and `bookingApplyChanges()` (cancellations first, then bookings with capacity / per-person checks; returns the refused ones). `save` uses them for booking calendars only; normal calendars keep the old upsert path.
 - The organiser booking for themselves skips `max_per_user` (so they can block slots); removing someone else's booking is a `save` for that user with status 0. When closed, participants get 403 `BOOKINGS_CLOSED` from `save` and `reset_user`; the organiser can still save.
 - Hidden booking calendars send the anonymous `summary` to accounts that have not joined, so they see Free / Full. Names follow `shouldShowRoster()`.
 - Browser: `index.js` BOOKING MODE block (`makeLimitControl()`, `applyBookingMode()`), `calendar-booking.js` (`bookingInfo()`, `onBookingSlotClick()` / `setPendingBooking()` - taps become normal pending changes saved by `savePending()`, which drops the server's `rejected` slots and handles `BOOKINGS_CLOSED`; `queueBooking()` - organiser removals of other people, `renderBookings()`, `setBookingsClosed()`, `refreshBookings()` every 30 s and on tab focus). `renderRankings()`, `refreshCalendarValues()`, `onSlotClick()`, `renderLegend()` and `updateChosenBanner()` branch to the booking versions when `state.booking` is set.
 - Self-disabling: until `migrations/004_booking.sql` runs, `features.booking` is false and the create page hides People per slot. Until `migrations/005_booking_total.sql` runs, `features.booking_total` is false, the Per day / In total toggle is hidden and every limit is per day (`bookingTotalColumnReady()`). Until `migrations/006_booking_styles.sql` runs, `features.booking_styles` is false, the Partly booked / Full colour and name settings are hidden and cells use the defaults (`bookingStyleColumnsReady()`; `calendars.partial_color` / `full_color` become the `--bk-partial` / `--bk-full` CSS variables via `applyBookingColors()`, and `partial_label` / `full_label` become `state.booking.partialLabel` / `fullLabel` in `calendar-users.js`).
 - Tests: `$env:TEMP\wruf_booking_test.php` (SQLite, not in the repo) covers `includes/booking.php`; there is no browser test.
+
+## Built: Invite only and Block
+
+- **Who can join** is chosen only on the create page (`calendars.invite_only`, `groups.invite_only`, migration 009) and never changes. Direct link is the default. A calendar created inside an Invite only Hub is forced to `invite_only = 1`.
+- **Requirement:** `membersRequirement()` - the Hub if its Hub is Invite only, else the calendar if it is, else nothing. So requests for calendars in an Invite only Hub go to the Hub organiser and one Hub approval opens every calendar in it.
+- **Gate:** `membersGate()` runs right after `accessGate()` (the emoji is asked first; an approved request also satisfies the emoji in `accessAccountAllowed()`). It uses the same target resolution (`?c=`, `?g=`, POSTed `group_token` on `create_calendar`). Exempt: `csrf_token`, `diag`, `access_check`, `request_access`, `cancel_access_request`, `remove_calendar_from_group`, `admin_*`. `membersDecide()` returns `ok` / `blocked` / `none` / `pending` / `declined`, checked in this order: Hub organiser; Hub-level `blocked` request; the account's name on the calendar (`users.blocked` -> blocked, else ok - this also covers organisers and anyone who joined before); then the request status (a calendar-level approval still counts if the calendar later sits in an Invite only Hub). Non-ok responses are 403 `INVITE_ONLY` with `invite: {kind, status, title, profile_name}` or 403 `BLOCKED`; `Account.handleApiError()` shows the matching panel (`Account.showInvite()`).
+- **Requests:** `access_requests` (`kind` calendar/group, `subject_id`, `account_id`, `display_name` snapshot, `status` pending/approved/declined/blocked). Approval only opens the gate; the person then joins with `join_calendar` as usual. Declined people get 403 `REQUEST_DECLINED` on `request_access`, but the organiser can approve them later. Limits: 10 requests per IP per hour (`rqa` + hour), 200 pending per calendar/Hub. No notifications - organisers see counts (`pending_requests` in `calendar_meta`, `group_meta`, memberships and admin lists).
+- **Block:** `set_user_blocked` (calendar organiser, not on other organisers) sets `users.blocked`. Blocked people get 403 `BLOCKED` ("The organiser has paused your access"), are hidden from other members in `users`, and their answers are left out of `availability`, the summary and Best Match. On booking calendars their bookings still count towards capacity and they stay listed. On Invite only Hubs the Hub organiser can block an approved person Hub-wide (request status `blocked`).
+- **Clean-up:** requests are deleted with their calendar or Hub (`membersForgetSubject()`), when a name is deleted (`membersForgetCalendarAccount()`), with the account (FK cascade), and by cleanup step 11.
+- **Browser:** create page `#joinModeField` (`initJoinModeField()`, `renderJoinMode()`, `isInviteOnly()`) and `#hideNamesRow`; `hub.js` `renderHubJoinMode()` and the organiser People card (`loadHubPeople()`, `decideHubRequest()`); `calendar-users.js` People modal (`loadPeopleRequests()`, `decidePeopleRequest()`, `setCalendarUserBlocked()`, `updatePeopleBadge()`); `account.js` `renderWaiting()`; admin `inviteBadge()`.
+- **Self-disabling:** until `migrations/009_invite_only.sql` runs, `membersTablesReady()` is false, nothing is gated, `features.invite_only` is false and the create pages hide Who can join and Hide names too.
+- **Tests:** a throwaway SQLite script (not in the repo) covered `membersDecide()`, `membersRequirement()`, `membersDecideRequest()`, `membersApproveAll()` and `membersNamesHidden()`; there is no browser test.
+
+## Built: People view and organiser marks
+
+- **See someone's calendar (read only):** in the People list, rows where `canViewUser(u)` is true say "Tap to see"; `openUserView(u)` sets `state.viewUserId`, shows `#viewBar` ("Viewing NAME (read only)") above the legend and adds `.is-viewing` to `.calendar-section`. `refreshCalendarValues()` paints `state.viewUserId || state.currentUserId`; `onSlotClick()` only shows a toast while viewing, so `state.pending` (your unsaved changes) is untouched and autosave keeps running. `closeUserView()` runs from the bar's X, Escape (when no modal is open) or `loadUsers()` when the person is no longer viewable (blocked, deleted). `setViewBarText()` keeps the name current after a rename. Front end only: it draws rows `availability` already returned.
+- **Organiser marks:** `calendars.show_organiser_marks` (migration 010, default 1). `calendar_meta` returns `organiser_marks` and `organiser_marks_available`; `set_organiser_marks` (organiser, sensitive POST) changes it. `shouldShowOrganiserDots()` returns `state.organiserMarks` on Open calendars, `true` on Hidden (only the organiser has the rows there, e.g. while viewing someone) and `false` on Blind and booking calendars. The switch sits in Calendar settings (`#settingsMarksField`, `organiserMarksSettingShown()`, `saveOrganiserMarks()`); the gear now shows for organisers when either the access emoji or this switch is available. Turning it off is a nudge, not privacy: on Open calendars the organiser's answers are still in Best Match names and the People view.
+- **Self-disabling:** until `migrations/010_organiser_marks.sql` runs, `organiserMarksColumnReady()` is false, the edge always shows on Open calendars and the switch is hidden.
 
 ## Future ideas
 

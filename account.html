@@ -8,7 +8,7 @@
   <meta name="description" content="Your When RU Free profile: your name, sign-in methods, calendars and Hubs.">
   <title>Your profile - When RU Free</title>
   <link rel="stylesheet" href="page.css">
-  <link rel="stylesheet" href="account.css?v=20260927c">
+  <link rel="stylesheet" href="account.css?v=20261009a">
 </head>
 <body class="acct-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -66,6 +66,11 @@
             <p id="profileNote" class="acct-hint" role="status"></p>
             <button type="submit" class="acct-btn acct-btn-primary">Save profile</button>
           </form>
+        </section>
+
+        <section class="acct-section" id="waitingSection" aria-labelledby="waitingTitle" hidden>
+          <h2 id="waitingTitle">Waiting for approval</h2>
+          <ul id="waitingList" class="acct-list"></ul>
         </section>
 
         <section class="acct-section" aria-labelledby="calTitle">
@@ -126,7 +131,7 @@
   </div>
 
   <script src="passkey.js?v=20260927a"></script>
-  <script src="account-core.js?v=20260927c"></script>
-  <script src="account.js?v=20261008a"></script>
+  <script src="account-core.js?v=20261009a"></script>
+  <script src="account.js?v=20261008b"></script>
 </body>
 </html>

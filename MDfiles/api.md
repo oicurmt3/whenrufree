@@ -9,6 +9,7 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`. Endpoints are in `api.ph
 - Who you are: the HttpOnly `wruf_account` cookie (30 days, sent automatically). There are no PINs and no auth headers
 - Everything except `csrf_token`, `diag`, `get_site_config`, `account_*`, `oauth_*` and `admin_*` needs a signed-in account with a username and profile name (401 `ACCOUNT_REQUIRED`, 403 `ACCOUNT_SETUP`)
 - Calendars / Hubs with an access emoji: the organiser, people with a name on the calendar and accounts that picked it before pass; others add `X-Access-Grant` (grants from `access_check`, comma-separated, max 3) or get 403 `ACCESS_REQUIRED`
+- Invite only calendars / Hubs (after the emoji check): the organiser, the Hub organiser, people with a name on the calendar and approved accounts pass; others get 403 `INVITE_ONLY` with `invite: {kind, status, title, profile_name}`. Blocked people get 403 `BLOCKED`
 
 ## Endpoints
 
@@ -35,15 +36,20 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `access_settings` | GET | Account | organiser / Hub organiser | Current emoji (`c` or `g`) |
 | `set_access_emoji` | POST | Account | organiser | Set or remove the calendar's emoji (`emoji` 0-34 or null) |
 | `set_group_access_emoji` | POST | Account | Hub organiser | Set or remove the Hub's emoji |
-| `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}` |
-| `group_meta` | GET | Account | - | Hub listing (`g` param, not `c`) with `organiser_name`, `is_organiser`, `claimable` |
-| `create_group` | POST | Account | - | Create Hub (optional `organiser_name`) |
+| `request_access` | POST | Account | - | Ask to join an Invite only calendar (`c`) or Hub (`g`); returns `request_status` |
+| `cancel_access_request` | POST | Account | - | Withdraw your pending request (`c` or `g`) |
+| `access_requests` | GET | Account | organiser / Hub organiser | Pending, approved, declined and blocked requests (`c` or `g`); `managed_by` hub or calendar |
+| `decide_access_request` | POST | Account | organiser / Hub organiser | `decision` approve / decline / block / unblock with `request_id`, or `approve_all` |
+| `set_user_blocked` | POST | Account | organiser | Pause (`blocked` 1) or restore (0) a person (`user_id`) on the calendar |
+| `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}`, `invite_only`, `invite_via_hub`, `hide_names`, `names_private`, `pending_requests` (organiser), `organiser_marks`, `organiser_marks_available` |
+| `group_meta` | GET | Account | - | Hub listing (`g` param, not `c`) with `organiser_name`, `is_organiser`, `claimable`, `invite_only`, `pending_requests` (organiser) |
+| `create_group` | POST | Account | - | Create Hub (optional `organiser_name`, `invite_only`) |
 | `claim_hub` | POST | Account | - | Claim an old Hub once with its organiser PIN (`g`, `pin`) |
 | `add_calendar_to_group` | POST | Account | organiser | Attach calendar to Hub |
 | `remove_calendar_from_group` | POST | Account | organiser or Hub organiser | Detach calendar from Hub |
-| `users` | GET | Account | - | List names (`mine`, `claimable` flags) |
-| `availability` | GET | Account | - | Read availability (from/to params) |
-| `create_calendar` | POST | Account | - | Create calendar; the account is organiser (optional `admin_name`, `group_token`) |
+| `users` | GET | Account | - | List names (`mine`, `claimable`, `blocked` for the organiser) + `total`, `names_hidden` |
+| `availability` | GET | Account | - | Read availability (from/to params); blocked people left out |
+| `create_calendar` | POST | Account | - | Create calendar; the account is organiser (optional `admin_name`, `group_token`, `invite_only`, `hide_names`) |
 | `join_calendar` | POST | Account | - | Join with the profile name or a per-calendar `display_name` |
 | `rename_user` | POST | Account | joined (self) / organiser | Rename (`display_name`, or `use_profile` for yourself) |
 | `claim_name` | POST | Account | - | Claim an old name once with its PIN (`user_id`, `pin`) |
@@ -57,6 +63,7 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `choose_slot` | POST | Account | organiser | Lock in date+slot (freeze) |
 | `unchoose_slot` | POST | Account | organiser | Reopen frozen calendar |
 | `set_bookings_closed` | POST | Account | organiser | Close (`closed` 1) or reopen (0) bookings on a booking calendar |
+| `set_organiser_marks` | POST | Account | organiser | Show (`on` 1) or hide (0) your answers as a coloured slot edge on Open calendars (migration 010) |
 | `admin_login` | POST | CSRF | - | Super admin login |
 | `admin_login_account` | POST | CSRF + account | - | Super admin session for an account listed in `admin.account_ids` |
 | `admin_calendars` | GET | Admin | super | List all calendars (includes optional Hub fields) |
@@ -83,12 +90,12 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | 200 | Success |
 | 400 | Validation error (`USERNAME_INVALID`, `USERNAME_RESERVED`, `NAME_INVALID`, `CONFIRM_MISMATCH`) |
 | 401 | Not signed in (`ACCOUNT_REQUIRED`), wrong old PIN when claiming, or wrong access emoji (`ACCESS_WRONG`, with `attempts_left`) |
-| 403 | Account setup unfinished (`ACCOUNT_SETUP`), not joined (`NOT_JOINED`), account admin sign-in off or not allowed (`ADMIN_ACCOUNT_OFF`, `NOT_ADMIN`), CSRF failure or insufficient role, calendar frozen, bookings closed (`BOOKINGS_CLOSED`), or access emoji needed (`ACCESS_REQUIRED`, `HUB_ACCESS_REQUIRED`) |
+| 403 | Account setup unfinished (`ACCOUNT_SETUP`), not joined (`NOT_JOINED`), account admin sign-in off or not allowed (`ADMIN_ACCOUNT_OFF`, `NOT_ADMIN`), CSRF failure or insufficient role, calendar frozen, bookings closed (`BOOKINGS_CLOSED`), access emoji needed (`ACCESS_REQUIRED`, `HUB_ACCESS_REQUIRED`), Invite only (`INVITE_ONLY`, `REQUEST_DECLINED`) or blocked (`BLOCKED`) |
 | 404 | Calendar/user/action not found, or passkey not linked to any account (`NO_PASSKEY`) |
 | 409 | `ALREADY_JOINED`, `NAME_TAKEN`, `USERNAME_TAKEN`, `ALREADY_CLAIMED`, `LAST_METHOD`, `PASSKEY_EXISTS`, `PASSKEY_LIMIT` |
-| 429 | Rate limited, old name / Hub locked after wrong PINs (`ACCOUNT_LOCKED`), too many wrong emoji picks (`ACCESS_LOCKED`) or too many unknown codes |
+| 429 | Rate limited, old name / Hub locked after wrong PINs (`ACCOUNT_LOCKED`), too many wrong emoji picks (`ACCESS_LOCKED`), too many unknown codes, or too many access requests |
 | 500 | Server misconfiguration (e.g. missing `accounts.pepper`) |
-| 503 | Rate limiter unavailable on a sensitive POST, or accounts tables missing (migration 007 not run) |
+| 503 | Rate limiter unavailable on a sensitive POST, accounts tables missing (migration 007 not run), Invite only tables missing (migration 009 not run), or `show_organiser_marks` missing (migration 010 not run) |
 
 ## Data Conventions
 
@@ -99,6 +106,8 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 - Roles: "admin" (organiser) or "member" (participant)
 - Names: letters, numbers, spaces, `'` and `-`, up to 32 characters, unique per calendar; one name per account per calendar
 - Usernames: 3-20 lowercase letters, numbers or `_`, unique, private
-- Privacy: 0=open, 1=hidden, 2=blind
+- Privacy: 0=open, 1=hidden, 2=blind; names are private on blind, and on hidden with `hide_names` 1
+- Who can join: `invite_only` 0 (direct link) or 1, set only at creation; calendars in an Invite only Hub are always 1
+- Organiser marks: `show_organiser_marks` 1 (default) or 0; the organiser can change it any time; only affects Open, non-booking calendars
 - Frozen calendar: `chosen_date` + `chosen_slot` both non-null blocks `save` endpoint
 - Booking calendar: `slot_capacity` 1-20 (people per slot), `max_per_user` 1-20 or null, `per_user_total` (limit per day or in total), `bookings_closed`; one status (1 = booked); no Blind privacy. Set only at creation (`create_calendar`)

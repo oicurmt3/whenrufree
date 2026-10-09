@@ -69,11 +69,16 @@ function link(href, text) {
   return a;
 }
 
-function tag(text) {
+function tag(text, extraClass) {
   const t = document.createElement('span');
-  t.className = 'acct-tag';
+  t.className = extraClass ? `acct-tag ${extraClass}` : 'acct-tag';
   t.textContent = text;
   return t;
+}
+
+/** "N requests waiting" tag for organisers of Invite only calendars and Hubs. */
+function pendingTag(n) {
+  return n > 0 ? tag(`${n} ${n === 1 ? 'request' : 'requests'} waiting`, 'acct-tag-alert') : null;
 }
 
 // -------------------------
@@ -152,12 +157,17 @@ async function loadMemberships() {
     return;
   }
 
+  renderWaiting(r.data.requests || []);
+
   if (!r.data.calendars.length) emptyItem(calList, 'No calendars yet. Open a calendar link to join, or create one from Home.');
   r.data.calendars.forEach((c) => {
     const main = link(`calendar.html?c=${encodeURIComponent(c.token)}`, c.title || 'Untitled calendar');
     const wrap = document.createElement('span');
     wrap.appendChild(main);
     if (c.role === 'admin') wrap.appendChild(tag('Organiser'));
+    if (c.blocked) wrap.appendChild(tag('Access paused', 'acct-tag-muted'));
+    const waiting = pendingTag(c.pending_requests);
+    if (waiting) wrap.appendChild(waiting);
     const parts = [];
     if (c.start_date && c.end_date) parts.push(`${formatDay(c.start_date)} - ${formatDay(c.end_date)}`);
     if (c.name_custom) parts.push(`you appear as "${c.display_name}"`);
@@ -170,8 +180,26 @@ async function loadMemberships() {
     const wrap = document.createElement('span');
     wrap.appendChild(link(`hub.html?g=${encodeURIComponent(h.token)}`, h.title || 'Untitled Hub'));
     if (h.is_organiser) wrap.appendChild(tag('Organiser'));
+    const waiting = pendingTag(h.pending_requests);
+    if (waiting) wrap.appendChild(waiting);
     const sub = `${h.calendar_count} calendar${h.calendar_count === 1 ? '' : 's'}`;
     hubList.appendChild(listItem('hub', wrap, sub));
+  });
+}
+
+/** Your own requests to Invite only calendars and Hubs that are still waiting or were declined. */
+function renderWaiting(requests) {
+  const list = $('waitingList');
+  list.textContent = '';
+  $('waitingSection').hidden = requests.length === 0;
+  requests.forEach((q) => {
+    const isHub = q.kind === 'hub';
+    const href = isHub ? `hub.html?g=${encodeURIComponent(q.token)}` : `calendar.html?c=${encodeURIComponent(q.token)}`;
+    const wrap = document.createElement('span');
+    wrap.appendChild(link(href, q.title || (isHub ? 'Untitled Hub' : 'Untitled calendar')));
+    wrap.appendChild(q.status === 'declined' ? tag('Not approved', 'acct-tag-muted') : tag('Waiting'));
+    const sub = `${isHub ? 'Hub' : 'Calendar'} - asked ${formatDay(String(q.created_at).slice(0, 10))}`;
+    list.appendChild(listItem(isHub ? 'hub' : 'calendar_month', wrap, sub));
   });
 }
 

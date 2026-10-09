@@ -205,10 +205,12 @@ function updatePrivacyIndicator(){
   const PRIVACY_CONFIG = {
     open: { icon: 'visibility', tooltip: 'Open: All users can see each other\'s choices' },
     hidden: { icon: 'visibility_off', tooltip: 'Hidden: Users cannot see each other\'s choices (organiser sees all)' },
-    blind: { icon: 'lock', tooltip: 'Blind: All choices are private (even organiser cannot see individual responses)' }
+    hiddenNames: { icon: 'visibility_off', tooltip: 'Hidden, names private: Users cannot see each other\'s choices or names (organiser sees all)' },
+    blind: { icon: 'lock', tooltip: 'Blind: All choices and names are private (even organiser cannot see individual responses)' }
   };
   
-  const config = PRIVACY_CONFIG[state.privacyMode] || PRIVACY_CONFIG.open;
+  const mode = state.privacyMode === 'hidden' && state.namesPrivate ? 'hiddenNames' : state.privacyMode;
+  const config = PRIVACY_CONFIG[mode] || PRIVACY_CONFIG.open;
   
   // Find or create the indicator element
   let indicator = document.querySelector('.privacy-indicator');
@@ -324,7 +326,8 @@ function shouldShowRoster(){
  * Determines if organiser dots should be shown on time slots in calendar grid.
  * Privacy rules for calendar-section (organiser's choices as border indicators):
  * - User MUST be logged in to see organiser dots
- * - Open/Hidden modes: logged-in users can see organiser dots
+ * - Open mode: shown unless the organiser turned them off (Calendar settings)
+ * - Hidden mode: allowed, but only the organiser receives the organiser's rows
  * - Blind mode: never show organiser dots
  * @returns {boolean}
  */
@@ -334,8 +337,26 @@ function shouldShowOrganiserDots(){
   const auth = state.auth.get(state.currentUserId);
   if (!auth || !auth.token) return false;
   if (isBookingMode()) return false;
-  
-  return state.privacyMode !== 'blind';
+  if (state.privacyMode === 'blind') return false;
+  // Open: everyone sees them unless the organiser turned them off. Hidden: only the organiser has the data
+  if (state.privacyMode === 'open') return state.organiserMarks;
+  return true;
+}
+
+/** Calendar settings offers the organiser-marks switch: Open availability calendars once migration 010 ran. */
+function organiserMarksSettingShown(){
+  return state.organiserMarksAvailable && state.privacyMode === 'open' && !isBookingMode();
+}
+
+/**
+ * Whether you can open someone else's calendar read-only from the People list.
+ * Same rule as the Best Match names (joined; Open, or Hidden for the organiser).
+ * Not for bookings, or blocked people (their answers are never sent).
+ * @param {object|undefined} u - Entry from state.users
+ * @returns {boolean}
+ */
+function canViewUser(u){
+  return !!u && !u.mine && !u.blocked && !isBookingMode() && shouldShowRoster();
 }
 
 /**
@@ -693,8 +714,17 @@ const state = {
   dateFilterDates:[], // Array of YYYY-MM-DD strings marked by organiser
   dateFilterDirty:false, // True when filter dates have unsaved changes
   privacyMode:'open', // 'open', 'hidden', or 'blind'
+  inviteOnly:false, // People request access (own setting or the Hub's)
+  inviteViaHub:false, // Requests go to the Hub organiser
+  namesPrivate:false, // Blind, or Hidden with Hide names too
+  organiserMarks:true, // Organiser's answers as a coloured slot edge (Open calendars; organiser can turn off)
+  organiserMarksAvailable:false, // Server has calendars.show_organiser_marks (migration 010)
+  pendingRequests:null, // Requests waiting (only for whoever decides them)
   users:[],
+  usersTotal:0, // Everyone who has joined (users may be trimmed when names are private)
+  namesHidden:false, // users list trimmed for you (names private, not the organiser)
   currentUserId:null,
+  viewUserId:null, // Someone else's answers shown read-only in the grid (People list)
   currentUserName:'',
   currentUserRole:null, // 'admin' or 'user' - tracks if current user is organiser
   adminUserId:null, // Cache the admin user ID for organiser dots

@@ -104,6 +104,7 @@
     <p>
       Each slot may show a <b>coloured left border</b>. This indicates the 
       <b>organiser's choice</b> for that slot, helping you see which times they prefer.
+      They appear on Open calendars, unless the organiser has turned them off.
     </p>
     
     <h3>Changing your responses</h3>
@@ -154,6 +155,8 @@
     <p>
       When you (the organiser) set your availability, other participants will see a coloured left border 
       on their slots indicating your preferences. This helps guide participants to times that work for you.
+      This works on Open calendars. If you'd rather not steer people's choices, turn it off under
+      <span class="material-symbols-outlined icon-inline">settings</span> Calendar settings.
     </p>
 
     <!-- BEST DATES RANKING -->
@@ -194,6 +197,7 @@
       <div class="faq-answer">
         <p>So only you can change your availability, without remembering a PIN for every calendar. Your profile page also lists all your calendars and Hubs, so a lost link is no longer lost.</p>
         <p>Sign in with Google, Facebook or a passkey (fingerprint, face or screen lock). We never receive your email, name or photo from Google or Facebook &mdash; only a private ID that we keep scrambled. There are no ads and no tracking.</p>
+        <p>You can look around the home page without signing in. Tap <b>Sign in</b> at the top, or anything in the create form, when you're ready.</p>
       </div>
     </div>
 
@@ -248,7 +252,7 @@
       <div class="faq-answer">
         <p>Yes. When creating the calendar, set <b>People per slot</b> (under Slots) to 1, 2 or More (up to 20), and choose <b>Bookings per person</b> - how many slots each person can book, counted <b>Per day</b> (e.g. court hire) or <b>In total</b> across the whole calendar (e.g. one interview per candidate).
         People tap a free slot to book it (tap again to un-book) and it saves like any calendar, first come, first served. Slots booked by other people show in red, and if two people tap the last place at the same moment only the first gets it.</p>
-        <p>The organiser can remove anyone's booking and use <b>Close bookings</b> to stop changes. Booking settings cannot be changed after the calendar is created, and Blind privacy is not available for booking calendars.</p>
+        <p>The organiser can remove anyone's booking and use <b>Close bookings</b> to stop changes. Booking settings cannot be changed after the calendar is created. Blind privacy is not available for booking calendars, because the organiser needs to see who booked.</p>
         <p>Each account can have one name per calendar, so the per-person limit applies per account. Someone with a second account could still book more; the organiser sees every name and can remove extra bookings.</p>
       </div>
     </div>
@@ -263,6 +267,43 @@
         The emoji is written next to the link when the organiser copies, shares, emails or prints it. Your account remembers it for 30 days, and people who have joined the calendar (or organise the Hub) never need it.</p>
         <p>Organisers turn it on when creating the calendar (above Privacy Mode) or Hub, or later with the <b>Settings</b> (gear) button.
         A calendar in a Hub uses the Hub's emoji unless it has its own. Three wrong picks lock that device out for 5 minutes, then longer.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What is Invite only?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>When creating a calendar or Hub, <b>Who can join</b> sets how people get in. <b>Direct link</b> (the default) lets anyone signed in with the link open it.
+        With <b>Invite only</b>, people with the link tap <b>Request access</b> and the organiser approves or declines each one. Approved people then join with their own name as usual.
+        This is chosen when creating and can't be changed later.</p>
+        <p>Organisers see requests in the <b>People</b> list (the number on the People button shows how many are waiting), or on the Hub page for an Invite only Hub. Approving someone for a Hub opens every calendar in it, and calendars created inside an Invite only Hub are always Invite only.
+        If there is also an access emoji, people pick it before they can request access; once approved they are never asked again.</p>
+        <p>While you wait, the calendar or Hub is listed on your profile under <b>Waiting for approval</b>. Requests that aren't answered within 30 days expire, and you can ask again. If the organiser declines, you can't ask again, but they can still approve you later.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Can the organiser block someone?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Yes, on any calendar. In the <b>People</b> list the organiser taps the <b>block</b> icon beside a name. That person sees "The organiser has paused your access" and can't open the calendar, and their answers are left out of the calendar, Best Match and totals. Bookings they made still hold their places.
+        Nothing is deleted: tapping the <b>undo</b> icon restores everything. On an Invite only Hub, the organiser can also block an approved person from the whole Hub on the Hub page.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        Can I see one person's whole calendar?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>Yes, where the privacy mode allows it. Tap the <span class="material-symbols-outlined icon-inline">group</span> <b>People</b> button, then a name marked <b>Tap to see</b>. Their answers fill the calendar, read only, with a bar above it showing whose they are. Tap its <span class="material-symbols-outlined icon-inline">close</span> (or press Escape) to go back to yours; your own unsaved changes are kept.</p>
+        <p>On Open calendars anyone who has joined can do this; on Hidden calendars only the organiser; on Blind calendars nobody. It isn't available on booking calendars or for people the organiser has blocked.</p>
       </div>
     </div>
 
@@ -306,7 +347,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>The calendar link is the invite - anyone signed in with the link can view and join. 
+        <p>The calendar link is the invite - anyone signed in with the link can view and join, unless the organiser made it <b>Invite only</b> (then they approve each person). 
         Only share links with trusted participants. Only your account can change your entry. 
         <b>Do not enter sensitive or private information.</b></p>
       </div>
@@ -321,10 +362,11 @@
         <p>When creating a calendar, you can choose from three privacy modes:</p>
         <ul>
           <li><b><span class="material-symbols-outlined icon-inline">visibility</span> Open</b> - All users can see each other's choices. This is the default and works best when everyone should see who's available when.</li>
-          <li><b><span class="material-symbols-outlined icon-inline">visibility_off</span> Hidden</b> - Users cannot see each other's choices, but the organiser can still see all individual responses. Useful for voting or when you don't want participants to influence each other.</li>
-          <li><b><span class="material-symbols-outlined icon-inline">lock</span> Blind</b> - All choices are completely private. Even the organiser cannot see individual responses - only aggregate counts (e.g., "3 Yes, 2 Maybe"). Perfect for anonymous voting or sensitive surveys.</li>
+          <li><b><span class="material-symbols-outlined icon-inline">visibility_off</span> Hidden</b> - Users cannot see each other's choices, but the organiser can still see all individual responses. Useful for voting or when you don't want participants to influence each other. Tick <b>Hide names too</b> to also keep the People list private.</li>
+          <li><b><span class="material-symbols-outlined icon-inline">lock</span> Blind</b> - All choices are completely private. Even the organiser cannot see individual responses - only aggregate counts (e.g., "3 Yes, 2 Maybe"). Names are private too. Perfect for anonymous voting or sensitive surveys.</li>
         </ul>
         <p>In all modes, aggregate counts are always visible so everyone can see the overall results.</p>
+        <p>When names are private (Blind, or Hidden with Hide names too), the People list only shows each person their own name, the organiser and how many people have joined. The organiser always sees everyone.</p>
       </div>
     </div>
     
@@ -387,7 +429,8 @@
       <div class="faq-answer">
         <p>Organiser indicators (coloured left borders on slots) only appear when the organiser has set their availability for a slot. 
         If you ARE the organiser, you won't see your own indicators (you already know your preferences!). 
-        They are only visible to other participants. In Blind mode, no individual indicators are shown.</p>
+        They are only visible to other participants, and only on Open calendars. The organiser can also turn them off
+        in Calendar settings.</p>
       </div>
     </div>
     

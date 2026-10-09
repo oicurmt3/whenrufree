@@ -107,8 +107,8 @@ function getDefaultConfig() {
             ]
         },
         retention: {
-            inactive_days: 30,
-            hub_inactive_days: 30
+            inactive_days: 40,
+            hub_inactive_days: 40
         }
     };
 }
@@ -500,11 +500,11 @@ function renderSetupEditor(cfg) {
     // Retention / auto-delete
     if (retentionDaysInput) {
         const days = parseInt(cfg.retention?.inactive_days, 10);
-        retentionDaysInput.value = (days >= 1 && days <= 3650) ? days : 30;
+        retentionDaysInput.value = (days >= 1 && days <= 3650) ? days : 40;
     }
     if (hubRetentionDaysInput) {
         const hubDays = parseInt(cfg.retention?.hub_inactive_days, 10);
-        hubRetentionDaysInput.value = (hubDays >= 1 && hubDays <= 3650) ? hubDays : 30;
+        hubRetentionDaysInput.value = (hubDays >= 1 && hubDays <= 3650) ? hubDays : 40;
     }
 }
 
@@ -533,8 +533,8 @@ function readEditorConfig() {
             presets: readDatePresets()
         },
         retention: {
-            inactive_days: Math.max(1, Math.min(3650, parseInt(retentionDaysInput?.value, 10) || 30)),
-            hub_inactive_days: Math.max(1, Math.min(3650, parseInt(hubRetentionDaysInput?.value, 10) || 30))
+            inactive_days: Math.max(1, Math.min(3650, parseInt(retentionDaysInput?.value, 10) || 40)),
+            hub_inactive_days: Math.max(1, Math.min(3650, parseInt(hubRetentionDaysInput?.value, 10) || 40))
         }
     };
 }

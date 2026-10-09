@@ -215,18 +215,40 @@
     return wrap;
   }
 
-  /** Full-screen sign-in panel. Not dismissible: nothing on the page works without an account. */
-  function showSignIn(info) {
+  /**
+   * Full-screen sign-in panel. Not dismissible by default: nothing on the page works without an
+   * account. With opts.dismissible (the home page preview) it has a close button, Escape and a
+   * backdrop tap to close.
+   */
+  function showSignIn(info, opts) {
     if (document.getElementById('acctOverlay')) return;
+    const dismissible = !!(opts && opts.dismissible);
     const overlay = el('div', { id: 'acctOverlay', className: 'acct-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'acctTitle' });
     const box = el('div', { className: 'acct-box' });
+
+    if (dismissible) {
+      const onKey = (e) => { if (e.key === 'Escape') close(); };
+      const close = () => {
+        overlay.remove();
+        document.body.classList.remove('acct-locked');
+        document.removeEventListener('keydown', onKey);
+      };
+      overlay.classList.add('acct-overlay-soft');
+      const x = el('button', { type: 'button', className: 'acct-close', 'aria-label': 'Close', title: 'Close' });
+      x.appendChild(icon('close'));
+      x.addEventListener('click', close);
+      box.appendChild(x);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+      document.addEventListener('keydown', onKey);
+    }
+
     box.appendChild(el('h2', { id: 'acctTitle', className: 'acct-title' }, 'Sign in to continue'));
 
     if (!info.available) {
       box.appendChild(el('p', { className: 'acct-text' }, 'Sign-in is not set up on this server yet. Please try again later.'));
     } else {
       box.appendChild(el('p', { className: 'acct-text' },
-        'You need a free account to open, join or create calendars and Hubs. We never get your email, name or photo from Google or Facebook - only a private ID we keep scrambled.'));
+        'You need a free account to open, join or create calendars and Hubs.'));
       box.appendChild(renderSignInButtons(info.methods || {}));
     }
 
@@ -240,7 +262,7 @@
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     document.body.classList.add('acct-locked');
-    const first = box.querySelector('button, a');
+    const first = box.querySelector('.acct-methods button') || box.querySelector('button, a');
     if (first) first.focus();
   }
 
@@ -256,7 +278,100 @@
     return new Promise(() => {});
   }
 
-  /** React to an API error that means "not signed in" / "not set up". Returns true when handled. */
+  /** The calendar (?c=) or Hub (?g=) this page is for, as API params. */
+  function pageTarget() {
+    const qs = new URL(location.href).searchParams;
+    if (qs.get('c')) return { c: qs.get('c') };
+    if (qs.get('g')) return { g: qs.get('g') };
+    return {};
+  }
+
+  const INVITE_TEXT = {
+    none: (what, name) => [
+      `${what} is invite only`,
+      `Ask the organiser to let you in. They will see your profile name${name ? ` (${name})` : ''}.`,
+    ],
+    pending: (what) => [
+      'Request sent',
+      `Waiting for the organiser to approve you. Come back to this link later: ${what.toLowerCase()} opens once you are approved. It is also listed on your profile under "Waiting for approval".`,
+    ],
+    declined: () => ['Not approved', 'The organiser did not approve your request.'],
+    blocked: () => ['Access paused', 'The organiser has paused your access.'],
+  };
+
+  /**
+   * Panel for an Invite only calendar or Hub (403 INVITE_ONLY) or a blocked person (403 BLOCKED).
+   * Not dismissible: the page cannot load until the organiser lets the account in.
+   */
+  function showInvite(invite) {
+    let overlay = document.getElementById('acctInvite');
+    if (!overlay) {
+      overlay = el('div', { id: 'acctInvite', className: 'acct-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'acctInviteTitle' });
+      document.body.appendChild(overlay);
+      document.body.classList.add('acct-locked');
+    }
+    overlay.textContent = '';
+    const what = invite.kind === 'hub' ? 'This Hub' : 'This calendar';
+    const status = INVITE_TEXT[invite.status] ? invite.status : 'none';
+    const [title, text] = INVITE_TEXT[status](what, invite.profile_name || '');
+
+    const box = el('div', { className: 'acct-box' });
+    box.appendChild(el('h2', { id: 'acctInviteTitle', className: 'acct-title' }, title));
+    if (invite.title) box.appendChild(el('p', { className: 'acct-invite-name' }, invite.title));
+    box.appendChild(el('p', { className: 'acct-text' }, text));
+
+    const msg = el('p', { className: 'acct-status', role: 'status', 'aria-live': 'polite' });
+    const actions = el('div', { className: 'acct-invite-actions' });
+    const button = (cls, iconName, label, onClick) => {
+      const b = el('button', { type: 'button', className: `acct-btn ${cls}` });
+      b.appendChild(icon(iconName));
+      b.appendChild(el('span', {}, label));
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        await onClick();
+        b.disabled = false;
+      });
+      actions.appendChild(b);
+      return b;
+    };
+
+    if (status === 'none') {
+      button('acct-btn-primary', 'how_to_reg', 'Request access', async () => {
+        const r = await postJson('request_access', {}, pageTarget());
+        if (r.ok && r.data.request_status === 'approved') { location.reload(); return; }
+        if (r.ok) { showInvite({ ...invite, status: 'pending' }); return; }
+        if (r.data.code === 'BLOCKED' || r.data.code === 'REQUEST_DECLINED') {
+          showInvite({ ...invite, status: r.data.code === 'BLOCKED' ? 'blocked' : 'declined' });
+          return;
+        }
+        msg.textContent = r.data.message || 'Could not send the request. Please try again.';
+      });
+    } else if (status === 'pending') {
+      button('acct-btn-primary', 'refresh', 'Check again', async () => { location.reload(); });
+      button('acct-btn-ghost', 'close', 'Cancel request', async () => {
+        const r = await postJson('cancel_access_request', {}, pageTarget());
+        if (r.ok) showInvite({ ...invite, status: 'none' });
+        else msg.textContent = r.data.message || 'Could not cancel. Please try again.';
+      });
+    }
+    box.appendChild(actions);
+    box.appendChild(msg);
+
+    const links = el('p', { className: 'acct-links' });
+    [['index.html', 'Home'], ['account.html', 'Your profile'], ['faq.html', 'FAQs']].forEach(([href, label], i) => {
+      if (i) links.appendChild(document.createTextNode(' | '));
+      links.appendChild(el('a', { href: new URL(href, BASE).toString() }, label));
+    });
+    box.appendChild(links);
+    overlay.appendChild(box);
+    const first = box.querySelector('button, a');
+    if (first) first.focus();
+  }
+
+  /**
+   * React to an API error that means "not signed in", "not set up", "invite only" or "blocked".
+   * Returns true when handled (the page should stop).
+   */
   function handleApiError(data) {
     const code = data && data.code;
     if (code === 'ACCOUNT_REQUIRED') {
@@ -265,6 +380,10 @@
     }
     if (code === 'ACCOUNT_SETUP') {
       goToSetup();
+      return true;
+    }
+    if (code === 'INVITE_ONLY' || code === 'BLOCKED') {
+      showInvite({ ...(data.invite || {}), status: code === 'BLOCKED' ? 'blocked' : ((data.invite || {}).status || 'none') });
       return true;
     }
     return false;
@@ -300,6 +419,17 @@
     return a;
   }
 
+  /** "Sign in" button in the badge spot for signed-out visitors (home page preview). */
+  function renderSignInBadge(parent, onClick) {
+    if (!parent) return null;
+    const b = el('button', { type: 'button', className: 'acct-badge acct-badge-signin', title: 'Sign in or create a free account' });
+    b.appendChild(icon('login'));
+    b.appendChild(el('span', { className: 'acct-badge-name' }, 'Sign in'));
+    b.addEventListener('click', onClick);
+    parent.appendChild(b);
+    return b;
+  }
+
   async function logout() {
     await postJson('account_logout');
     mePromise = null;
@@ -321,10 +451,12 @@
     passkeySignup,
     renderSignInButtons,
     showSignIn,
+    showInvite,
     handleApiError,
     takeSigninResult,
     toast,
     renderBadge,
+    renderSignInBadge,
     logout,
     currentReturnPath,
   };

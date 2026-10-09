@@ -108,6 +108,12 @@ els.userSelectBtn.addEventListener('click', ()=> openUserSelectModal());
 // User select modal cancel
 els.userSelectCancel.addEventListener('click', ()=> closeUserSelectModal());
 
+// Read-only view of someone else's calendar: X or Escape goes back to yours
+document.getElementById('viewBarClose').addEventListener('click', closeUserView);
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape' && state.viewUserId && !document.querySelector('.modal-overlay.active')) closeUserView();
+});
+
 // Info modal event listeners
 els.infoModalCancel.addEventListener('click', closeInfoModal);
 els.infoModalAdd.addEventListener('click', () => {
@@ -197,6 +203,7 @@ document.getElementById('hubRemoveBtn')?.addEventListener('click', removeFromHub
 document.getElementById('hubModalCancel')?.addEventListener('click', hideHubModal);
 document.getElementById('hubModalConfirm')?.addEventListener('click', confirmAddToHub);
 els.settingsBtn.addEventListener('click', openSettingsModal);
+document.getElementById('organiserMarksInput').addEventListener('change', (e)=> saveOrganiserMarks(e.target));
 els.settingsClose.addEventListener('click', hideSettingsModal);
 document.addEventListener('DOMContentLoaded', init);
 

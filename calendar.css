@@ -308,6 +308,40 @@ main{
   margin-bottom:var(--spacing-sm);
 }
 
+/* Someone else's calendar, read only */
+.view-bar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+  padding:4px 4px 4px 12px;
+  background:#e8eaf6;
+  color:#283593;
+  border:1px solid #c5cae9;
+  border-radius:var(--radius);
+  font-size:.9rem;
+}
+.view-bar[hidden]{display:none;}
+.view-bar > .material-symbols-outlined{font-size:20px;}
+.view-bar-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.view-bar-close{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 44px;
+  width:44px;
+  height:44px;
+  border:none;
+  border-radius:50%;
+  background:transparent;
+  color:inherit;
+  cursor:pointer;
+}
+.view-bar-close:hover{background:rgba(40,53,147,.1);}
+.view-bar-close:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+.calendar-section.is-viewing .time-slot{cursor:default;}
+.calendar-section.is-viewing .calendar-grid{outline:2px dashed #c5cae9;outline-offset:4px;border-radius:var(--radius);}
+
 /* ============================================
    CALENDAR GRID
    ============================================ */
@@ -1059,6 +1093,84 @@ main{
   font-size:20px;
 }
 
+/* Block / Unblock beside Delete (organiser). Only the avatar and name dim; buttons stay full colour. */
+.user-select-item .user-select-delete,
+.user-select-block{
+  width:44px;
+  height:44px;
+}
+.user-select-block{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:none;
+  background:transparent;
+  color:#555;
+  border-radius:50%;
+  cursor:pointer;
+  flex-shrink:0;
+  padding:0;
+  transition:background .15s, color .15s;
+}
+.user-select-block:hover{background:#fff3e0;color:#8a5300;}
+.user-select-block.is-undo{color:#2e7d32;}
+.user-select-block.is-undo:hover{background:#e8f5e9;color:#1b5e20;}
+.user-select-block .material-symbols-outlined{font-size:20px;}
+.user-select-item.is-blocked .user-select-avatar,
+.user-select-item.is-blocked .user-select-info{opacity:.45;}
+
+/* People button badge: requests waiting */
+#userSelectBtn{position:relative;}
+.people-badge{
+  position:absolute;
+  top:-4px;
+  right:-4px;
+  min-width:18px;
+  height:18px;
+  padding:0 5px;
+  border-radius:9px;
+  background:#b00020;
+  color:#fff;
+  font-size:.7rem;
+  font-weight:700;
+  line-height:18px;
+  text-align:center;
+  pointer-events:none;
+}
+.people-badge[hidden]{display:none;}
+
+/* People modal: Invite only requests (organiser) */
+.user-requests{
+  margin:10px 0 4px;
+  border:1px solid #c5cae9;
+  border-radius:8px;
+  background:#f5f6fc;
+  padding:10px 12px;
+}
+.user-requests[hidden]{display:none;}
+.user-requests-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.user-requests-head h3{margin:0;font-size:.95rem;}
+.user-requests .modal-note{margin:4px 0 0;font-size:.85rem;color:#555;}
+.user-request-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  padding:8px 0;
+  border-bottom:1px solid #e3e5f2;
+}
+.user-request-row:last-child{border-bottom:none;}
+.user-request-name{flex:1;min-width:120px;font-weight:600;overflow-wrap:anywhere;}
+.user-request-actions{display:flex;gap:6px;}
+.user-request-actions .btn{min-height:44px;}
+.user-requests details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600;font-size:.9rem;}
+
 /* People list: only your own name and claimable old names are tappable */
 .user-select-item:not(.is-clickable){cursor:default;}
 .user-select-item:not(.is-clickable):not(.selected):hover{background:transparent;}
@@ -1071,6 +1183,11 @@ main{
 .settings-title-icon{vertical-align:-4px;font-size:26px;}
 #settingsModal .modal{max-height:90vh;overflow-y:auto;}
 #settingsModal .error:not(:empty){display:block;}
+.settings-marks{margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid #e0e0e0;}
+.settings-marks[hidden]{display:none;}
+.settings-check{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:600;cursor:pointer;}
+.settings-check input{width:22px;height:22px;margin:0;flex:0 0 auto;accent-color:var(--primary);cursor:pointer;}
+#settingsModal p.settings-hint{margin:0;font-size:.85rem;color:var(--text-muted);line-height:1.4;}
 
 .user-select-empty{
   padding:24px;

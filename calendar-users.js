@@ -70,6 +70,14 @@ async function loadCalendarMeta(){
     } else {
       state.privacyMode = 'open';
     }
+    // Invite only (own or the Hub's) and private names; set at creation
+    state.inviteOnly = meta.calendar.invite_only === true;
+    state.inviteViaHub = meta.calendar.invite_via_hub === true;
+    state.namesPrivate = meta.calendar.names_private === true;
+    state.organiserMarks = meta.calendar.organiser_marks !== false;
+    state.organiserMarksAvailable = meta.calendar.organiser_marks_available === true;
+    state.pendingRequests = Number.isInteger(meta.calendar.pending_requests) ? meta.calendar.pending_requests : null;
+    updatePeopleBadge();
     updatePrivacyIndicator();
 
     // Rank sort order: 'score' (default) or 'date' (chronological)
@@ -137,13 +145,51 @@ async function loadUsers(){
   const data = await apiGet('users');
   if(data.status!=='success') throw new Error('Failed to load users');
   state.users = (data.users??[]).map(u => ({
-    id:Number(u.id), display_name:u.display_name, role:(u.role??'member'), mine:u.mine === true, claimable:u.claimable === true
+    id:Number(u.id), display_name:u.display_name, role:(u.role??'member'), mine:u.mine === true, claimable:u.claimable === true,
+    blocked:u.blocked === true
   }));
+  // Private names: the list only has you, the organisers and old names; total counts everyone
+  state.usersTotal = Number.isInteger(data.total) ? data.total : state.users.length;
+  state.namesHidden = data.names_hidden === true;
   // admin first
   state.users.sort((a,b)=> (a.role==='admin'? -1:0) + (b.role==='admin'? 1:0));
   // Cache admin user ID for organiser dots
   const admin = state.users.find(u => u.role === 'admin');
   state.adminUserId = admin ? admin.id : null;
+  // Keep the read-only view only while that person can still be viewed
+  if(state.viewUserId){
+    const viewed = state.users.find(u => u.id === state.viewUserId);
+    if(canViewUser(viewed)) setViewBarText(viewed);
+    else closeUserView();
+  }
+}
+
+/*** Read-only view of someone else's calendar (People list) */
+function setViewBarText(u){
+  const text = document.getElementById('viewBarText');
+  const name = document.createElement('b');
+  name.textContent = u.display_name;
+  text.textContent = '';
+  text.append('Viewing ', name, ' (read only)');
+}
+
+function openUserView(u){
+  if(!canViewUser(u)) return;
+  state.viewUserId = u.id;
+  setViewBarText(u);
+  document.getElementById('viewBar').hidden = false;
+  const section = document.querySelector('.calendar-section');
+  section.classList.add('is-viewing');
+  refreshCalendarValues();
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeUserView(){
+  if(!state.viewUserId) return;
+  state.viewUserId = null;
+  document.getElementById('viewBar').hidden = true;
+  document.querySelector('.calendar-section').classList.remove('is-viewing');
+  refreshCalendarValues();
 }
 
 /*** Update current user display in header (after title) */
@@ -168,10 +214,30 @@ function updateCurrentUserDisplay(){
   els.nameBanner.style.display = state.currentUserId ? 'none' : '';
 }
 
+/*** People button badge: requests waiting (whoever decides them) */
+function updatePeopleBadge(){
+  const badge = document.getElementById('peopleBadge');
+  if(!badge) return;
+  const n = state.pendingRequests || 0;
+  badge.hidden = n < 1;
+  badge.textContent = n > 99 ? '99+' : String(n);
+  els.userSelectBtn.setAttribute('aria-label', n > 0
+    ? `People on this calendar, ${n} ${n === 1 ? 'request' : 'requests'} waiting`
+    : 'People on this calendar');
+}
+
 /*** People modal: everyone on the calendar, your name first */
 function populateUserSelectModal(){
   els.userSelectList.innerHTML = '';
   els.userSelectAddLink.style.display = state.currentUserId ? 'none' : '';
+  const introText = document.getElementById('userSelectIntroText');
+  if(state.namesHidden){
+    const n = state.usersTotal;
+    const verb = state.booking ? 'booked' : 'joined';
+    introText.textContent = `Names are private on this calendar. ${n} ${n === 1 ? 'person has' : 'people have'} ${verb}.`;
+  } else {
+    introText.textContent = 'Everyone on this calendar.';
+  }
 
   if(state.users.length === 0){
     const empty = document.createElement('div');
@@ -196,6 +262,7 @@ function populateUserSelectModal(){
     const item = document.createElement('div');
     item.className = 'user-select-item';
     if(u.mine) item.classList.add('selected');
+    if(u.blocked) item.classList.add('is-blocked');
     item.dataset.userId = u.id;
 
     const avatar = document.createElement('div');
@@ -210,23 +277,40 @@ function populateUserSelectModal(){
     name.textContent = u.mine ? `${u.display_name} (you)` : u.display_name;
     info.appendChild(name);
 
-    const roleText = u.role === 'admin' ? 'Organiser' : '';
+    const canView = canViewUser(u);
+    const roleText = u.role === 'admin' ? 'Organiser' : (u.blocked ? 'Access paused' : '');
     const claimText = canClaim && u.claimable ? 'Yours from before? Tap to claim it' : '';
-    if(roleText || claimText){
+    const viewText = canView ? (u.id === state.viewUserId ? 'Showing their calendar' : 'Tap to see') : '';
+    if(roleText || claimText || viewText){
       const role = document.createElement('div');
       role.className = 'user-select-role';
-      role.textContent = [roleText, claimText].filter(Boolean).join(' - ');
+      role.textContent = [roleText, claimText, viewText].filter(Boolean).join(' - ');
       info.appendChild(role);
     }
 
     item.appendChild(avatar);
     item.appendChild(info);
 
-    if(u.mine){
+    if(u.mine || (canView && u.id === state.viewUserId)){
       const check = document.createElement('span');
       check.className = 'material-symbols-outlined user-select-check';
-      check.textContent = 'check_circle';
+      check.textContent = u.mine ? 'check_circle' : 'visibility';
       item.appendChild(check);
+    }
+
+    // Organiser can pause (block) or restore other people
+    if(isOrganiser && u.role !== 'admin'){
+      const blockBtn = document.createElement('button');
+      blockBtn.className = 'user-select-block' + (u.blocked ? ' is-undo' : '');
+      blockBtn.type = 'button';
+      blockBtn.title = (u.blocked ? 'Unblock ' : 'Block ') + u.display_name;
+      blockBtn.setAttribute('aria-label', blockBtn.title);
+      blockBtn.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${u.blocked ? 'undo' : 'block'}</span>`;
+      blockBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setCalendarUserBlocked(u, !u.blocked, blockBtn);
+      });
+      item.appendChild(blockBtn);
     }
 
     // Organiser can remove other people (not themselves)
@@ -244,7 +328,7 @@ function populateUserSelectModal(){
       item.appendChild(delBtn);
     }
 
-    if(u.mine || (canClaim && u.claimable)){
+    if(u.mine || (canClaim && u.claimable) || canView){
       item.classList.add('is-clickable');
       item.addEventListener('click', () => onUserSelectItemClick(u.id));
     }
@@ -256,6 +340,152 @@ function populateUserSelectModal(){
 function openUserSelectModal(){
   populateUserSelectModal();
   els.userSelectModal.classList.add('active');
+  loadPeopleRequests();
+}
+
+/** After a change to who is in: reload people, answers and Best Match. */
+async function refreshPeopleAndViews(){
+  await loadUsers();
+  populateUserSelectModal();
+  await ensureDateRangeLoaded();
+  renderDateRangeSkeleton();
+  refreshCalendarValues();
+  renderRankings();
+}
+
+/**
+ * Pause or restore one person (organiser). Paused people can't open the calendar and their
+ * answers are left out of the views and Best Match; nothing is deleted.
+ */
+async function setCalendarUserBlocked(u, blocked, btn){
+  if(!isCurrentUserOrganiser()) return;
+  if(blocked && !confirm(`Block "${u.display_name}"?\n\nThey can't open this calendar and their answers are hidden until you unblock them. Nothing is deleted.`)) return;
+  btn.disabled = true;
+  try{
+    const res = await apiPost('set_user_blocked', { user_id: u.id, blocked: blocked ? 1 : 0 });
+    if(res.status !== 'success'){
+      showToast(res.message || 'Could not change that');
+      return;
+    }
+    showToast(blocked ? `${u.display_name} blocked` : `${u.display_name} unblocked`);
+    await refreshPeopleAndViews();
+  } catch(e){
+    console.error('Error blocking user:', e);
+    showToast('Could not change that');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/*** Invite only: requests in the People modal (organiser) */
+async function loadPeopleRequests(){
+  const wrap = document.getElementById('userRequestsWrap');
+  if(!wrap) return;
+  wrap.textContent = '';
+  wrap.hidden = !(state.inviteOnly && isCurrentUserOrganiser());
+  if(wrap.hidden) return;
+  const data = await apiGet('access_requests');
+  if(data.status !== 'success'){ wrap.hidden = true; return; }
+  if(!data.requests){
+    const note = document.createElement('p');
+    note.className = 'modal-note';
+    note.textContent = data.managed_by === 'hub'
+      ? 'This calendar is in an invite only Hub: the Hub organiser approves requests on the Hub page.'
+      : 'Requests are not available.';
+    wrap.appendChild(note);
+    return;
+  }
+  renderPeopleRequests(data.requests);
+}
+
+function requestRow(req, actions){
+  const row = document.createElement('div');
+  row.className = 'user-request-row';
+  const name = document.createElement('span');
+  name.className = 'user-request-name';
+  name.textContent = req.display_name || 'Unnamed';
+  row.appendChild(name);
+  const box = document.createElement('div');
+  box.className = 'user-request-actions';
+  for(const a of actions){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `btn btn-sm ${a.cls}`;
+    b.textContent = a.label;
+    b.setAttribute('aria-label', `${a.label} ${req.display_name || ''}`.trim());
+    b.addEventListener('click', () => decidePeopleRequest(a.decision, req.id, b));
+    box.appendChild(b);
+  }
+  row.appendChild(box);
+  return row;
+}
+
+function renderPeopleRequests(lists){
+  const wrap = document.getElementById('userRequestsWrap');
+  wrap.textContent = '';
+  const pending = lists.pending || [];
+  const declined = lists.declined || [];
+  state.pendingRequests = pending.length;
+  updatePeopleBadge();
+
+  const head = document.createElement('div');
+  head.className = 'user-requests-head';
+  const h = document.createElement('h3');
+  h.textContent = `Requests (${pending.length})`;
+  head.appendChild(h);
+  if(pending.length > 1){
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'btn btn-ghost btn-sm';
+    all.textContent = 'Approve all';
+    all.addEventListener('click', () => {
+      if(confirm(`Approve all ${pending.length} requests?`)) decidePeopleRequest('approve_all', null, all);
+    });
+    head.appendChild(all);
+  }
+  wrap.appendChild(head);
+
+  if(!pending.length){
+    const none = document.createElement('p');
+    none.className = 'modal-note';
+    none.textContent = 'No requests waiting. Approved people can then join with their own name.';
+    wrap.appendChild(none);
+  }
+  pending.forEach(r => wrap.appendChild(requestRow(r, [
+    { label: 'Approve', cls: 'btn-confirm', decision: 'approve' },
+    { label: 'Decline', cls: 'btn-cancel', decision: 'decline' }
+  ])));
+
+  if(declined.length){
+    const det = document.createElement('details');
+    const sum = document.createElement('summary');
+    sum.textContent = `Declined (${declined.length})`;
+    det.appendChild(sum);
+    declined.forEach(r => det.appendChild(requestRow(r, [
+      { label: 'Approve', cls: 'btn-ghost', decision: 'approve' }
+    ])));
+    wrap.appendChild(det);
+  }
+}
+
+async function decidePeopleRequest(decision, requestId, btn){
+  btn.disabled = true;
+  try{
+    const body = { decision };
+    if(requestId !== null) body.request_id = requestId;
+    const res = await apiPost('decide_access_request', body);
+    if(res.status !== 'success'){
+      showToast(res.message || 'Could not save that');
+      return;
+    }
+    renderPeopleRequests(res.requests || {});
+    if(decision !== 'decline') showToast(decision === 'approve_all' ? 'All approved' : 'Approved');
+  } catch(e){
+    console.error('Error deciding request:', e);
+    showToast('Could not save that');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function closeUserSelectModal(){
@@ -278,12 +508,7 @@ async function confirmDeleteCalendarUser(userId, displayName){
     const res = await apiPost('delete_user', { user_id: userId });
     if(res.status === 'success'){
       showToast(displayName + ' deleted');
-      await loadUsers();
-      populateUserSelectModal();
-      await ensureDateRangeLoaded();
-      renderDateRangeSkeleton();
-      refreshCalendarValues();
-      renderRankings();
+      await refreshPeopleAndViews();
     } else {
       showToast(res.message || 'Failed to delete user');
     }
@@ -293,7 +518,7 @@ async function confirmDeleteCalendarUser(userId, displayName){
   }
 }
 
-/*** People modal: tap your name to change it, or an old name to claim it */
+/*** People modal: tap your name to change it, an old name to claim it, or someone else to see their calendar */
 function onUserSelectItemClick(userId){
   const uid = Number(userId);
   const u = state.users.find(x => x.id === uid);
@@ -303,6 +528,8 @@ function onUserSelectItemClick(userId){
     openUserModal('rename');
   } else if(!state.currentUserId && u.claimable){
     openClaimModal(u);
+  } else if(canViewUser(u)){
+    openUserView(u);
   }
 }
 
@@ -367,7 +594,8 @@ function updateUserUI(){
   els.renameBtn.style.display = isAuthenticated ? 'inline-flex' : 'none';
   els.renameBtn.disabled = !isAuthenticated;
   els.shareBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-  els.settingsBtn.style.display = (isAdmin && state.accessAvailable && window.AccessEmoji) ? 'inline-flex' : 'none';
+  const hasSettings = (state.accessAvailable && window.AccessEmoji) || organiserMarksSettingShown();
+  els.settingsBtn.style.display = (isAdmin && hasSettings) ? 'inline-flex' : 'none';
   if(isAdmin && state.accessAvailable && !state.accessEmojiLoaded) loadAccessEmoji();
   if(!isAdmin) state.accessEmojiLoaded = false;
   
@@ -510,13 +738,17 @@ async function loadAccessEmoji(){
 
 async function openSettingsModal(){
   const auth = state.auth.get(state.currentUserId || -1);
-  if(!auth || auth.role !== 'admin' || !window.AccessEmoji){
+  if(!auth || auth.role !== 'admin'){
     showToast('Organiser auth required');
     return;
   }
   els.settingsError.textContent = '';
-  els.settingsAccessField.innerHTML = '<p class="ae-note">Loading...</p>';
+  document.getElementById('settingsMarksField').hidden = !organiserMarksSettingShown();
+  document.getElementById('organiserMarksInput').checked = state.organiserMarks;
+  els.settingsAccessField.innerHTML = '';
   els.settingsModal.classList.add('active');
+  if(!state.accessAvailable || !window.AccessEmoji) return;
+  els.settingsAccessField.innerHTML = '<p class="ae-note">Loading...</p>';
 
   const data = await apiGet('access_settings');
   if(data.status !== 'success' || !data.available){
@@ -560,6 +792,30 @@ async function openSettingsModal(){
 
 function hideSettingsModal(){
   els.settingsModal.classList.remove('active');
+}
+
+/** Calendar settings: show or hide your answers as a coloured edge on everyone's slots. */
+async function saveOrganiserMarks(input){
+  const on = input.checked;
+  els.settingsError.textContent = '';
+  input.disabled = true;
+  try{
+    const res = await apiPost('set_organiser_marks', { on: on ? 1 : 0 });
+    if(res.status !== 'success'){
+      input.checked = !on;
+      els.settingsError.textContent = res.message || 'Could not save that.';
+      return;
+    }
+    state.organiserMarks = res.organiser_marks === true;
+    refreshCalendarValues();
+    showToast(state.organiserMarks ? 'Coloured edge on' : 'Coloured edge off');
+  } catch(e){
+    console.error('Error saving organiser marks:', e);
+    input.checked = !on;
+    els.settingsError.textContent = 'Could not save that.';
+  } finally {
+    input.disabled = false;
+  }
 }
 
 /*** Join / change your name on this calendar (your profile name is the default) */

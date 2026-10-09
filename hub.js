@@ -84,8 +84,9 @@ const hubSaveKit = {
       '',
       'INSTRUCTIONS',
       '- Share the Hub link with your group so they can pick a calendar.',
-      '- Bookmark this link - it cannot be recovered if lost.',
+      '- Bookmark this link. While signed in, you can also find it on your profile page.',
       '- Everyone signs in (Google, Facebook or passkey) to open the Hub and its calendars.',
+      ...(meta.invite_only ? ['- Invite only: people request access and the organiser approves them on the Hub page.'] : []),
       '- Only the organiser account can manage the Hub.',
       '',
       window.location.origin
@@ -504,7 +505,9 @@ const state = {
   calendars: [],
   accessAvailable: false, // Server has the access emoji tables (group_meta.group.access.available)
   accessField: null,      // Create form emoji switch (AccessEmoji.field)
-  hubEmoji: null          // The Hub's emoji position, loaded for the organiser
+  hubEmoji: null,         // The Hub's emoji position, loaded for the organiser
+  inviteOnly: false,      // People request access and the organiser approves (set at creation)
+  joinMode: 'link'        // Create form: 'link' or 'invite' (shown once migrations/009 has run)
 };
 
 // -------------------------
@@ -523,6 +526,7 @@ function showSaveHubPanel(meta) {
   qs('#saveHubEmojiWrap').classList.toggle('hideme', !hasEmoji);
   qs('#saveHubEmoji').textContent = hasEmoji ? AccessEmoji.glyph(meta.access_emoji) : '';
   qs('#saveHubEmojiName').textContent = hasEmoji ? AccessEmoji.name(meta.access_emoji) : '';
+  qs('#saveHubInvite').classList.toggle('hideme', meta.invite_only !== true);
 
   const ack = qs('#saveAckCheckbox');
   const continueBtn = qs('#saveContinueBtn');
@@ -582,6 +586,7 @@ async function createHub() {
       organiser_name: organiserName
     };
     if (accessEmoji !== null) body.access_emoji = accessEmoji;
+    if (state.joinMode === 'invite') body.invite_only = 1;
 
     const csrf = await ensureCsrfToken();
     const resp = await fetch('api.php?action=create_group', {
@@ -604,7 +609,8 @@ async function createHub() {
     showSaveHubPanel({
       token: data.token,
       title: data.title || title || 'Untitled Hub',
-      access_emoji: accessEmoji
+      access_emoji: accessEmoji,
+      invite_only: state.joinMode === 'invite'
     });
   } catch (e) {
     alert('Failed to create Hub. Please try again.');
@@ -671,7 +677,8 @@ function getHubMeta() {
     token: state.token,
     title: state.title,
     url: hubSaveKit.buildHubUrl(state.token),
-    access_emoji: state.auth ? state.hubEmoji : null
+    access_emoji: state.auth ? state.hubEmoji : null,
+    invite_only: state.inviteOnly
   };
 }
 
@@ -797,16 +804,125 @@ async function loadHubView() {
   state.organiserName = data.group?.organiser_name || '';
   state.auth = data.group?.is_organiser === true ? { organiser_name: state.organiserName } : null;
   state.claimable = data.group?.claimable === true;
+  state.inviteOnly = data.group?.invite_only === true;
 
   const displayTitle = state.title || 'Hub';
   qs('#hubTitleDisplay').innerHTML =
-    `<span class="material-symbols-outlined">hub</span> ${escapeHtml(displayTitle)}`;
+    `<span class="material-symbols-outlined">hub</span> ${escapeHtml(displayTitle)}`
+    + (state.inviteOnly ? '<span class="badge badge-invite">Invite only</span>' : '');
 
   document.title = `${displayTitle} \u2013 When RU Free Hub`;
 
   renderCalendarGrid();
   updateHubPublicUI();
   updateOrganiserUI();
+  loadHubPeople();
+}
+
+// -------------------------
+// Invite only Hub: requests, approved and declined people (organiser)
+// -------------------------
+
+function formatRequestDate(s) {
+  const d = new Date(String(s || '').replace(' ', 'T'));
+  return isNaN(d) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+/** One person row: name, date and action buttons [{label, icon, cls, decision, confirm}]. */
+function peopleRow(req, actions, extraClass = '') {
+  const li = document.createElement('li');
+  if (extraClass) li.className = extraClass;
+  const name = document.createElement('span');
+  name.className = 'people-name';
+  name.textContent = req.display_name || 'Unnamed';
+  const when = formatRequestDate(req.decided_at || req.created_at);
+  if (when) {
+    const small = document.createElement('small');
+    small.textContent = extraClass === 'is-blocked' ? `Paused ${when}` : (req.decided_at ? `Since ${when}` : `Asked ${when}`);
+    name.appendChild(small);
+  }
+  li.appendChild(name);
+  const box = document.createElement('div');
+  box.className = 'people-actions';
+  for (const a of actions) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `btn btn-small ${a.cls}`;
+    b.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${a.icon}</span>`;
+    b.appendChild(document.createTextNode(a.label));
+    b.setAttribute('aria-label', `${a.label} ${req.display_name || ''}`.trim());
+    b.addEventListener('click', () => decideHubRequest(req, a, b));
+    box.appendChild(b);
+  }
+  li.appendChild(box);
+  return li;
+}
+
+function renderHubPeople(lists) {
+  const pending = lists.pending || [];
+  const approved = lists.approved || [];
+  const blocked = lists.blocked || [];
+  const declined = lists.declined || [];
+
+  const reqList = qs('#hubRequestList');
+  reqList.innerHTML = '';
+  pending.forEach(r => reqList.appendChild(peopleRow(r, [
+    { label: 'Approve', icon: 'check', cls: 'btn-confirm', decision: 'approve' },
+    { label: 'Decline', icon: 'close', cls: 'btn-secondary', decision: 'decline' }
+  ])));
+  qs('#hubRequestCount').textContent = String(pending.length);
+  qs('#hubRequestEmpty').classList.toggle('hideme', pending.length > 0);
+  qs('#hubApproveAllBtn').classList.toggle('hideme', pending.length < 2);
+
+  const appList = qs('#hubApprovedList');
+  appList.innerHTML = '';
+  approved.forEach(r => appList.appendChild(peopleRow(r, [
+    { label: 'Block', icon: 'block', cls: 'btn-secondary', decision: 'block',
+      confirm: `Pause ${r.display_name}'s access to every calendar in this Hub? You can undo this.` }
+  ])));
+  blocked.forEach(r => appList.appendChild(peopleRow(r, [
+    { label: 'Unblock', icon: 'undo', cls: 'btn-secondary', decision: 'unblock' }
+  ], 'is-blocked')));
+  qs('#hubApprovedEmpty').classList.toggle('hideme', approved.length + blocked.length > 0);
+
+  const decList = qs('#hubDeclinedList');
+  decList.innerHTML = '';
+  declined.forEach(r => decList.appendChild(peopleRow(r, [
+    { label: 'Approve', icon: 'check', cls: 'btn-secondary', decision: 'approve' }
+  ])));
+  qs('#hubDeclinedCount').textContent = String(declined.length);
+  qs('#hubDeclinedWrap').classList.toggle('hideme', declined.length === 0);
+}
+
+async function loadHubPeople() {
+  const card = qs('#hubPeopleCard');
+  if (!state.auth || !state.inviteOnly) {
+    card.classList.add('hideme');
+    return;
+  }
+  card.classList.remove('hideme');
+  const data = await apiGet('access_requests', { g: state.token });
+  if (data.status !== 'success' || !data.requests) {
+    qs('#hubPeopleError').textContent = data.message || 'Could not load requests.';
+    return;
+  }
+  qs('#hubPeopleError').textContent = '';
+  renderHubPeople(data.requests);
+}
+
+async function decideHubRequest(req, action, btn) {
+  if (action.confirm && !confirm(action.confirm)) return;
+  btn.disabled = true;
+  const body = { decision: action.decision };
+  if (req) body.request_id = req.id;
+  const data = await hubPost('decide_access_request', body);
+  btn.disabled = false;
+  if (data.status !== 'success') {
+    qs('#hubPeopleError').textContent = data.message || 'Could not save that change.';
+    return;
+  }
+  qs('#hubPeopleError').textContent = '';
+  renderHubPeople(data.requests || {});
 }
 
 // -------------------------
@@ -913,6 +1029,10 @@ async function initViewMode() {
   qs('#pinInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') confirmClaimHub();
   });
+  qs('#hubApproveAllBtn').addEventListener('click', (e) => {
+    const n = qs('#hubRequestList').children.length;
+    decideHubRequest(null, { decision: 'approve_all', confirm: `Approve all ${n} requests?` }, e.currentTarget);
+  });
 }
 
 async function initCreateMode() {
@@ -923,16 +1043,45 @@ async function initCreateMode() {
   initCreateAccessField();
 }
 
-/** Shows the optional emoji switch once the server supports it. */
+const HUB_JOIN_HINTS = {
+  link: 'Anyone with the link can open the Hub and its calendars.',
+  invite: "People with the link tap Request access and you approve each one. Approval opens every calendar in the Hub. This can't be changed later."
+};
+
+function renderHubJoinMode() {
+  qs('#hubJoinToggle').querySelectorAll('.join-btn').forEach(b => {
+    const on = b.dataset.join === state.joinMode;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  qs('#hubJoinHint').textContent = HUB_JOIN_HINTS[state.joinMode];
+  if (state.accessField) {
+    state.accessField.setOnHint(state.joinMode === 'invite'
+      ? 'Asked before people request access.'
+      : 'Use this emoji to access the Hub.');
+  }
+}
+
+/** Shows Who can join and the optional emoji switch once the server supports them. */
 async function initCreateAccessField() {
-  if (!window.AccessEmoji) return;
+  let features = {};
   try {
     const resp = await fetch('api.php?action=get_site_config', { credentials: 'same-origin' });
     const data = await resp.json();
-    if (data?.features?.access_emoji !== true) return;
+    features = data?.features || {};
   } catch (e) {
     return;
   }
+  if (features.invite_only === true) {
+    qs('#hubJoinField').classList.remove('hideme');
+    qs('#hubJoinToggle').addEventListener('click', (e) => {
+      const btn = e.target.closest('.join-btn');
+      if (!btn) return;
+      state.joinMode = btn.dataset.join === 'invite' ? 'invite' : 'link';
+      renderHubJoinMode();
+    });
+  }
+  if (!window.AccessEmoji || features.access_emoji !== true) return;
   state.accessField = AccessEmoji.field(qs('#hubAccessField'), {
     label: 'Access emoji',
     pickerTitle: 'Choose Hub emoji',
@@ -941,6 +1090,7 @@ async function initCreateAccessField() {
     onHint: 'Use this emoji to access the Hub.'
   });
   qs('#hubAccessWrap').classList.remove('hideme');
+  renderHubJoinMode();
 }
 
 async function init() {

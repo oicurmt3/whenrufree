@@ -10,5 +10,5 @@ alwaysApply: true
 - Auto-save with a manual save fallback.
 - Support template URLs for pre-configured calendars.
 - Calendar logic lives in `calendar-*.js` (core, users, grid, rank, booking, main); admin panel in `admin-*.js` (core, calendars, hubs, accounts, setup); create-page logic in `index.js`; Hub logic in `hub.js`; profile page in `account.js`.
-- Every page loads `passkey.js`, then `account-core.js` (`window.Account`), before its own scripts, and starts with `await Account.require()`. API wrappers pass 401/403 responses to `Account.handleApiError()`.
+- Every page loads `passkey.js`, then `account-core.js` (`window.Account`), before its own scripts, and starts with `await Account.require()` (except the home page, which previews the form signed out and opens a closable sign-in panel on tap). API wrappers pass 401/403 responses to `Account.handleApiError()`.
 - Split files are classic scripts sharing global scope, loaded in order by the page (no modules). Load-time code may only use names from its own or an earlier file; never declare the same top-level name in two files; startup runs on `DOMContentLoaded`.

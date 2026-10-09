@@ -91,8 +91,8 @@ function updateOrganiserDot(slotEl, dateStr, slotId){
   // Don't show indicator in Blind mode - no individual choices visible
   if(!shouldShowOrganiserDots()) return;
   
-  // Don't show indicator when admin/organiser is viewing - they don't need to see their own status
-  if(state.currentUserId === state.adminUserId) return;
+  // Not on the organiser's own answers (yours, or theirs when viewing them)
+  if((state.viewUserId || state.currentUserId) === state.adminUserId) return;
   
   // Get organiser's status for this slot
   const orgStatus = getOrganiserStatus(dateStr, slotId);
@@ -365,13 +365,14 @@ function applyPastDateFilter(){
  */
 function refreshCalendarValues(){
   if(isBookingMode()){ refreshBookingCells(); return; }
+  const shownUserId = state.viewUserId || state.currentUserId;
   for(const [dateStr, slotMap] of state.slotEls.entries()){
     for(const slot of TIME_SLOTS){
       const el=slotMap.get(slot.id);
-      
-      // Update current user's status colour
-      if(state.currentUserId){
-        const {status}=getStatus(state.currentUserId, dateStr, slot.id);
+
+      // Your status colour, or the person you are viewing
+      if(shownUserId){
+        const {status}=getStatus(shownUserId, dateStr, slot.id);
         setSlotClass(el, status);
       } else {
         // No user selected - show neutral
@@ -436,6 +437,10 @@ function closeInfoModal(){
 }
 function onSlotClick(dateStr, slotId){
   if(isBookingMode()){ onBookingSlotClick(dateStr, slotId); return; }
+  if(state.viewUserId){
+    showToast('Read only. Close this view to change your own.');
+    return;
+  }
   // Block slot changes if the calendar has been finalised
   if(isCalendarFrozen()){
     showToast('Calendar finalised - no changes allowed.');

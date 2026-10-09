@@ -248,6 +248,14 @@ function showAdminPanel() {
  * @param {number|null} emoji
  * @param {boolean} inherited
  */
+/** "Invite only" badge with the number of requests waiting, or ''. */
+function inviteBadge(inviteOnly, pending) {
+    if (!inviteOnly) return '';
+    const n = Number(pending) || 0;
+    const title = n > 0 ? `Invite only - ${n} request${n === 1 ? '' : 's'} waiting` : 'Invite only';
+    return `<span class="invite-badge" title="${title}">Invite only${n > 0 ? ` (${n})` : ''}</span>`;
+}
+
 function emojiBadge(emoji, inherited) {
     const AE = window.AccessEmoji;
     if (AE && AE.valid(emoji)) {

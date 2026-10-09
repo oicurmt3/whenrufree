@@ -56,6 +56,7 @@ require_once __DIR__ . '/includes/accounts.php';
 require_once __DIR__ . '/includes/oauth.php';
 require_once __DIR__ . '/includes/access.php';
 require_once __DIR__ . '/includes/booking.php';
+require_once __DIR__ . '/includes/members.php';
 
 // -------------------------
 // Main routing
@@ -97,6 +98,9 @@ accountGate($pdo, $action);
 
 // Access emoji: calendars and Hubs with an emoji need a grant (includes/access.php)
 accessGate($pdo, $config, $action);
+
+// Invite only and blocked people (includes/members.php)
+membersGate($pdo, $action);
 
 // CSRF token endpoint
 if ($action === 'csrf_token' && $_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -417,6 +421,133 @@ if ($action === 'set_group_access_emoji' && $_SERVER['REQUEST_METHOD'] === 'POST
 }
 
 // -------------------------
+// Invite only (includes/members.php)
+// -------------------------
+
+// Ask to join an Invite only calendar (?c=) or Hub (?g=). The emoji gate has already run.
+if ($action === 'request_access' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $acct = requireAccount($pdo);
+    if (!membersTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Invite only is not available yet']);
+    $resolved = membersResolveTarget($pdo, $action);
+    if ($resolved === null) respond(404, ['status' => 'error', 'message' => 'Not found']);
+    [$kind, $row] = $resolved;
+
+    $decision = membersDecide($pdo, $kind, $row, $acct['id']);
+    if ($decision === 'ok') respond(200, ['status' => 'success', 'request_status' => 'approved']);
+    if ($decision === 'blocked') membersRespondBlocked($kind);
+    if ($decision === 'declined') {
+        respond(403, ['status' => 'error', 'code' => 'REQUEST_DECLINED', 'message' => 'The organiser did not approve your request.']);
+    }
+    if ($decision === 'pending') respond(200, ['status' => 'success', 'request_status' => 'pending']);
+
+    enforceActionRateLimit($pdo, clientIp(), 'rqa' . gmdate('YmdH'), MEMBERS_REQUESTS_PER_HOUR, 'Too many requests. Try again later.');
+    $req = membersRequirement($kind, $row);
+    if (membersPendingCount($pdo, $req['kind'], $req['id']) >= MEMBERS_MAX_PENDING) {
+        respond(429, ['status' => 'error', 'message' => 'This organiser has too many requests waiting. Try again later.']);
+    }
+    $status = membersRequestCreate($pdo, $req, $acct);
+    logSecurityEvent('ACCESS_REQUESTED', [$req['kind'] === 'group' ? 'group_id' : 'calendar_id' => $req['id'], 'account_id' => $acct['id']]);
+    respond(200, ['status' => 'success', 'request_status' => $status]);
+}
+
+// Withdraw your own pending request
+if ($action === 'cancel_access_request' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $acct = requireAccount($pdo);
+    if (!membersTablesReady($pdo)) respond(200, ['status' => 'success']);
+    $resolved = membersResolveTarget($pdo, $action);
+    if ($resolved === null) respond(404, ['status' => 'error', 'message' => 'Not found']);
+    $req = membersRequirement($resolved[0], $resolved[1]);
+    if ($req !== null) {
+        $pdo->prepare(
+            "DELETE FROM access_requests WHERE kind = :k AND subject_id = :sid AND account_id = :aid AND status = 'pending'"
+        )->execute([':k' => $req['kind'], ':sid' => $req['id'], ':aid' => $acct['id']]);
+    }
+    respond(200, ['status' => 'success']);
+}
+
+// Requests for the organiser of ?c= or ?g= (a calendar in an Invite only Hub: the Hub organiser)
+if ($action === 'access_requests' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    [, $req] = membersOrganiserSubject($pdo, $action);
+    respond(200, [
+        'status' => 'success',
+        'invite_only' => true,
+        'managed_by' => $req['kind'] === 'group' ? 'hub' : 'calendar',
+        'requests' => membersRequestLists($pdo, $req['kind'], $req['id']),
+    ]);
+}
+
+// Approve, decline, approve all, or (Hubs) block / unblock an approved person
+if ($action === 'decide_access_request' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    [$acct, $req] = membersOrganiserSubject($pdo, $action);
+    $decision = (string)($_POST['decision'] ?? '');
+    $subjectKey = $req['kind'] === 'group' ? 'group_id' : 'calendar_id';
+
+    if ($decision === 'approve_all') {
+        $n = membersApproveAll($pdo, $req['kind'], $req['id']);
+        logSecurityEvent('ACCESS_REQUEST_DECIDED', [$subjectKey => $req['id'], 'account_id' => $acct['id'], 'decision' => 'approve_all', 'count' => $n]);
+    } else {
+        $requestId = (int)($_POST['request_id'] ?? 0);
+        $stmt = $pdo->prepare("SELECT id FROM access_requests WHERE id = :id AND kind = :k AND subject_id = :sid");
+        $stmt->execute([':id' => $requestId, ':k' => $req['kind'], ':sid' => $req['id']]);
+        if (!$stmt->fetchColumn()) respond(404, ['status' => 'error', 'message' => 'Request not found']);
+        if (!membersDecideRequest($pdo, $requestId, $decision)) {
+            respond(400, ['status' => 'error', 'message' => 'That change is not possible']);
+        }
+        logSecurityEvent('ACCESS_REQUEST_DECIDED', [$subjectKey => $req['id'], 'account_id' => $acct['id'], 'decision' => $decision]);
+    }
+    if ($req['kind'] === 'group') touchGroupActivity($pdo, $req['id']);
+    respond(200, ['status' => 'success', 'requests' => membersRequestLists($pdo, $req['kind'], $req['id'])]);
+}
+
+// Pause or restore one person on a calendar (calendar organiser). Their answers stay stored.
+if ($action === 'set_user_blocked' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!membersTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Blocking is not available yet']);
+    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can block people']);
+    }
+    $userId = (int)($_POST['user_id'] ?? 0);
+    $blocked = !empty($_POST['blocked']) ? 1 : 0;
+    $stmt = $pdo->prepare(
+        "UPDATE users SET blocked = :b WHERE id = :uid AND calendar_id = :cid AND role <> 'admin'"
+    );
+    $stmt->execute([':b' => $blocked, ':uid' => $userId, ':cid' => $calId]);
+    $check = $pdo->prepare("SELECT 1 FROM users WHERE id = :uid AND calendar_id = :cid AND role <> 'admin'");
+    $check->execute([':uid' => $userId, ':cid' => $calId]);
+    if (!$check->fetchColumn()) respond(404, ['status' => 'error', 'message' => 'Person not found']);
+    logSecurityEvent('USER_BLOCKED', ['calendar_id' => $calId, 'user_id' => $userId, 'blocked' => $blocked === 1]);
+    respond(200, ['status' => 'success', 'blocked' => $blocked === 1]);
+}
+
+// Show or hide the organiser's answers as a coloured edge on everyone's slots (calendar organiser)
+if ($action === 'set_organiser_marks' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!organiserMarksColumnReady($pdo)) respond(503, ['status' => 'error', 'message' => 'This setting is not available yet']);
+    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can change settings']);
+    }
+    $on = !empty($_POST['on']) ? 1 : 0;
+    $pdo->prepare("UPDATE calendars SET show_organiser_marks = :v WHERE id = :id")
+        ->execute([':v' => $on, ':id' => $calId]);
+    respond(200, ['status' => 'success', 'organiser_marks' => $on === 1]);
+}
+
+// -------------------------
 // Actions
 // -------------------------
 
@@ -522,6 +653,18 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         prepareHubCalendarAdd($pdo, $groupId, $config);
     }
 
+    // Invite only and private names are chosen here and never changed. Inside an Invite only
+    // Hub a calendar is always Invite only.
+    $inviteOnly = !empty($_POST['invite_only']) ? 1 : 0;
+    $hideNames = $isPrivate === 1 && !empty($_POST['hide_names']) ? 1 : 0;
+    if (($inviteOnly || $hideNames) && !membersTablesReady($pdo)) {
+        respond(400, ['status' => 'error', 'message' => 'Invite only is not available yet']);
+    }
+    if ($groupId !== null && membersTablesReady($pdo)) {
+        $hubRow = membersGroupRow($pdo, $groupTokenPost);
+        if ($hubRow && (int)$hubRow['invite_only'] === 1) $inviteOnly = 1;
+    }
+
     for ($i = 0; $i < 5; $i++) {
         // Generate shorter 8-char URL-safe tokens for cleaner URLs
         $token = createToken(8);
@@ -582,6 +725,10 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare("UPDATE calendars SET access_emoji = :e WHERE id = :id")
                     ->execute([':e' => $accessEmoji, ':id' => $calId]);
             }
+            if ($inviteOnly || $hideNames) {
+                $pdo->prepare("UPDATE calendars SET invite_only = :io, hide_names = :hn WHERE id = :id")
+                    ->execute([':io' => $inviteOnly, ':hn' => $hideNames, ':id' => $calId]);
+            }
             logSecurityEvent('CALENDAR_CREATED', ['calendar_id' => $calId, 'account_id' => $acct['id']]);
             respond(200, ['status' => 'success', 'token' => $token]);
         } catch (PDOException $e) {
@@ -611,6 +758,10 @@ if ($action === 'create_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($accessEmoji !== null && !accessTablesReady($pdo)) {
         respond(400, ['status' => 'error', 'message' => 'Access emoji is not available yet']);
     }
+    $inviteOnly = !empty($_POST['invite_only']) ? 1 : 0;
+    if ($inviteOnly && !membersTablesReady($pdo)) {
+        respond(400, ['status' => 'error', 'message' => 'Invite only is not available yet']);
+    }
 
     for ($i = 0; $i < 5; $i++) {
         $token = createToken(8);
@@ -632,6 +783,9 @@ if ($action === 'create_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($accessEmoji !== null) {
                 $pdo->prepare("UPDATE `groups` SET access_emoji = :e WHERE id = :id")
                     ->execute([':e' => $accessEmoji, ':id' => $groupId]);
+            }
+            if ($inviteOnly) {
+                $pdo->prepare("UPDATE `groups` SET invite_only = 1 WHERE id = :id")->execute([':id' => $groupId]);
             }
             logSecurityEvent('HUB_CREATED', ['group_id' => $groupId, 'account_id' => $acct['id']]);
             respond(200, ['status' => 'success', 'token' => $token, 'title' => $titleForDb]);
@@ -681,6 +835,8 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $acct = requireAccount($pdo);
     accountTouchHub($pdo, $acct['id'], $groupId);
     $ownerId = $grp['organiser_account_id'] !== null ? (int)$grp['organiser_account_id'] : null;
+    $memberRow = membersTablesReady($pdo) ? membersGroupRow($pdo, $token) : null;
+    $inviteOnly = $memberRow !== null && (int)$memberRow['invite_only'] === 1;
 
     respond(200, [
         'status' => 'success',
@@ -692,6 +848,8 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             'is_organiser' => $ownerId === $acct['id'],
             'claimable' => $ownerId === null && !empty($grp['organiser_pin_hash']),
             'access' => accessPublicInfo($pdo, accessRequirementForGroup(accessGroupRow($pdo, $token) ?? [])),
+            'invite_only' => $inviteOnly,
+            'pending_requests' => $inviteOnly && $ownerId === $acct['id'] ? membersPendingCount($pdo, 'group', $groupId) : null,
         ],
         'calendars' => $calendars,
     ]);
@@ -846,6 +1004,10 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     if ($bookingCols !== '' && bookingStyleColumnsReady($pdo)) {
         $bookingCols .= ' c.partial_color, c.full_color, c.partial_label, c.full_label,';
     }
+    $members = membersTablesReady($pdo);
+    if ($members) $bookingCols .= ' c.invite_only, c.hide_names, g.invite_only AS group_invite_only,';
+    $marksReady = organiserMarksColumnReady($pdo);
+    if ($marksReady) $bookingCols .= ' c.show_organiser_marks,';
     $stmt = $pdo->prepare(
         "SELECT c.id, c.token, c.group_id, c.title, c.category, c.slots_json, c.statuses_json,
                 c.start_date, c.end_date, c.exclude_weekends, c.date_filter_mode, c.date_filter_dates,
@@ -938,13 +1100,29 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         }
     }
 
-    unset($cal['group_id'], $cal['group_token'], $cal['group_title']);
+    // Invite only (own flag or the Hub's) and private names; set at creation, never changed
+    $inviteReq = $members ? membersRequirement('calendar', $cal) : null;
+    $cal['invite_only'] = $inviteReq !== null;
+    $cal['invite_via_hub'] = $inviteReq !== null && $inviteReq['kind'] === 'group';
+    $cal['hide_names'] = $members && (int)($cal['hide_names'] ?? 0) === 1;
+    $cal['names_private'] = membersNamesHidden($cal);
+
+    // Organiser's answers as a coloured edge on Open calendars; the organiser can turn it off
+    $cal['organiser_marks'] = !$marksReady || (int)($cal['show_organiser_marks'] ?? 1) === 1;
+    $cal['organiser_marks_available'] = $marksReady;
+
+    unset($cal['group_id'], $cal['group_token'], $cal['group_title'], $cal['group_invite_only'], $cal['show_organiser_marks']);
 
     $cal['access'] = accessPublicInfo($pdo, accessRequirementForCalendar(accessCalendarRow($pdo, $token) ?? []));
 
     // Who the signed-in account is here (null until it joins), and whether old PIN names are left to claim
     $acct = requireAccount($pdo);
     $me = accountCalendarUser($pdo, (int)$cal['id'], $acct['id']);
+    // Requests waiting, for whoever decides them (calendar organiser, or the Hub organiser)
+    $cal['pending_requests'] = null;
+    if ($inviteReq !== null && membersIsOrganiserOf($pdo, $inviteReq['kind'], $inviteReq['id'], $acct['id'])) {
+        $cal['pending_requests'] = membersPendingCount($pdo, $inviteReq['kind'], $inviteReq['id']);
+    }
     $stmtCl = $pdo->prepare("SELECT 1 FROM users WHERE calendar_id = :cid AND account_id IS NULL AND pin_hash IS NOT NULL LIMIT 1");
     $stmtCl->execute([':cid' => (int)$cal['id']]);
     $account = [
@@ -1077,33 +1255,53 @@ if ($action === 'save_organiser_message' && $_SERVER['REQUEST_METHOD'] === 'POST
 }
 
 // List users. mine: the signed-in account's name. claimable: an old name (from before accounts)
-// that can be claimed once with its PIN.
+// that can be claimed once with its PIN. The organiser sees everyone (with blocked flags); others
+// never see blocked people, and on calendars with private names only themselves, the organisers
+// and a total.
 if ($action === 'users' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $token = requireToken();
-    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
+    $members = membersTablesReady($pdo);
+    $cols = ($members ? ', hide_names' : '') . (bookingColumnsReady($pdo) ? ', slot_capacity' : '');
+    $stmtC = $pdo->prepare("SELECT id, is_private{$cols} FROM calendars WHERE token = :t");
     $stmtC->execute([':t' => $token]);
     $cal = $stmtC->fetch();
     if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
     $calId = (int)$cal['id'];
     $acct = requireAccount($pdo);
+    $session = getOptionalSession($pdo, $calId);
+    $isOrganiser = $session !== null && $session['role'] === 'admin';
+    $namesHidden = !$isOrganiser && membersNamesHidden($cal);
+    // Blocked people's bookings still hold their places, so booking calendars keep their names
+    $hideBlocked = !$isOrganiser && bookingSettingsFromRow($cal)['capacity'] === null;
 
     $stmtU = $pdo->prepare(
-        "SELECT id, display_name, role, account_id, (account_id IS NULL AND pin_hash IS NOT NULL) AS claimable
+        "SELECT id, display_name, role, account_id, (account_id IS NULL AND pin_hash IS NOT NULL) AS claimable"
+        . ($members ? ', blocked' : ', 0 AS blocked') . "
          FROM users WHERE calendar_id = :cid ORDER BY created_at ASC, id ASC"
     );
     $stmtU->execute([':cid' => $calId]);
     $users = [];
+    $total = 0;
     foreach ($stmtU->fetchAll() as $u) {
-        $users[] = [
+        $blocked = (int)$u['blocked'] === 1;
+        $mine = $u['account_id'] !== null && (int)$u['account_id'] === $acct['id'];
+        if ($blocked && $hideBlocked) continue;
+        $total++;
+        $claimable = (int)$u['claimable'] === 1;
+        // Old PIN names stay listed so their owners can claim them
+        if ($namesHidden && !$mine && !$claimable && $u['role'] !== 'admin') continue;
+        $user = [
             'id' => (int)$u['id'],
             'display_name' => (string)$u['display_name'],
             'role' => (string)$u['role'],
-            'mine' => $u['account_id'] !== null && (int)$u['account_id'] === $acct['id'],
-            'claimable' => (int)$u['claimable'] === 1,
+            'mine' => $mine,
+            'claimable' => $claimable,
         ];
+        if ($isOrganiser) $user['blocked'] = $blocked;
+        $users[] = $user;
     }
 
-    respond(200, ['status' => 'success', 'users' => $users]);
+    respond(200, ['status' => 'success', 'users' => $users, 'total' => $total, 'names_hidden' => $namesHidden]);
 }
 
 // Join a calendar as the signed-in account: its profile name, or a name just for this calendar
@@ -1283,15 +1481,21 @@ if ($action === 'availability' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $session = getOptionalSession($pdo, $calId);
     $rows = [];
     $summary = [];
+    // Blocked people's answers are left out; their bookings still hold their places
+    $skipBlocked = !$isBooking && membersTablesReady($pdo);
+    $blockedSql = $skipBlocked
+        ? ' AND user_id NOT IN (SELECT id FROM users WHERE calendar_id = :cidb AND blocked = 1)'
+        : '';
+    $allParams = [':cid' => $calId, ':f' => $from, ':t' => $to] + ($skipBlocked ? [':cidb' => $calId] : []);
 
     if ($isPrivate === 0) {
         // Open: anyone with the calendar link sees all rows
         $stmt = $pdo->prepare(
             "SELECT calendar_id, user_id, day, slot, status
              FROM availability
-             WHERE calendar_id = :cid AND day BETWEEN :f AND :t"
+             WHERE calendar_id = :cid AND day BETWEEN :f AND :t{$blockedSql}"
         );
-        $stmt->execute([':cid' => $calId, ':f' => $from, ':t' => $to]);
+        $stmt->execute($allParams);
         $rows = $stmt->fetchAll();
     } elseif ($session === null) {
         // Hidden/Blind without auth: no data, except booking counts so visitors can see free slots
@@ -1302,9 +1506,9 @@ if ($action === 'availability' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $stmt = $pdo->prepare(
             "SELECT calendar_id, user_id, day, slot, status
              FROM availability
-             WHERE calendar_id = :cid AND day BETWEEN :f AND :t"
+             WHERE calendar_id = :cid AND day BETWEEN :f AND :t{$blockedSql}"
         );
-        $stmt->execute([':cid' => $calId, ':f' => $from, ':t' => $to]);
+        $stmt->execute($allParams);
         $rows = $stmt->fetchAll();
     } else {
         // Hidden member or Blind (any role): own rows + anonymous summary
@@ -1315,7 +1519,7 @@ if ($action === 'availability' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         );
         $stmt->execute([':cid' => $calId, ':uid' => $session['user_id'], ':f' => $from, ':t' => $to]);
         $rows = $stmt->fetchAll();
-        $summary = buildAvailabilitySummary($pdo, $calId, $from, $to);
+        $summary = buildAvailabilitySummary($pdo, $calId, $from, $to, $skipBlocked);
     }
 
     respond(200, ['status' => 'success', 'rows' => $rows, 'summary' => $summary]);
@@ -1611,6 +1815,10 @@ if ($action === 'admin_calendars' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         ? 'c.access_emoji, g.access_emoji AS group_access_emoji,'
         : 'NULL AS access_emoji, NULL AS group_access_emoji,';
     $bookingCol = bookingColumnsReady($pdo) ? 'c.slot_capacity,' : 'NULL AS slot_capacity,';
+    $inviteCols = membersTablesReady($pdo)
+        ? "c.invite_only, g.invite_only AS group_invite_only,
+           (SELECT COUNT(*) FROM access_requests r WHERE r.kind = 'calendar' AND r.subject_id = c.id AND r.status = 'pending') AS pending_requests,"
+        : '0 AS invite_only, 0 AS group_invite_only, 0 AS pending_requests,';
     $sql = "
         SELECT 
             c.id,
@@ -1622,6 +1830,7 @@ if ($action === 'admin_calendars' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             c.never_expires,
             {$emojiCols}
             {$bookingCol}
+            {$inviteCols}
             c.group_id,
             g.token AS group_token,
             g.title AS group_title,
@@ -1644,7 +1853,11 @@ if ($action === 'admin_calendars' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $cal['access_emoji'] = $cal['access_emoji'] !== null ? (int)$cal['access_emoji'] : null;
         $cal['group_access_emoji'] = $cal['group_access_emoji'] !== null ? (int)$cal['group_access_emoji'] : null;
         $cal['slot_capacity'] = $cal['slot_capacity'] !== null ? (int)$cal['slot_capacity'] : null;
+        $cal['invite_only'] = (int)$cal['invite_only'] === 1 || (int)$cal['group_invite_only'] === 1;
+        $cal['pending_requests'] = (int)$cal['pending_requests'];
+        unset($cal['group_invite_only']);
     }
+    unset($cal);
 
     respond(200, [
         'status' => 'success',
@@ -1710,6 +1923,7 @@ if ($action === 'admin_delete_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST'
     // Delete calendar (cascades to users, sessions, availability)
     $stmt = $pdo->prepare("DELETE FROM calendars WHERE id = :id");
     $stmt->execute([':id' => $calendarId]);
+    membersForgetSubject($pdo, 'calendar', $calendarId);
 
     logSecurityEvent('ADMIN_DELETE_CALENDAR', [
         'calendar_id' => $calendarId,
@@ -1727,9 +1941,13 @@ if ($action === 'admin_groups' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     requireAdminSession();
 
     $emojiCol = accessTablesReady($pdo) ? 'g.access_emoji' : 'NULL AS access_emoji';
+    $inviteCols = membersTablesReady($pdo)
+        ? "g.invite_only,
+           (SELECT COUNT(*) FROM access_requests r WHERE r.kind = 'group' AND r.subject_id = g.id AND r.status = 'pending') AS pending_requests"
+        : '0 AS invite_only, 0 AS pending_requests';
     $sql = "
         SELECT g.id, g.token, g.title, g.organiser_name,
-               g.created_at, g.last_activity, g.never_expires, g.locked_until, {$emojiCol},
+               g.created_at, g.last_activity, g.never_expires, g.locked_until, {$emojiCol}, {$inviteCols},
                COUNT(c.id) AS calendar_count
         FROM `groups` g
         LEFT JOIN calendars c ON c.group_id = g.id
@@ -1745,6 +1963,8 @@ if ($action === 'admin_groups' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $group['calendar_count'] = (int)($group['calendar_count'] ?? 0);
         $group['locked_seconds'] = pinLockoutRemaining($group['locked_until'] ?? null);
         $group['access_emoji'] = $group['access_emoji'] !== null ? (int)$group['access_emoji'] : null;
+        $group['invite_only'] = (int)$group['invite_only'] === 1;
+        $group['pending_requests'] = (int)$group['pending_requests'];
         unset($group['locked_until']);
     }
     unset($group);
@@ -1846,6 +2066,7 @@ if ($action === 'admin_delete_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = $pdo->prepare("DELETE FROM `groups` WHERE id = :id");
     $stmt->execute([':id' => $groupId]);
+    membersForgetSubject($pdo, 'group', $groupId);
 
     logSecurityEvent('ADMIN_DELETE_GROUP', [
         'group_id' => $groupId,
@@ -1876,6 +2097,7 @@ if ($action === 'admin_list_users' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     $accountCol = accountsTablesReady($pdo) ? ', (account_id IS NOT NULL) AS has_account' : ', 0 AS has_account';
+    $accountCol .= membersTablesReady($pdo) ? ', blocked' : ', 0 AS blocked';
     $stmtU = $pdo->prepare(
         "SELECT id, display_name, role, locked_until{$accountCol} FROM users WHERE calendar_id = :cid ORDER BY role DESC, created_at ASC"
     );
@@ -1885,6 +2107,7 @@ if ($action === 'admin_list_users' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     foreach ($users as &$u) {
         $u['locked_seconds'] = pinLockoutRemaining($u['locked_until'] ?? null);
         $u['has_account'] = (int)$u['has_account'] === 1;
+        $u['blocked'] = (int)$u['blocked'] === 1;
         unset($u['locked_until']);
     }
     unset($u);
@@ -1988,7 +2211,7 @@ if ($action === 'admin_delete_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Verify user belongs to this calendar
-    $stmtU = $pdo->prepare("SELECT id, display_name, role FROM users WHERE id = :uid AND calendar_id = :cid");
+    $stmtU = $pdo->prepare("SELECT id, display_name, role, account_id FROM users WHERE id = :uid AND calendar_id = :cid");
     $stmtU->execute([':uid' => $userId, ':cid' => $calendarId]);
     $user = $stmtU->fetch();
     if (!$user) {
@@ -1998,6 +2221,7 @@ if ($action === 'admin_delete_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Delete user (cascades to availability and sessions)
     $stmtD = $pdo->prepare("DELETE FROM users WHERE id = :uid AND calendar_id = :cid");
     $stmtD->execute([':uid' => $userId, ':cid' => $calendarId]);
+    membersForgetCalendarAccount($pdo, $calendarId, $user['account_id'] !== null ? (int)$user['account_id'] : null);
 
     $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calendarId]);
 
@@ -2116,16 +2340,18 @@ if ($action === 'delete_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Verify target user exists in this calendar
-    $stmtU = $pdo->prepare("SELECT id, display_name, role FROM users WHERE id = :uid AND calendar_id = :cid");
+    $stmtU = $pdo->prepare("SELECT id, display_name, role, account_id FROM users WHERE id = :uid AND calendar_id = :cid");
     $stmtU->execute([':uid' => $targetId, ':cid' => $calId]);
     $targetUser = $stmtU->fetch();
     if (!$targetUser) {
         respond(404, ['status' => 'error', 'message' => 'User not found']);
     }
 
-    // Delete user (cascades to availability and sessions)
+    // Delete user (cascades to availability and sessions). On Invite only calendars they would
+    // have to request again.
     $stmtD = $pdo->prepare("DELETE FROM users WHERE id = :uid AND calendar_id = :cid");
     $stmtD->execute([':uid' => $targetId, ':cid' => $calId]);
+    membersForgetCalendarAccount($pdo, $calId, $targetUser['account_id'] !== null ? (int)$targetUser['account_id'] : null);
 
     $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
 
@@ -2271,6 +2497,7 @@ if ($action === 'get_site_config' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         'booking_total' => bookingColumnsReady($pdo) && bookingTotalColumnReady($pdo),
         'booking_styles' => bookingColumnsReady($pdo) && bookingStyleColumnsReady($pdo),
         'accounts' => accountsTablesReady($pdo),
+        'invite_only' => membersTablesReady($pdo),
     ];
     try {
         $stmt = $pdo->query("SELECT config_json FROM site_config WHERE id = 1 LIMIT 1");
@@ -2437,11 +2664,11 @@ if ($action === 'admin_save_config' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // hub_inactive_days: same rule for Hubs (separate threshold).
     // Permanent calendars/Hubs (never_expires = 1) are always protected by cleanup.php.
     $rawRetention = is_array($incoming['retention'] ?? null) ? $incoming['retention'] : [];
-    $inactiveDays = (int)($rawRetention['inactive_days'] ?? 30);
+    $inactiveDays = (int)($rawRetention['inactive_days'] ?? 40);
     if ($inactiveDays < 1)    $inactiveDays = 1;
     if ($inactiveDays > 3650) $inactiveDays = 3650;
 
-    $hubInactiveDays = (int)($rawRetention['hub_inactive_days'] ?? 30);
+    $hubInactiveDays = (int)($rawRetention['hub_inactive_days'] ?? 40);
     if ($hubInactiveDays < 1)    $hubInactiveDays = 1;
     if ($hubInactiveDays > 3650) $hubInactiveDays = 3650;
 

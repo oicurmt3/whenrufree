@@ -127,15 +127,20 @@ const MESSAGE_MAX_LEN = 250;
 /**
  * Aggregate availability counts per day/slot/status (no user identifiers).
  */
-function buildAvailabilitySummary(PDO $pdo, int $calId, string $from, string $to): array {
+function buildAvailabilitySummary(PDO $pdo, int $calId, string $from, string $to, bool $skipBlocked = false): array {
+    $blockedSql = $skipBlocked
+        ? ' AND user_id NOT IN (SELECT id FROM users WHERE calendar_id = :cidb AND blocked = 1)'
+        : '';
     $stmt = $pdo->prepare(
         "SELECT day, slot, status, COUNT(*) AS cnt
          FROM availability
-         WHERE calendar_id = :cid AND day BETWEEN :f AND :t
+         WHERE calendar_id = :cid AND day BETWEEN :f AND :t{$blockedSql}
          GROUP BY day, slot, status
          ORDER BY day, slot, status"
     );
-    $stmt->execute([':cid' => $calId, ':f' => $from, ':t' => $to]);
+    $params = [':cid' => $calId, ':f' => $from, ':t' => $to];
+    if ($skipBlocked) $params[':cidb'] = $calId;
+    $stmt->execute($params);
     $out = [];
     foreach ($stmt->fetchAll() as $row) {
         $out[] = [
@@ -146,6 +151,21 @@ function buildAvailabilitySummary(PDO $pdo, int $calId, string $from, string $to
         ];
     }
     return $out;
+}
+
+/** True once migrations/010_organiser_marks.sql has been applied. */
+function organiserMarksColumnReady(PDO $pdo): bool {
+    static $cache = [];
+    $key = spl_object_id($pdo);
+    if (!isset($cache[$key])) {
+        try {
+            $pdo->query('SELECT show_organiser_marks FROM calendars LIMIT 0');
+            $cache[$key] = true;
+        } catch (PDOException $e) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
 }
 
 /** Respond 409 when a unique display_name constraint is violated. */
