@@ -346,6 +346,17 @@ body.acct-locked {
 }
 .acct-page-head h1 { margin-right: auto; }
 
+/* Set by account-core.js when the full badge would wrap under the title */
+.acct-page-head.acct-head-compact { flex-wrap: nowrap; }
+.acct-head-compact h1 { min-width: 0; }
+.acct-head-compact > :not(h1) { flex-shrink: 0; }
+.acct-head-compact .acct-badge {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.acct-head-compact .acct-badge-name { display: none; }
+
 /* ---------- Toast ---------- */
 .acct-toast {
   position: fixed;

@@ -409,24 +409,49 @@
     setTimeout(() => t.remove(), 6000);
   }
 
+  /**
+   * Beside a page title (.acct-page-head), shrink the badge to its icon instead of
+   * letting it wrap under the h1 on narrow screens.
+   */
+  function fitBadgeToHead(badge) {
+    const head = badge.closest('.acct-page-head');
+    const title = head && head.querySelector('h1');
+    if (!title) return;
+    let queued = false;
+    const fit = () => {
+      queued = false;
+      head.classList.remove('acct-head-compact');
+      const wrapped = badge.getBoundingClientRect().top >= title.getBoundingClientRect().bottom;
+      head.classList.toggle('acct-head-compact', wrapped);
+    };
+    fit();
+    window.addEventListener('resize', () => {
+      if (!queued) { queued = true; requestAnimationFrame(fit); }
+    });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+  }
+
   /** Small "profile" link showing the profile name, for page headers. */
   function renderBadge(info, parent) {
     if (!parent || !info || !info.signed_in) return null;
-    const a = el('a', { href: ACCOUNT_PAGE, className: 'acct-badge', title: 'Your profile, calendars and Hubs' });
+    const name = info.display_name || 'Profile';
+    const a = el('a', { href: ACCOUNT_PAGE, className: 'acct-badge', title: 'Your profile, calendars and Hubs', 'aria-label': 'Your profile: ' + name });
     a.appendChild(icon('account_circle'));
-    a.appendChild(el('span', { className: 'acct-badge-name' }, info.display_name || 'Profile'));
+    a.appendChild(el('span', { className: 'acct-badge-name' }, name));
     parent.appendChild(a);
+    fitBadgeToHead(a);
     return a;
   }
 
   /** "Sign in" button in the badge spot for signed-out visitors (home page preview). */
   function renderSignInBadge(parent, onClick) {
     if (!parent) return null;
-    const b = el('button', { type: 'button', className: 'acct-badge acct-badge-signin', title: 'Sign in or create a free account' });
+    const b = el('button', { type: 'button', className: 'acct-badge acct-badge-signin', title: 'Sign in or create a free account', 'aria-label': 'Sign in' });
     b.appendChild(icon('login'));
     b.appendChild(el('span', { className: 'acct-badge-name' }, 'Sign in'));
     b.addEventListener('click', onClick);
     parent.appendChild(b);
+    fitBadgeToHead(b);
     return b;
   }
 
