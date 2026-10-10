@@ -623,6 +623,8 @@ function getContrastTextColor(bgColor) {
 
 /**
  * Applies the chosen colour as background to the label input with appropriate text contrast.
+ * The placeholder follows the same contrast colour as typed-in text, via --label-text, so an
+ * empty field ("e.g., Yes") reads as brightly as what is typed into it.
  * @param {HTMLInputElement} colorPicker - The color picker element
  * @param {HTMLInputElement} labelInput - The label input element
  */
@@ -632,6 +634,7 @@ function applyColorPreview(colorPicker, labelInput) {
   labelInput.style.backgroundColor = bgColor;
   labelInput.style.color = textColor;
   labelInput.style.borderColor = bgColor;
+  labelInput.style.setProperty('--label-text', textColor);
 }
 
 /**
@@ -1414,7 +1417,7 @@ function initNullColorPicker(){
     btn.style.background = color;
     btn.setAttribute('role', 'radio');
     btn.setAttribute('aria-checked', 'false');
-    btn.setAttribute('aria-label', `Unanswered Slot colour: ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
+    btn.setAttribute('aria-label', `No option colour: ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
     btn.title = color;
     btn.addEventListener('click', () => { nullColorChoice = color; paint(); });
     nullSwatchesEl.appendChild(btn);

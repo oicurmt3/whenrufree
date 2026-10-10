@@ -216,6 +216,11 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 .slot-row .move-up .material-symbols-outlined{ font-size:20px; }
 .slot-row .remove{ background:#fff; border:1px solid var(--border); border-radius:6px; }
 
+/* Option and booking labels are painted in their own colour, so the placeholder takes the same
+   contrasting colour as the typed-in text (set as --label-text by applyColorPreview). */
+.status-row .label-input::placeholder,
+.booking-label-row .label-input::placeholder{ color: var(--label-text, var(--text-muted)); opacity: 1; }
+
 /* Status options (mirrors slot rows) */
 /* The Default option box sits last, and its touch target spreads 4px past the button, so the row
    keeps 4px of right padding. Without it that spread overflows the row and it reads as scrollable. */
