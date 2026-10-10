@@ -1,4 +1,4 @@
-# Deployment Guide
+﻿# Deployment Guide
 
 ## Requirements
 
@@ -47,6 +47,8 @@ ALTER TABLE calendars
 9. **Invite only and Block** - run `migrations/009_invite_only.sql` **before** uploading the Invite only code (adds `calendars.invite_only`, `calendars.hide_names`, `groups.invite_only`, `users.blocked`; creates `access_requests`). Safe to re-run. Until it runs, nothing is gated and the create pages hide **Who can join** and **Hide names too**.
 
 10. **Organiser marks** - run `migrations/010_organiser_marks.sql` (adds `calendars.show_organiser_marks`, default 1). Safe to re-run. Until it runs, the organiser's coloured slot edge always shows on Open calendars and Calendar settings doesn't offer the switch.
+
+11. **Reports** - run `migrations/011_report_users.sql` **before** uploading the reports code (creates `reports`: a snapshot of who was reported, by whom, why, with no foreign keys so it survives the calendar and the account). Safe to re-run. Until it runs, blocking, deleting and reporting all still work but the **Report** dropdown is hidden and the admin **Reports** tab says to run the migration.
 
 And fix the known column width issue:
 
@@ -176,7 +178,7 @@ Set up the cleanup script to run daily:
 0 3 * * * /usr/bin/php /home/perthrel/public_html/grape/cleanup.php >> /home/perthrel/grape_private/logs/cleanup.log 2>&1
 ```
 
-This handles: inactive calendar and Hub deletion, rate limit table pruning, claim lockout resets, resetting the lockout escalation after 30 days without a lockout, deleting expired access emoji grants and old wrong-pick counters, and (step 10) expired account sessions, abandoned passkey sign-ups, emoji picks for deleted calendars/Hubs, and accounts unused for `accounts.inactive_days` that have no calendars or Hubs, and (step 11) Invite only requests left waiting for 30 days or belonging to deleted calendars/Hubs. Steps 3 and 6 (old PIN sessions) are skipped once migration 008 has run.
+This handles: inactive calendar and Hub deletion, rate limit table pruning, claim lockout resets, resetting the lockout escalation after 30 days without a lockout, deleting expired access emoji grants and old wrong-pick counters, and (step 10) expired account sessions, abandoned passkey sign-ups, emoji picks for deleted calendars/Hubs, and accounts unused for `accounts.inactive_days` that have no calendars or Hubs, and (step 11) Invite only requests left waiting for 30 days or belonging to deleted calendars/Hubs, and (step 12) closed reports kept for `reports.keep_days` (default 180) as an audit trail. Open reports are never touched. Steps 3 and 6 (old PIN sessions) are skipped once migration 008 has run.
 
 ## Security Checklist
 
@@ -212,6 +214,7 @@ All files must use plain ASCII only. No em dashes, curly quotes, or Unicode char
 6. **Accounts release:** run migration 007, add the `accounts` block to `config.php`, then upload `api.php`, all of `includes/` (new `accounts.php`, `oauth.php`), `cleanup.php`, every HTML page, `account.html`, `account.js`, `account-core.js`, `account.css`, `passkey.js`, the `calendar-*.js`, `admin-*.js` (new `admin-accounts.js`), `hub.js`, `index.js` and the CSS files. Existing PIN names and Hubs keep working as "claimable" until migration 008.
 7. **Invite only release:** run migration 009, then upload `api.php`, `cleanup.php`, `includes/` (new `members.php`; changed `access.php`, `accounts.php`, `data.php`, `security.php`), every HTML page (new `?v=` cache-busters), `account-core.js`, `account.js`, `emoji.js`, `calendar-core.js`, `calendar-users.js`, `hub.js`, `index.js`, `admin-core.js`, `admin-calendars.js`, `admin-hubs.js` and the CSS files (`account.css`, `calendar.css`, `hub.css`, `index.css`, `admin.css`). No config changes.
 8. **2026-10-09 release** (signed-out home page, People view with eye toggle, rename in People, organiser marks, compact account badge, template privacy / join): run migration 010, then upload `api.php`, `includes/data.php`, `includes/security.php`, `index.html`, `hub.html`, `calendar.html`, `account.html`, `admin.html`, `go/index.html`, `faq.html`, `guide.html`, `ideas.html`, `privacy.html`, `account-core.js`, `account.css`, `index.js`, `hub.js`, `admin-setup.js`, `calendar-core.js`, `calendar-users.js`, `calendar-grid.js`, `calendar-main.js` and `calendar.css`. No config changes.
+9. **2026-10-10 release** (Manage person menu, reports, private usernames): run migration 011, then upload `api.php`, `includes/data.php`, `includes/members.php`, `includes/reports.php`, `includes/security.php`, `cleanup.php`, `calendar.html`, `calendar.css`, `calendar-core.js`, `calendar-users.js`, `calendar-main.js`, `account.html`, `account-core.js`, `account.js`, `hub.html`, `hub.js`, `admin.html`, `admin-reports.js`, `admin-core.js`, `admin.css`, `index.html`, `go/index.html`, `faq.html`, `guide.html`, `privacy.html` and `ideas.html`. No config changes.
 
 ## Monitoring
 
