@@ -291,7 +291,7 @@ function populateUserSelectModal(){
     info.appendChild(name);
 
     const canView = canViewUser(u);
-    const roleText = u.role === 'admin' ? 'Organiser' : (u.blocked ? 'Access paused' : '');
+    const roleText = u.role === 'admin' ? 'Organiser' : (u.blocked ? 'Blocked' : '');
     const claimText = canClaim && u.claimable ? 'Yours from before? Tap to claim it' : '';
     const viewing = canView && u.id === state.viewUserId;
     const viewText = viewing ? 'Showing' : '';

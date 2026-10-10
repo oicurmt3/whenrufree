@@ -163,7 +163,7 @@ async function loadMemberships() {
     const wrap = document.createElement('span');
     wrap.appendChild(main);
     if (c.role === 'admin') wrap.appendChild(tag('Organiser'));
-    if (c.blocked) wrap.appendChild(tag('Access paused', 'acct-tag-muted'));
+    if (c.blocked) wrap.appendChild(tag('Blocked', 'acct-tag-muted'));
     const waiting = pendingTag(c.pending_requests);
     if (waiting) wrap.appendChild(waiting);
     const parts = [];
