@@ -279,8 +279,9 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 
 /* Default option (migrations/013): the option every Slot begins with, so Slots are never
    un-answered. One button per Option row: an empty box while it is off, a ticked box once it is
-   the default. The muted line above + Add status says what the box is for. */
-.status-default-col{ flex: 0 0 76px; width: 76px; display: flex; justify-content: center; }
+   the default. The muted line above + Add status says what the box is for.
+   Only 4px wider than the 36px box, so the label, the box and Delete sit close together. */
+.status-default-col{ flex: 0 0 44px; width: 44px; display: flex; justify-content: center; }
 .default-toggle{
   position: relative;
   width: 36px;
