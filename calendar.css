@@ -1359,14 +1359,15 @@ main{
 .default-toggle-row[disabled]{opacity:.55;cursor:not-allowed;}
 .default-toggle-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .default-toggle-tag{
-  min-width:76px;height:32px;padding:0 8px;flex-shrink:0;
+  width:36px;height:36px;flex-shrink:0;
   display:inline-flex;align-items:center;justify-content:center;
-  background:#fff;border:1px solid #aaa;border-radius:6px;
-  font-size:0.72rem;font-weight:700;color:var(--primary);
+  background:#fff;border:1px solid #aaa;border-radius:6px;color:#666;
 }
+.default-toggle-tag .material-symbols-outlined{font-size:20px;line-height:1;}
 .default-toggle-row.active .default-toggle-tag{
   border-color:var(--primary);
   background:color-mix(in srgb, var(--primary) 12%, #fff);
+  color:var(--primary);
 }
 .default-state{margin:0;font-size:0.85rem;color:#666;}
 

@@ -1252,6 +1252,12 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   defBtn.setAttribute('aria-pressed', 'false');
   defBtn.setAttribute('aria-label', 'Default option');
   defBtn.title = 'Default option';
+  // An empty box while it is off, a ticked box once it is the default (Material Symbols)
+  const defIcon = document.createElement('span');
+  defIcon.className = 'material-symbols-outlined';
+  defIcon.setAttribute('aria-hidden', 'true');
+  defIcon.textContent = 'check_box_outline_blank';
+  defBtn.appendChild(defIcon);
   defBtn.addEventListener('click', () => {
     defaultRowEl = (defaultRowEl === row) ? null : row;
     paintDefaultToggles();
@@ -1327,8 +1333,9 @@ function paintDefaultToggles(){
     const on = (row === defaultRowEl);
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    // Blank until chosen; the word "Default" is the only label, so it reads as a toggle
-    btn.textContent = on ? 'Default' : '';
+    // Empty box while it is off, ticked box once it is the default
+    const icon = btn.querySelector('.material-symbols-outlined');
+    if (icon) icon.textContent = on ? 'check_box' : 'check_box_outline_blank';
   });
 }
 

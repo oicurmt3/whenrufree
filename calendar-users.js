@@ -1061,7 +1061,7 @@ async function saveNullColor(color){
 /**
  * Calendar settings: the default option, the one every Slot begins with. Only one can be on, and
  * tapping the one that is on turns it off, leaving Slots un-answered until somebody answers them.
- * Each button is blank until it is the chosen one, when it reads "Default".
+ * Each row carries a box that reads empty while it is off and ticked once it is the default.
  * Picking one saves straight away; the grid repaints so the effect is visible.
  */
 function renderDefaultStatusField(){
@@ -1082,7 +1082,8 @@ function renderDefaultStatusField(){
       btn.classList.toggle('active', chosen);
       btn.setAttribute('aria-pressed', chosen ? 'true' : 'false');
       const tag = btn.querySelector('.default-toggle-tag');
-      if(tag) tag.textContent = chosen ? 'Default' : '';
+      const icon = tag ? tag.querySelector('.material-symbols-outlined') : null;
+      if(icon) icon.textContent = chosen ? 'check_box' : 'check_box_outline_blank';
     });
     const note = document.getElementById('settingsDefaultState');
     if(note){
@@ -1110,6 +1111,11 @@ function renderDefaultStatusField(){
 
     const tag = document.createElement('span');
     tag.className = 'default-toggle-tag';
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = 'check_box_outline_blank';
+    tag.appendChild(icon);
     btn.appendChild(tag);
 
     btn.addEventListener('click', () => saveDefaultStatus(defaultSlotStatus() === status ? 0 : status));
