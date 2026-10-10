@@ -15,8 +15,8 @@ An organiser signs in, creates a calendar with custom time slots, date ranges, a
 - Profile page: edit your name, manage sign-in methods, see all your calendars and Hubs, sign out, delete your account
 - No PINs: the unique link is the invite, and who you are comes from your account. Names and Hubs from before accounts can be claimed once with their old PIN
 - Optional access emoji: the organiser picks 1 of 35 emoji for a calendar or Hub as an invite confirmation; each account picks it once (calendars in a Hub use the Hub's emoji unless they have their own)
-- Who can join (set when creating): Direct link, or Invite only - people tap Request access and the organiser approves or declines (one Hub approval covers all its calendars)
-- Organisers can block anyone on a calendar; their answers are left out until unblocked
+- Anyone signed in with the link can open and join a calendar or Hub; the link is the only access control, so share it only with people you trust
+- Organisers can block anyone on a calendar; their access is paused and their answers are left out until unblocked
 - Three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices). Names are private on Blind, and on Hidden with "Hide names too"
 - Customisable time slots (1-6), status options (1-5 with colours and weights), and date ranges (up to 360 days)
 - Date filtering: organiser can show/hide specific dates for participants
@@ -89,10 +89,9 @@ robots.txt       - Search engine directives
 - `account_sessions` - Hashed 30-day sign-in sessions
 - `account_access` - Access emoji already picked by an account
 - `account_hubs` - Hubs an account has opened (profile page list)
-- `calendars` - Calendar configuration and metadata (`group_id` FK when in a Hub; `invite_only`, `hide_names`, `show_organiser_marks`)
-- `groups` - Hub metadata, organiser account (`organiser_account_id`), `invite_only` and, until claimed, the old organiser PIN hash
+- `calendars` - Calendar configuration and metadata (`group_id` FK when in a Hub; `hide_names`, `show_organiser_marks`)
+- `groups` - Hub metadata, organiser account (`organiser_account_id`) and, until claimed, the old organiser PIN hash
 - `users` - Names per calendar (`account_id`, `name_custom`, role, `blocked`; old unclaimed names still have a PIN hash)
-- `access_requests` - Invite only requests (account, profile name snapshot, pending / approved / declined / blocked)
 - `availability` - Status selections per user/date/slot
 - `access_grants` - Hashed 30-day grants issued after the right access emoji is picked
 - `access_attempts` - Wrong emoji picks per IP and calendar/Hub
@@ -108,7 +107,7 @@ The old `user_sessions`, `group_sessions`, `user_passkeys` and `group_passkeys` 
 - Google / Facebook: signed state cookie, OIDC nonce and PKCE; provider IDs stored only as HMAC-SHA-256 with a server secret
 - Passkeys: user verification required, origin + RP ID checked, single-use challenges, sign-counter replay detection
 - Old PIN claims: password_verify; 5 wrong PINs lock for 5 min, then 15 min, 2 hours, 2 days
-- Invite only and Block: checked server-side after the emoji on every calendar/Hub request; max 10 new requests per IP per hour and 200 waiting per calendar/Hub
+- Block: checked server-side after the emoji on every calendar request; a blocked person gets 403 `BLOCKED` and their answers are left out of views and Best Match
 - Access emoji: checked server-side before every calendar/Hub request; 3 wrong picks lock that IP for 5 min, then 15 min, 2 hours, 2 days; max 20 wrong picks and 30 unknown codes per IP per hour; grants stored as SHA-256 hashes; the emoji is never sent to visitors
 - Calendar tokens: 8-char URL-safe (new) or 48-char (legacy)
 - All dynamic HTML output escaped

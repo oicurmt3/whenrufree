@@ -24,8 +24,7 @@ Tap your name in the top corner of any page to open your profile (`account.html`
 - Change your username or profile name. A new profile name updates every calendar where you use it (not the ones where you chose a different name). If that name is already taken on a calendar, you are told which one keeps the old name.
 - Manage **Ways to sign in**: add Google, Facebook or a passkey for this device, or remove one (you always keep at least one). The Google and Facebook buttons disappear once linked; you can add a passkey on each device you use.
 - Usernames are 3-20 lowercase letters, numbers or `_`. A few, such as `admin` and `whenrufree`, are reserved.
-- See all your **calendars** and **Hubs** - handy if you lose a link. Organisers of Invite only calendars and Hubs see "N requests waiting", and a calendar where the organiser blocked you shows "Blocked".
-- **Waiting for approval** lists the Invite only calendars and Hubs you have asked to join (and any that were not approved).
+- See all your **calendars** and **Hubs** - handy if you lose a link. A calendar where the organiser blocked you shows "Blocked".
 - **Sign out** of this device.
 - **Delete your account**: shows what will be removed (the calendars and Hubs you organise, and your names on other calendars), then asks you to type your username.
 
@@ -53,7 +52,6 @@ If you used When RU Free with a PIN before accounts, you can claim your old name
    - **Date range**: The start and end dates. Maximum 360 days.
    - **Exclude weekends**: Tick this to hide Saturdays and Sundays.
    - **Date filter mode**: Choose whether participants see all dates, only dates you select, or all dates except ones you exclude.
-   - **Who can join**: **Direct link** (anyone signed in with the link) or **Invite only** (people tap Request access and you approve them). This can't be changed later. Inside an Invite only Hub the calendar is always Invite only and the Hub organiser handles requests.
    - **Access emoji** (optional): Turn the switch on and pick one of 35 emoji. Anyone opening the link must pick the same emoji once. Creating inside a Hub that already has an emoji? The calendar uses the Hub's emoji unless you pick its own.
    - **Privacy mode**: Open (everyone sees all choices), Hidden (only you see individual choices), or Blind (nobody sees individual choices, and names are private). With Hidden you can also tick **Hide names too**, so participants see only themselves, you and how many have joined.
 3. **Organiser name** (optional): leave blank to use your profile name, or type a name just for this calendar. You manage the calendar from this account.
@@ -64,15 +62,8 @@ If you used When RU Free with a PIN before accounts, you can claim your old name
 
 - Tap the **Share** icon in the header to copy or share the calendar link.
 - The link looks like: `whenrufree.net/calendar.html?c=3PNpKJTs`
-- The link is the invite: anyone signed in who has it can view the calendar and join. On an Invite only calendar they must be approved first.
+- The link is the invite: anyone signed in who has it can view the calendar and join.
 - If you set an access emoji, it is added to the copied, shared, emailed and printed link so people know which one to pick.
-
-### Invite Only Requests
-
-- Requests appear in the **People** list (the People button shows a number when some are waiting). Tap **Approve** or **Decline**, or **Approve all**.
-- Approved people then join with their own name as usual and are never asked for the emoji. Declined people can't ask again, but you can still approve them later from the **Declined** list.
-- Requests you don't answer expire after 30 days. There are no notifications - check the People button, or your profile page.
-- On an Invite only Hub, requests are on the Hub page (**Requests**, **Approved**, **Declined**) and one approval opens every calendar in the Hub.
 
 ### Access Emoji
 
@@ -133,7 +124,7 @@ index.html?template=1&title=...&category=...&slots=...&statuses=...&range=1week
 
 Add `&cap=1` (people per slot, 1-20) to make a booking calendar, and optionally `&per=2` (bookings per person, counted per day; `0` = no limit, default 1) and `&total=1` (count `per` across the whole calendar instead). With `cap`, the first `statuses` label becomes the booking label.
 
-Add `&privacy=open|hidden|blind` to preset the privacy mode (booking calendars fall back from Blind to Hidden), `&names=hidden` for Hidden with **Hide names too**, and `&join=invite` for **Invite only** (calendars in an Invite only Hub are Invite only anyway). The access emoji is never put in a link: pick it on the create page.
+Add `&privacy=open|hidden|blind` to preset the privacy mode (booking calendars fall back from Blind to Hidden), and `&names=hidden` for Hidden with **Hide names too**. The access emoji is never put in a link: pick it on the create page. There is no join setting: the link is the invite and anyone signed in with it can join.
 
 The Templates page has ready-made booking examples (interviews, parent-teacher nights, workshops, tours, volunteer rosters, court hire, hot desks, gym, school-run seats, pet care, holiday house, shared car, meeting room) in its Bookings section.
 
@@ -145,8 +136,7 @@ A **Hub** gives your group one link to find all related calendars (e.g. club fix
 
 1. Open **Create a Hub** from the home page footer or `hub.html?create=1` and sign in
 2. Enter the Hub name and, optionally, the organiser name shown on the Hub (blank = your profile name)
-3. Choose **Who can join**: **Direct link** or **Invite only** (you approve each person once for the whole Hub). This can't be changed later
-4. Optional: turn on **Access emoji** and pick one. It guards the Hub and every calendar in it that has no emoji of its own
+3. Optional: turn on **Access emoji** and pick one. It guards the Hub and every calendar in it that has no emoji of its own
 5. Save your Hub link from the save panel (copy, download, Share, Email, or Poster). The link is the invite; while you are signed in to this account the Hub is also listed on your profile page
 6. Tap **Continue to Hub**
 
@@ -154,7 +144,7 @@ A **Hub** gives your group one link to find all related calendars (e.g. club fix
 
 - The account that created the Hub is its organiser. Open the Hub signed in to that account to get Share, Email, Poster, Download, **Settings** (the Hub's access emoji) and removing calendars from the Hub
 - An old Hub (created with a PIN before accounts) shows **Claim this Hub**; see "Names and Hubs from Before Accounts"
-- Invite only Hubs show a **People** card for the organiser: approve or decline requests, block an approved person from the whole Hub (undo to restore), or approve someone you declined earlier
+- Anyone signed in with the Hub link can open the Hub and its calendars
 
 **Adding calendars to a Hub**
 
@@ -187,11 +177,9 @@ Use **Go to code** (`go/`) to open a calendar or Hub when you have a code or ful
 
 If the organiser set an emoji, a grid of 35 emoji appears before the calendar or Hub opens. Pick the one the organiser gave you (it is usually written next to the link) and tap **Open**. Your account remembers it, so you are not asked again on other devices. Three wrong picks lock you out for a few minutes, then longer. If you do not know it, ask the organiser.
 
-### Invite Only Calendars and Hubs
+### Blocked from a Calendar
 
-If the organiser made it Invite only, you see a **Request access** panel (after the emoji, if there is one). Tap it and wait: the panel shows "Request sent", with **Check again** and **Cancel request**, and it is listed on your profile page under **Waiting for approval**. Once approved, open the link again and join as usual. Requests not answered within 30 days expire, so you can ask again. If the organiser declines, you can't ask again.
-
-If you see "The organiser has blocked you from this calendar", the organiser has blocked you on that calendar or Hub. Your answers are kept; ask the organiser if you think it's a mistake.
+If you see "The organiser has blocked you from this calendar", the organiser has blocked you on that calendar. Your answers are kept, so nothing is lost; ask the organiser if you think it is a mistake. They can unblock you from **Manage person** in the People list at any time.
 
 ### Joining a Calendar
 

@@ -4,6 +4,19 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
+## 2026-10-10 - Invite only removed
+
+### Removed
+- **Invite only is gone.** The link is the only access control again: anyone signed in with it can open and join a calendar or Hub. Nothing else changed about who can see what
+  - Deleted endpoints: `request_access`, `cancel_access_request`, `access_requests` and `decide_access_request`. Deleted columns: `calendars.invite_only` and `groups.invite_only`. Deleted table: `access_requests`. Deleted error codes: 403 `INVITE_ONLY` and 403 `REQUEST_DECLINED`, plus the 10/hour `rqa` request rate limit. Deleted log events: `ACCESS_REQUESTED` and `ACCESS_REQUEST_DECIDED`
+  - Deleted UI: the **Who can join** toggle on the calendar create page and the Hub create page, the **Request access** / **Waiting for approval** panels, the organiser request lists and count badges (People, Hub page, admin), and the admin "Invite only" badges
+  - **Kept:** `calendars.hide_names` and `users.blocked`, which were never about invites. **Hide names too** and **Block** (with the blocked panel, the Manage person menu and the "Blocked" profile tag) work exactly as before. The Hub-wide block, which only existed for Invite only Hubs, is gone
+  - `get_site_config` replaces `features.invite_only` with `features.hide_names`; `calendar_meta` drops `invite_only`, `invite_via_hub` and `pending_requests`; `group_meta` drops `invite_only` and `pending_requests`; `account_memberships` drops `pending_requests` and `requests`; `create_calendar` / `create_group` no longer accept `invite_only`
+  - `migrations/014_drop_invite_only.sql` drops the `invite_only` columns and the `access_requests` table. cleanup.php no longer has a request-pruning step, so the reports step is now step 11
+  - `includes/members.php` keeps only `membersGate()` (calendar block), `membersCalendarBlocked()` and `membersNamesHidden()`
+
+---
+
 ## 2026-10-10
 
 ### Added

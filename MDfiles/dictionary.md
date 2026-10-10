@@ -146,7 +146,6 @@ Core configuration for each scheduling calendar.
 | full_color | CHAR(7) | NULL | Booking calendars: `#rrggbb` cell colour for full slots, NULL = default red. Migration 006 |
 | per_user_total | TINYINT(1) | 0 | Booking calendars: 1 = `max_per_user` counts across the whole calendar, 0 = per day. Ignored when `max_per_user` is NULL. Migration 005 |
 | bookings_closed | TINYINT(1) | 0 | Booking calendars: 1 = organiser closed bookings. Migration 004 |
-| invite_only | TINYINT(1) | 0 | 1 = Invite only (people request access, the organiser approves). Set only at creation; forced to 1 in an Invite only Hub. Migration 009 |
 | hide_names | TINYINT(1) | 0 | Hidden calendars: 1 = members see only themselves, the organisers and a total (Blind always does this). Migration 009 |
 | show_organiser_marks | TINYINT(1) | 1 | Open calendars: 1 = the organiser's answers show as a coloured left edge on everyone's slots, 0 = hidden. The organiser changes it in Calendar settings (`set_organiser_marks`). Migration 010 |
 
@@ -166,7 +165,7 @@ Core configuration for each scheduling calendar.
 - A calendar with `access_emoji` NULL inside a Hub with an emoji uses the Hub's emoji
 - Booking calendars (`slot_capacity` set) have exactly one status (1 = booked, weight 1), never Blind privacy (`is_private` 0 or 1), and store bookings as `availability` rows. `save` locks the calendar row and refuses bookings beyond `slot_capacity` per slot or `max_per_user` per person per day (or in total when `per_user_total` = 1; the organiser booking for themselves is exempt from `max_per_user`). The booking columns are set only at creation
 - While `bookings_closed` = 1, participants cannot save or reset; the organiser still can
-- `invite_only` and `hide_names` are set only in `create_calendar`. When the calendar's Hub is Invite only, the Hub's requests apply instead of the calendar's own
+- `hide_names` is set only in `create_calendar` (Hidden calendars only)
 - `show_organiser_marks` only changes what the page draws; on Open calendars the organiser's answers are still in `availability` responses (Best Match names, People view)
 
 ---
@@ -293,7 +292,6 @@ Hub (group calendar folder) - one private URL lists multiple calendars.
 | last_activity | DATETIME | NULL | Last hub view or child calendar activity |
 | never_expires | TINYINT(1) | 0 | 1 = protected from cleanup.php Hub deletion |
 | access_emoji | TINYINT UNSIGNED | NULL | Hub access emoji position 0-34, NULL = none. Also guards every calendar in the Hub that has no emoji of its own. Migration 003 |
-| invite_only | TINYINT(1) | 0 | 1 = Invite only: one approval opens the Hub and every calendar in it; calendars created inside are Invite only. Set only at creation. Migration 009 |
 
 **Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_groups_token` (`token`), INDEX `idx_groups_organiser_account` (`organiser_account_id`)
 
@@ -391,34 +389,6 @@ Wrong emoji picks per IP address and calendar/Hub. Created by `migrations/003_ac
 
 ---
 
-## Table: access_requests
-
-Requests to join an Invite only calendar or Hub. Created by `migrations/009_invite_only.sql`.
-
-| Column | Type | Default | Description |
-|--------|------|---------|-------------|
-| id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
-| kind | ENUM('calendar','group') | - | Calendar or Hub |
-| subject_id | BIGINT UNSIGNED | - | calendars.id or groups.id |
-| account_id | BIGINT UNSIGNED | - | FK to accounts.id (CASCADE DELETE) |
-| display_name | VARCHAR(40) | - | The account's profile name when it asked (shown to the organiser) |
-| status | ENUM('pending','approved','declined','blocked') | 'pending' | `blocked` is used only for Hub-wide blocks; calendar blocks use `users.blocked` |
-| created_at | DATETIME | - | When it asked |
-| decided_at | DATETIME | NULL | Last organiser decision |
-
-**Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_access_requests` (`kind`, `subject_id`, `account_id`), INDEX `idx_access_requests_subject` (`kind`, `subject_id`, `status`), INDEX `idx_access_requests_account` (`account_id`)
-
-**Constraints:** FK `fk_access_requests_account` -> accounts.id ON DELETE CASCADE
-
-**Business rules:**
-- One row per account per calendar/Hub. Approval only opens the gate; the person then joins with `join_calendar`
-- Approve works from pending, declined or blocked; decline from pending or approved; block / unblock only for Hub rows
-- Declined accounts cannot ask again (403 `REQUEST_DECLINED`) but can still be approved
-- Max 200 pending per calendar/Hub; max 10 new requests per IP per hour
-- Deleted with the calendar or Hub, when the person's name is deleted from the calendar, and with the account. cleanup.php deletes pending rows older than 30 days and orphaned rows
-
----
-
 ## Table: reports
 
 Reports an organiser sends about a person from the **Manage person** menu. Created by `migrations/011_report_users.sql`.
@@ -443,7 +413,7 @@ Reports an organiser sends about a person from the **Manage person** menu. Creat
 - No foreign keys on purpose: a report is a snapshot and survives the calendar, the name and the account it names
 - Usernames are never stored here (they stay private to the super admin)
 - Written by `manage_calendar_user` *before* any block or delete, so a report sent with a delete still records the name and account
-- Super admin resolves them in the admin **Reports** tab (`admin_reports`, `admin_report_decide`); cleanup.php step 12 prunes decided reports
+- Super admin resolves them in the admin **Reports** tab (`admin_reports`, `admin_report_decide`); cleanup.php step 11 prunes closed reports older than `accounts.reports_keep_days` (default 180)
 
 ---
 

@@ -46,14 +46,14 @@ All requests are rate-limited per IP address. Default: 120 requests per minute. 
 
 Client IP is taken from `REMOTE_ADDR` by default. `X-Forwarded-For` is honoured only when the direct connection comes from an IP listed in `config.php` `trusted_proxies` (empty by default).
 
-If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `admin_login_account`, `claim_name`, `claim_hub`, `create_calendar`, `create_group`, `save`, `join_calendar`, `account_update`, `account_remove_method`, `account_delete`, the six `account_passkey_*` actions, `access_check`, `set_access_emoji`, `set_group_access_emoji`, `set_bookings_closed`, `request_access`, `cancel_access_request`, `decide_access_request`, `manage_calendar_user`, `admin_report_decide` and `set_organiser_marks`) return HTTP 503 instead of running unthrottled.
+If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `admin_login_account`, `claim_name`, `claim_hub`, `create_calendar`, `create_group`, `save`, `join_calendar`, `account_update`, `account_remove_method`, `account_delete`, the six `account_passkey_*` actions, `access_check`, `set_access_emoji`, `set_group_access_emoji`, `set_bookings_closed`, `manage_calendar_user`, `admin_report_decide` and `set_organiser_marks`) return HTTP 503 instead of running unthrottled.
 
 Exceeding the limit returns HTTP 429:
 ```json
 {"status": "error", "message": "Too many requests"}
 ```
 
-Extra per-IP limits on account actions (in `api_rate_limit`): profile changes 20/min (`acu`), new passkey accounts 10/hour (`aps`), passkey enrolment 20/min (`apr`), passkey sign-in 30/min (`apl`), Google / Facebook starts and callbacks 20/min each (`oas`, `oac`), new Invite only requests 10/hour (`rqa`).
+Extra per-IP limits on account actions (in `api_rate_limit`): profile changes 20/min (`acu`), new passkey accounts 10/hour (`aps`), passkey enrolment 20/min (`apr`), passkey sign-in 30/min (`apl`), Google / Facebook starts and callbacks 20/min each (`oas`, `oac`).
 
 ### Hub calendar limits
 
@@ -98,11 +98,10 @@ An organiser can give a calendar or Hub one of 35 emoji (stored as its position 
 - **Per-IP hourly caps** (in `api_rate_limit`): 20 wrong picks across all calendars/Hubs (`aw` + hour key), and 30 requests for calendar/Hub codes that do not exist (`nf` + hour key; after that every calendar/Hub request from that IP gets 429 until the hour ends).
 - Config (optional, `config.php`): `'access_emoji' => ['max_attempts' => 3, 'schedule_minutes' => [5, 15, 120, 2880], 'global_per_hour' => 20, 'not_found_per_hour' => 30, 'grant_days' => 30, 'attempts_keep_days' => 30]`.
 - `share.php` shows the generic link preview (no title) for calendars guarded by an emoji.
-- On an Invite only calendar or Hub the emoji is checked first (before Request access); an approved request also counts as having picked it.
 
 ### GET get_site_config
 
-Public site config for the create pages (no sign-in needed). **Response:** `{ status, config, features: { access_emoji: bool, booking: bool, booking_total: bool, booking_styles: bool, invite_only: bool } }` - `features.access_emoji` is `true` once migration 003 has run (the create pages show the emoji switch only then); `features.booking` is `true` once migration 004 has run (the create page shows **People per slot** only then); `features.booking_total` is `true` once migration 005 has also run (the create page shows the **Per day / In total** toggle only then); `features.booking_styles` is `true` once migration 006 has also run (the create page shows the Partly booked / Full colour and name settings only then); `features.invite_only` is `true` once migration 009 has run (the create pages show **Who can join** and **Hide names too** only then).
+Public site config for the create pages (no sign-in needed). **Response:** `{ status, config, features: { access_emoji: bool, booking: bool, booking_total: bool, booking_styles: bool, accounts: bool, hide_names: bool } }` - `features.access_emoji` is `true` once migration 003 has run (the create pages show the emoji switch only then); `features.booking` is `true` once migration 004 has run (the create page shows **People per slot** only then); `features.booking_total` is `true` once migration 005 has also run (the create page shows the **Per day / In total** toggle only then); `features.booking_styles` is `true` once migration 006 has also run (the create page shows the Partly booked / Full colour and name settings only then); `features.accounts` is `true` once migration 007 has run; `features.hide_names` is `true` once migration 009 has run (the create page shows **Hide names too** only then).
 
 ### POST access_check
 
@@ -130,30 +129,14 @@ Hub organiser only. CSRF + `g`. Body: `emoji` (0-34 or `null`). Deletes existing
 
 ---
 
-## Invite only and Block
+## Block and private names
 
-Implemented in `includes/members.php`; inactive until `migrations/009_invite_only.sql` has run (`features.invite_only`).
+Implemented in `includes/members.php`; the `blocked` and `hide_names` columns need `migrations/009_invite_only.sql` (reported as `features.hide_names`).
 
-- **Who can join** is set only at creation (`invite_only` on `create_calendar` / `create_group`) and never changes. A calendar created in an Invite only Hub is always Invite only, and its requests belong to the Hub: one Hub approval opens every calendar in it.
-- **Gate:** runs after the access emoji gate, with the same target resolution and the same exemptions plus `request_access` and `cancel_access_request`. These pass: the Hub organiser, anyone with a name on the calendar (organisers included) that is not blocked, and accounts with an approved request. Otherwise HTTP 403 `{ code: "INVITE_ONLY", message, invite: { kind: "calendar"|"hub", status: "none"|"pending"|"declined", title, profile_name } }`, or 403 `{ code: "BLOCKED", message }` for a blocked name or a Hub-wide block.
-- **Requests** (`access_requests`): one per account per calendar/Hub, with a copy of the profile name when asked. Pending requests expire after 30 days (`cleanup.php`). Declined people cannot ask again but can still be approved. No notifications: organisers see `pending_requests` counts.
-- **Blocking:** `users.blocked` blocks one person on a calendar. Their availability is left out of `availability` and its `summary` (not on booking calendars, where their bookings still hold their places), and other members don't see them in `users`.
-
-### POST request_access
-
-CSRF + `c` or `g`. **Response:** `{ status, request_status: "pending"|"approved" }` (`approved` when the account already passes). Declined: 403 `REQUEST_DECLINED`; blocked: 403 `BLOCKED`; too many requests from this IP (10/hour) or 200 already waiting: 429; migration 009 not run: 503.
-
-### POST cancel_access_request
-
-CSRF + `c` or `g`. Withdraws the account's pending request. **Response:** `{ status }`
-
-### GET access_requests
-
-`c` (organiser of the calendar, or the Hub organiser when the calendar is in an Invite only Hub) or `g` (Hub organiser). **Response:** `{ status, invite_only: true, managed_by: "calendar"|"hub", requests: { pending, approved, declined, blocked } }` - each list holds `{ id, display_name, created_at, decided_at }`. A calendar organiser whose requests belong to the Hub gets `{ status, invite_only: true, managed_by: "hub" }` without `requests`. Not Invite only: `{ status, invite_only: false }`.
-
-### POST decide_access_request
-
-CSRF + `c` or `g`, same roles as `access_requests`. Body: `decision` = `approve` / `decline` / `block` / `unblock` with `request_id`, or `decision` = `approve_all`. Approve works from pending, declined or blocked; decline from pending or approved; block (approved) and unblock (blocked) only on Hub requests. **Response:** `{ status, requests }` (the updated lists). Invalid change: 400; unknown request: 404.
+- **Joining:** anyone signed in with the link can open and join a calendar or Hub. The link is the only access control.
+- **Gate:** runs after the access emoji gate, for calendar-scoped actions only. A person the organiser has blocked on that calendar gets HTTP 403 `{ code: "BLOCKED", message }` everywhere on it. Exempt actions: `csrf_token`, `diag`, `access_check` and every `admin_*` action.
+- **Blocking:** `users.blocked` blocks one person on one calendar. Their availability is left out of `availability` and its `summary` (not on booking calendars, where their bookings still hold their places), and other members don't see them in `users`. Set or cleared from the Manage person menu, which keeps their answers.
+- **Private names:** `calendars.hide_names` (Hidden calendars only) makes members see only themselves, the organisers and a total. Blind calendars always do this. Reported as `names_hidden` by `users`.
 
 ### POST manage_calendar_user
 
@@ -193,7 +176,7 @@ CSRF. Body: `type`, `id`. The last method can never be removed (409 `LAST_METHOD
 
 ### GET account_memberships
 
-**Response:** `{ status, calendars: [{ token, title, start_date, end_date, role, display_name, name_custom, hub: {token, title}|null, blocked, pending_requests }], hubs: [{ token, title, is_organiser, calendar_count, pending_requests }], requests: [{ kind: "calendar"|"hub", token, title, status: "pending"|"declined", created_at }] }` - calendars the account has a name on, Hubs it organises or has opened, and its own Invite only requests that are waiting or were declined. `pending_requests` is the number of requests waiting where this account decides them, otherwise `null`; `blocked` is `true` when the organiser has blocked the account on that calendar.
+**Response:** `{ status, calendars: [{ token, title, start_date, end_date, role, display_name, name_custom, hub: {token, title}|null, blocked }], hubs: [{ token, title, is_organiser, calendar_count }] }` - calendars the account has a name on, and Hubs it organises or has opened. `blocked` is `true` when the organiser has blocked the account on that calendar.
 
 ### GET account_delete_preview
 
@@ -284,11 +267,8 @@ Returns full calendar configuration and metadata.
 | partial_color / full_color | string/null | Booking calendars: `#rrggbb` cell colours for partly booked / full slots, `null` = default (orange / red) |
 | partial_label / full_label | string/null | Booking calendars: names for partly booked / full slots, `null` = default ("Partly booked" / "Full") |
 | bookings_closed | bool | Booking calendars: `true` when the organiser has closed bookings |
-| invite_only | bool | `true` when joining needs approval (its own setting or its Hub's) |
-| invite_via_hub | bool | `true` when requests are handled by the Hub organiser (calendar in an Invite only Hub) |
 | hide_names | bool | Hidden calendars: the organiser ticked **Hide names too** |
 | names_private | bool | `true` on Blind, or Hidden with `hide_names` (members see only themselves, organisers and a total) |
-| pending_requests | int/null | Requests waiting, for whoever decides them (calendar or Hub organiser); `null` for everyone else |
 | organiser_marks | bool | `true` (default) when the organiser's answers show as a coloured slot edge on Open calendars; always `true` before migration 010 |
 | organiser_marks_available | bool | `true` once `migrations/010_organiser_marks.sql` has run (the organiser can then change `organiser_marks`) |
 
@@ -298,11 +278,11 @@ Opening a calendar with `from_hub=1&g=HUB_TOKEN` (matching its Hub) counts as Hu
 
 Hub listing (secret URL). Parameter: `g` (hub token). Also remembers the Hub on the account's profile page (`account_hubs`).
 
-**Response:** `{ group: {title, token, calendar_count, organiser_name, is_organiser, claimable, access: {available, enabled, inherited}, invite_only, pending_requests}, calendars: [{token, title, start_date, end_date, is_frozen, slot_capacity, last_activity}] }`. `claimable` is `true` for an old Hub whose organiser PIN has not been claimed yet. `pending_requests` is the number of requests waiting (Hub organiser of an Invite only Hub only, otherwise `null`). `is_frozen` is also `true` for a booking calendar whose bookings are closed; `slot_capacity` is non-null for booking calendars.
+**Response:** `{ group: {title, token, calendar_count, organiser_name, is_organiser, claimable, access: {available, enabled, inherited}}, calendars: [{token, title, start_date, end_date, is_frozen, slot_capacity, last_activity}] }`. `claimable` is `true` for an old Hub whose organiser PIN has not been claimed yet. `is_frozen` is also `true` for a booking calendar whose bookings are closed; `slot_capacity` is non-null for booking calendars.
 
 ### POST create_group
 
-Creates a Hub organised by the signed-in account. CSRF required. Body: `title`, optional `organiser_name` (blank = profile name), optional `access_emoji` (0-34), optional `invite_only` (1 = Invite only; 400 before migration 009; cannot be changed later).
+Creates a Hub organised by the signed-in account. CSRF required. Body: `title`, optional `organiser_name` (blank = profile name), optional `access_emoji` (0-34).
 
 **Response:** `{ status, token, title }`
 
@@ -399,7 +379,6 @@ Creates a new calendar. The signed-in account becomes its organiser.
 | admin_name | string | No | Organiser name on this calendar (max 32 chars). Blank = the account's profile name |
 | group_token | string | No | Hub token - assigns new calendar to that Hub (valid token only; no Hub organiser needed; rate limited; needs the Hub's emoji if it has one) |
 | access_emoji | int | No | 0-34: the calendar's own access emoji |
-| invite_only | int | No | 1 = Invite only (people request access, the organiser approves). Forced to 1 in an Invite only Hub. 400 before migration 009. Cannot be changed later |
 | hide_names | int | No | Hidden calendars (`is_private` 1) only: 1 = members see only themselves, the organisers and a total. Blind always hides names. Ignored for other modes |
 | slot_capacity | int | No | 1-20: makes a booking calendar (people per slot). Omit, `null` or 0 for a normal availability poll |
 | max_per_user | int | No | Booking only: 1-20 bookings per person (organiser exempt); omit, `null` or 0 for no limit |
@@ -563,7 +542,7 @@ CSRF. Opens the same 1-hour admin session for the signed-in account when its id 
 
 ### GET admin_calendars
 
-Lists all calendars with user counts. Each row may include optional Hub fields: `group_id`, `group_token`, `group_title` (null when not in a Hub), plus `access_emoji` and `group_access_emoji` (0-34 or null), `slot_capacity` (people per slot for booking calendars, else null), `invite_only` (its own or its Hub's) and `pending_requests` (requests waiting on the calendar itself).
+Lists all calendars with user counts. Each row may include optional Hub fields: `group_id`, `group_token`, `group_title` (null when not in a Hub), plus `access_emoji` and `group_access_emoji` (0-34 or null), and `slot_capacity` (people per slot for booking calendars, else null).
 
 ### POST admin_set_permanent
 
@@ -575,7 +554,7 @@ Deletes a calendar and all associated data. Body: `calendar_id`
 
 ### GET admin_groups
 
-Lists all Hubs with calendar counts. Each Hub includes `locked_seconds` (seconds left on a claim lockout, 0 if not locked), `access_emoji` (0-34 or null), `invite_only` and `pending_requests`.
+Lists all Hubs with calendar counts. Each Hub includes `locked_seconds` (seconds left on a claim lockout, 0 if not locked) and `access_emoji` (0-34 or null).
 
 ### GET admin_group_calendars
 
@@ -659,8 +638,6 @@ All security-relevant actions are logged to `grape_private/logs/security_YYYY-MM
 | ADMIN_RESET_USER | Organiser resets another user |
 | ADMIN_RESET_ALL | Organiser resets all users |
 | ORGANISER_DELETE_USER | Organiser deletes a participant |
-| ACCESS_REQUESTED | Account asks to join an Invite only calendar or Hub |
-| ACCESS_REQUEST_DECIDED | Organiser approves, declines, blocks or unblocks a request, or approves all (`decision`, `count`) |
 | USER_BLOCKED | Organiser blocks or unblocks a person on a calendar (`blocked`) |
 | CHOOSE_SLOT | Organiser locks in a date+slot |
 | UNCHOOSE_SLOT | Organiser reopens the calendar |

@@ -16,7 +16,7 @@ Create a MariaDB database and import the schema. The SQL dump is in `perthrel_gr
 ```sql
 -- See dictionary.md for full schema
 -- Tables: calendars, groups, group_sessions, users, availability, user_sessions, api_rate_limit
--- (migrations add access_grants, access_attempts, access_requests and the account_* tables;
+-- (migrations add access_grants, access_attempts and the account_* tables;
 --  008 later drops group_sessions, user_sessions, user_passkeys, group_passkeys)
 ```
 
@@ -44,11 +44,17 @@ ALTER TABLE calendars
 
 8. **Drop old PINs** - `migrations/008_drop_pins.sql` is a draft: run it about 90 days after accounts go live, once Admin > Accounts shows few unclaimed names and Hubs. It deletes all remaining PIN hashes (they can no longer be claimed) and drops the old session and passkey tables.
 
-9. **Invite only and Block** - run `migrations/009_invite_only.sql` **before** uploading the Invite only code (adds `calendars.invite_only`, `calendars.hide_names`, `groups.invite_only`, `users.blocked`; creates `access_requests`). Safe to re-run. Until it runs, nothing is gated and the create pages hide **Who can join** and **Hide names too**.
+9. **Hide names and Block** - run `migrations/009_invite_only.sql` (adds `calendars.hide_names`, `users.blocked`). Safe to re-run. Until it runs, **Hide names too** is hidden on the create page and nobody can be blocked. Migration 009 also added the Invite only feature (`calendars.invite_only`, `groups.invite_only`, `access_requests`); `migrations/014_drop_invite_only.sql` removes those again.
 
 10. **Organiser marks** - run `migrations/010_organiser_marks.sql` (adds `calendars.show_organiser_marks`, default 1). Safe to re-run. Until it runs, the organiser's coloured slot edge always shows on Open calendars and Calendar settings doesn't offer the switch.
 
 11. **Reports** - run `migrations/011_report_users.sql` **before** uploading the reports code (creates `reports`: a snapshot of who was reported, by whom, why, with no foreign keys so it survives the calendar and the account). Safe to re-run. Until it runs, blocking, deleting and reporting all still work but the **Report** dropdown is hidden and the admin **Reports** tab says to run the migration.
+
+12. **No option colour** - run `migrations/012_null_color.sql` (adds `calendars.null_color`). Safe to re-run. Until it runs, Slots use the default light grey and the **No option colour** setting is not offered.
+
+13. **Default option** - run `migrations/013_slot_default.sql` (adds `calendars.default_status`). Safe to re-run. Until it runs, Slots start un-answered and the **Default option** setting is not offered.
+
+14. **Remove Invite only** - run `migrations/014_drop_invite_only.sql` **after** uploading the code that no longer uses it (drops `access_requests` and the `invite_only` columns on `calendars` and `groups`). Safe to re-run. `calendars.hide_names` and `users.blocked` from migration 009 stay.
 
 And fix the known column width issue:
 
@@ -178,7 +184,7 @@ Set up the cleanup script to run daily:
 0 3 * * * /usr/bin/php /home/perthrel/public_html/grape/cleanup.php >> /home/perthrel/grape_private/logs/cleanup.log 2>&1
 ```
 
-This handles: inactive calendar and Hub deletion, rate limit table pruning, claim lockout resets, resetting the lockout escalation after 30 days without a lockout, deleting expired access emoji grants and old wrong-pick counters, and (step 10) expired account sessions, abandoned passkey sign-ups, emoji picks for deleted calendars/Hubs, and accounts unused for `accounts.inactive_days` that have no calendars or Hubs, and (step 11) Invite only requests left waiting for 30 days or belonging to deleted calendars/Hubs, and (step 12) closed reports kept for `reports.keep_days` (default 180) as an audit trail. Open reports are never touched. Steps 3 and 6 (old PIN sessions) are skipped once migration 008 has run.
+This handles: inactive calendar and Hub deletion, rate limit table pruning, claim lockout resets, resetting the lockout escalation after 30 days without a lockout, deleting expired access emoji grants and old wrong-pick counters, and (step 10) expired account sessions, abandoned passkey sign-ups, emoji picks for deleted calendars/Hubs, and accounts unused for `accounts.inactive_days` that have no calendars or Hubs, and (step 11) closed reports kept for `accounts.reports_keep_days` (default 180) as an audit trail. Open reports are never touched. Steps 3 and 6 (old PIN sessions) are skipped once migration 008 has run.
 
 ## Security Checklist
 
@@ -215,6 +221,7 @@ All files must use plain ASCII only. No em dashes, curly quotes, or Unicode char
 7. **Invite only release:** run migration 009, then upload `api.php`, `cleanup.php`, `includes/` (new `members.php`; changed `access.php`, `accounts.php`, `data.php`, `security.php`), every HTML page (new `?v=` cache-busters), `account-core.js`, `account.js`, `emoji.js`, `calendar-core.js`, `calendar-users.js`, `hub.js`, `index.js`, `admin-core.js`, `admin-calendars.js`, `admin-hubs.js` and the CSS files (`account.css`, `calendar.css`, `hub.css`, `index.css`, `admin.css`). No config changes.
 8. **2026-10-09 release** (signed-out home page, People view with eye toggle, rename in People, organiser marks, compact account badge, template privacy / join): run migration 010, then upload `api.php`, `includes/data.php`, `includes/security.php`, `index.html`, `hub.html`, `calendar.html`, `account.html`, `admin.html`, `go/index.html`, `faq.html`, `guide.html`, `ideas.html`, `privacy.html`, `account-core.js`, `account.css`, `index.js`, `hub.js`, `admin-setup.js`, `calendar-core.js`, `calendar-users.js`, `calendar-grid.js`, `calendar-main.js` and `calendar.css`. No config changes.
 9. **2026-10-10 release** (Manage person menu, reports, private usernames): run migration 011, then upload `api.php`, `includes/data.php`, `includes/members.php`, `includes/reports.php`, `includes/security.php`, `cleanup.php`, `calendar.html`, `calendar.css`, `calendar-core.js`, `calendar-users.js`, `calendar-main.js`, `account.html`, `account-core.js`, `account.js`, `hub.html`, `hub.js`, `admin.html`, `admin-reports.js`, `admin-core.js`, `admin.css`, `index.html`, `go/index.html`, `faq.html`, `guide.html`, `privacy.html` and `ideas.html`. No config changes.
+10. **Invite only removal** (the link is the only access control): run migration 014, then upload `api.php`, `cleanup.php`, `includes/access.php`, `includes/accounts.php`, `includes/members.php`, `includes/security.php`, `index.html`, `index.js`, `index.css`, `calendar.html`, `calendar-core.js`, `calendar-users.js`, `calendar.css`, `hub.html`, `hub.js`, `hub.css`, `account.html`, `account-core.js`, `account.js`, `account.css`, `admin-core.js`, `admin-calendars.js`, `admin-hubs.js`, `admin.css`, `faq.html`, `guide.html`, `ideas.html` and `privacy.html`. No config changes.
 
 ## Monitoring
 

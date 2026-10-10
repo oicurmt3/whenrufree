@@ -179,30 +179,27 @@ The calendar page is split into six classic scripts that share global scope (no 
 
 | Function | File:Line | Description |
 |----------|------|-------------|
-| `updatePeopleBadge()` | calendar-users.js:218 | Count badge (`#peopleBadge`) on the People button for `state.pendingRequests`; the button's label adds "and your name" once you have joined. |
+| `updateCurrentUserDisplay()` | calendar-users.js:206 | Header state for your name here: People button tooltip and `has-user` / `People and your name (NAME)` state, organiser marker from `markBadgeOrganiser()`, and the join banner until you have a name on this calendar. |
 | `populateUserSelectModal()` | calendar-users.js:231 | People list: your name first with "(you)" and a `person_edit` button (`.user-select-edit`) that opens rename, one `more_vert` button (`.user-select-manage`) per other person for the organiser that opens the Manage person modal, blocked rows dimmed (avatar and name only) with "Blocked", "Yours from before? Tap to claim it" on old PIN names while you have not joined, and an eye button (`.user-select-view`, `visibility` / `visibility_off`, `aria-pressed`) on people `canViewUser()` allows that calls `toggleUserView()`; the one being viewed also shows "Showing". When names are private, an intro line says "Names are private on this calendar. N people have joined/booked." Clickable rows get `is-clickable`. |
 | `toggleUserView(u)` | calendar-users.js:561 | Eye button or row tap: shows `u`'s Slots (closes the People list, `openUserView()`), or if already viewing them, `closeUserView()` and redraws the list, which stays open. |
 | `setViewBarText(u)` | calendar-users.js:168 | Sets `#viewBarText` to "Viewing NAME" (name in bold, via `textContent`). |
 | `openUserView(u)` | calendar-users.js:176 | Read-only view of `u`'s calendar: sets `state.viewUserId`, shows `#viewBar`, adds `.is-viewing` to `.calendar-section`, redraws the grid and scrolls to it. |
 | `closeUserView()` | calendar-users.js:187 | Back to your own calendar: clears `state.viewUserId`, hides the bar, redraws. Wired to the bar's X and Escape (when no modal is open) in calendar-main.js. |
-| `openUserSelectModal()` | calendar-users.js:302 | Shows the People modal and calls `loadPeopleRequests()`. |
-| `closeUserSelectModal()` | calendar-users.js | Hides the People modal. |
-| `refreshPeopleAndViews()` | calendar-users.js:309 | Reloads users and availability, then redraws the People list, grid and rankings (after block / unblock / delete / report). |
-| `openManageModal(u)` .. `applyManageChoices()` | calendar-users.js:384 .. 522 | Manage person (organiser): Block/Unblock two-way toggle starting on the person's current status, Delete checkbox, Report dropdown (`state.reportReasons`, from `meta.calendar.report_reasons`) and optional details. `updateManageState()` enables **Confirm choices** once a delete, report or block change is pending; `manageChoiceLines()` builds the review lines, dropping the block line when a delete is chosen and only showing it when access really changes. `applyManageChoices()` POSTs `manage_calendar_user`, toasts the outcome and calls `refreshPeopleAndViews()`. |
-| `loadPeopleRequests()` | calendar-users.js:343 | Organiser of an Invite only calendar: GET `access_requests` into `#userRequestsWrap`; when `managed_by` is hub, shows a note pointing to the Hub page. |
-| `requestRow(req, actions)` / `renderPeopleRequests(lists)` | calendar-users.js:363 / 385 | **Requests (N)** with Approve / Decline and **Approve all**, plus a collapsed **Declined** list with Approve. |
-| `decidePeopleRequest(decision, requestId, btn)` | calendar-users.js:433 | POST `decide_access_request`, redraws the lists and badge. |
-| `onUserSelectItemClick(userId)` | calendar-users.js:545 | Your own name closes the list and `closeUserView()` (back to your own Slots; only the `person_edit` button renames); a claimable old name opens `openClaimModal()`; anyone `canViewUser()` allows calls `toggleUserView()`. |
-| `openUserModal(mode)` | calendar-users.js:566 | Join (`'add'`, profile name prefilled, claim hint when old names exist) or rename (`'rename'`, with **Use my profile name**). |
-| `closeUserModal()` | calendar-users.js:592 | Closes the join / rename modal. |
-| `validateName(name)` | calendar-users.js:593 | Validates a name (1-32 chars, letters, numbers, spaces, `'` and `-`). |
-| `validatePin4(s)` | calendar-users.js:599 | Returns true if string is exactly 4 digits (claim modal). |
-| `showUserModalError(msg)` | calendar-users.js:602 | Error line in the join / rename modal. |
-| `afterMyNameChanged()` | calendar-users.js:613 | Reloads users and refreshes the header, People list and rankings after a join, rename or claim. |
-| `becomeUser(user)` | calendar-users.js:626 | Sets `state.auth` / `state.currentUserId` to a name you just joined or claimed, restores pending changes. |
-| `saveMyName(useProfile)` | calendar-users.js:634 | POST `join_calendar` (add) or `rename_user` (rename, or `use_profile`). Handles `NAME_TAKEN` / `ALREADY_JOINED`. |
-| `openClaimModal(user)` | calendar-users.js:693 | "Claim your old name" window (`#pinModal`): 4-digit PIN, POST `claim_name`, then `becomeUser()`. Shows lockout messages. |
-| `wirePinToggle(inputEl, btnEl)` | calendar-users.js:731 | Show/hide toggle for the claim PIN field. |
+| `openUserSelectModal()` | calendar-users.js:353 | Shows the People modal after `populateUserSelectModal()`. |
+| `closeUserSelectModal()` | calendar-users.js:556 | Hides the People modal. |
+| `refreshPeopleAndViews()` | calendar-users.js:359 | Reloads users and availability, then redraws the People list, grid and rankings (after block / unblock / delete / report). |
+| `openManageModal(u)` .. `applyManageChoices()` | calendar-users.js:377 .. 519 | Manage person (organiser): Block/Unblock two-way toggle starting on the person's current status, Delete checkbox, Report dropdown (`state.reportReasons`, from `meta.calendar.report_reasons`) and optional details. `updateManageState()` enables **Confirm choices** once a delete, report or block change is pending; `manageChoiceLines()` builds the review lines, dropping the block line when a delete is chosen and only showing it when access really changes. `applyManageChoices()` POSTs `manage_calendar_user`, toasts the outcome and calls `refreshPeopleAndViews()`. |
+| `onUserSelectItemClick(userId)` | calendar-users.js:561 | Your own name closes the list and `closeUserView()` (back to your own Slots; only the `person_edit` button renames); a claimable old name opens `openClaimModal()`; anyone `canViewUser()` allows calls `toggleUserView()`. |
+| `openUserModal(mode)` | calendar-users.js:1055 | Join (`'add'`, profile name prefilled, claim hint when old names exist) or rename (`'rename'`, with **Use my profile name**). |
+| `closeUserModal()` | calendar-users.js:1081 | Closes the join / rename modal. |
+| `validateName(name)` | calendar-users.js:1082 | Validates a name (1-32 chars, letters, numbers, spaces, `'` and `-`). |
+| `validatePin4(s)` | calendar-users.js:1088 | Returns true if string is exactly 4 digits (claim modal). |
+| `showUserModalError(res, fallback)` | calendar-users.js:1091 | Error line in the join / rename modal. |
+| `afterMyNameChanged()` | calendar-users.js:1102 | Reloads users and refreshes the header, People list and rankings after a join, rename or claim. |
+| `becomeUser(user)` | calendar-users.js:1115 | Sets `state.auth` / `state.currentUserId` to a name you just joined or claimed, restores pending changes. |
+| `saveMyName(useProfile)` | calendar-users.js:1123 | POST `join_calendar` (add) or `rename_user` (rename, or `use_profile`). Handles `NAME_TAKEN` / `ALREADY_JOINED`. |
+| `openClaimModal(user)` | calendar-users.js:1182 | "Claim your old name" window (`#pinModal`): 4-digit PIN, POST `claim_name`, then `becomeUser()`. Shows lockout messages. |
+| `wirePinToggle(inputEl, btnEl)` | calendar-users.js:1220 | Show/hide toggle for the claim PIN field. |
 | `showInfoModal()` | calendar-grid.js:428 | Shows the "Join first" prompt modal. |
 | `closeInfoModal()` | calendar-grid.js:434 | Closes the info modal. |
 
@@ -213,7 +210,7 @@ The calendar page is split into six classic scripts that share global scope (no 
 | `accessHubToken()` | calendar-core.js:757 | Hub token of this calendar (from meta), used to send the Hub grant too. |
 | `accessGrantKeys(extraHubToken)` | calendar-core.js:763 | Grant storage keys to send: `c_{calendar}`, `g_{hub}` and an optional extra Hub (for `confirmAddToHub`). |
 | `requireAccess(info)` | calendar-core.js:772 | Shows the blocking emoji popup (`AccessEmoji.gate`), posts `access_check` and saves the grant. Resolves false if the user leaves. |
-| `accessFetch(url, opts, extraHubToken)` | calendar-core.js:799 | `fetch` wrapper used by `apiGet`, `apiPost` and `postSave`: adds `X-Access-Grant`; on 403 `ACCESS_REQUIRED` clears stale grants, shows the popup and retries (max 3 tries). On 401/403 account, `INVITE_ONLY` or `BLOCKED` errors it hands over to `Account.handleApiError()` and never resolves (the page shows sign-in or the Invite only panel). |
+| `accessFetch(url, opts, extraHubToken)` | calendar-core.js:917 | `fetch` wrapper used by `apiGet`, `apiPost` and `postSave`: adds `X-Access-Grant`; on 403 `ACCESS_REQUIRED` clears stale grants, shows the popup and retries (max 3 tries). On 401/403 account errors and `BLOCKED` it hands over to `Account.handleApiError()` and never resolves (the page shows sign-in or the blocked panel). |
 | `applyAccessSettings(data)` / `loadAccessEmoji()` | calendar-users.js:496 | Organiser only: GET `access_settings` into `accessAvailable`, `accessEmoji`, `accessHubEmoji`. |
 | `openSettingsModal()` / `hideSettingsModal()` | calendar-users.js:739 | Organiser **Settings** window (`#settingsModal`, gear `#settingsBtn`, shown when the emoji or the organiser-marks switch is available): **Show my answers on everyone's calendar** (`#settingsMarksField`, when `organiserMarksSettingShown()`), and emoji on/off/change via `AccessEmoji.field`, confirms, then POST `set_access_emoji` and stores the fresh grant. |
 | `saveOrganiserMarks(input)` | calendar-users.js:798 | POST `set_organiser_marks` (`on` 1/0) from the settings tick box; sets `state.organiserMarks` and redraws; undoes the tick on error. |
@@ -328,9 +325,9 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `parseTemplateParams()` | 1910 | Reads URL params (title, category, slots, statuses, weights, mode, range, weekends, datefilter, `privacy` (open / hidden / blind), `names=hidden`, `join=invite`, and booking `cap` / `per` / `total`) and prefills the form. `privacy` is applied before `cap`, so a booking template drops Blind to Hidden; `names` and `join` need migrations/009. With `cap`, the first status label becomes the booking label. |
-| `showTemplateBanner()` | 2008 | Shows blue "Template loaded!" notification banner. |
-| `initHubContext()` | 159 | Reads `?g=` token, fetches `group_meta`, shows Hub banner; sets `hubContext` (including `inviteOnly`) for `create_calendar` and redraws Who can join. |
+| `parseTemplateParams()` | 1979 | Reads URL params (title, category, slots, statuses, weights, mode, range, weekends, datefilter, `privacy` (open / hidden / blind), `names=hidden`, and booking `cap` / `per` / `total`) and prefills the form. `privacy` is applied before `cap`, so a booking template drops Blind to Hidden; `names` needs migrations/009. With `cap`, the first status label becomes the booking label. |
+| `showTemplateBanner()` | 2161 | Shows blue "Template loaded!" notification banner. |
+| `initHubContext()` | 125 | Reads `?g=` token, fetches `group_meta`, shows the Hub banner and sets `hubContext` for `create_calendar`, so the new calendar joins the Hub. |
 | `getHubTokenFromUrl()` | 44 | Returns Hub token from `?g=` query param. |
 
 ### Access emoji (create page)
@@ -340,18 +337,16 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 | `requireHubAccess()` | 53 | Emoji popup for a guarded Hub when creating inside it (`?g=`); saves the Hub grant. |
 | `accessFetch(url, opts)` | 76 | Adds the Hub grant; on 403 `ACCESS_REQUIRED` shows the popup and retries (max 3 tries); account errors go to `Account.handleApiError()`. Used for `group_meta` and `create_calendar`. |
 | `initAccessField(features)` | 93 | Shows the **Access emoji** switch above Privacy Mode when `get_site_config` reports `features.access_emoji`. |
-| `updateAccessOffHint()` | 106 | Off-state hint: "Uses the Hub's emoji" when the Hub has one; on Invite only the on-state hint says the emoji is asked before people request access. |
+| `updateAccessOffHint()` | 106 | Off-state hint: "Uses the Hub's emoji" when the Hub has one. |
 
-### Who can join and private names (create page)
+### Private names (create page)
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `isInviteOnly()` | 127 | True when **Invite only** is picked, or the calendar is being created in an Invite only Hub. |
-| `renderJoinMode()` | 131 | Draws the **Who can join** toggle (`#joinModeToggle`, hint `#joinModeHint`), or the `#joinModeHubNote` note instead inside an Invite only Hub. |
-| `initJoinModeField(features)` | 145 | Shows Who can join when `get_site_config` reports `features.invite_only`. |
-| `updateHideNamesRow()` / `hideNamesValue()` | 1491 / 1497 | **Hide names too** checkbox (`#hideNamesRow`), shown only for Hidden privacy; sends `hide_names: 1`. Template param `names=hidden`. |
+| `initHideNamesField(features)` | 119 | Enables the **Hide names too** row once `get_site_config` reports `features.hide_names` (migration 009). |
+| `updateHideNamesRow()` / `hideNamesValue()` | 1555 / 1561 | **Hide names too** checkbox (`#hideNamesRow`, hint `#hideNamesHint`), shown only for Hidden privacy; sends `hide_names: 1`. Template param `names=hidden`. |
 
-`createCalendar()` sends `invite_only` / `hide_names`; the save panel (`#saveCalInvite`), details text and poster add an "Invite only" line.
+`createCalendar()` sends `hide_names`. There is no join setting to send: the link is the invite, so the save panel, details text and poster carry no join line.
 | `calendarSaveKit.emojiLine(meta)` / `buildCopyText(meta)` | 182 | Emoji line added to the copied link, share, email, poster and `.txt`. |
 
 ### Booking mode (create page)
@@ -382,7 +377,7 @@ Hub create/view page. Uses `hubSaveKit` object for copy, share, email, download,
 | `isCreateMode()` | 16 | True when `?create=1` (show create form). |
 | `toPlainAscii(str)` | 20 | Strips smart punctuation for plain-text share/download output. |
 
-`state` = `{token, title, auth: {organiser_name} | null, claimable, organiserName, calendars, accessAvailable, accessField, hubEmoji, inviteOnly, joinMode}`.
+`state` = `{token, title, auth: {organiser_name} | null, claimable, organiserName, calendars, accessAvailable, accessField, hubEmoji}`.
 
 ### hubSaveKit (save panel and link bar)
 
@@ -416,32 +411,21 @@ Hub create/view page. Uses `hubSaveKit` object for copy, share, email, download,
 | `getHubMeta()` | 669 | Current Hub meta for the toolbar buttons (includes `access_emoji` for the organiser). |
 | `loadHubEmoji()` | 679 | GET `access_settings` when you are the organiser. |
 | `openHubSettings()` | 741 | Organiser **Settings** window: emoji on/off/change, POST `set_group_access_emoji`. |
-| `initCreateAccessField()` | 1066 | Shows the emoji switch, and **Who can join** when `features.invite_only`, on the create form. |
-| `renderHubJoinMode()` | 1051 | Draws the Direct link / Invite only toggle (`#hubJoinField`) and its hint. |
-
-### Invite only (Hub organiser)
-
-| Function | Line | Description |
-|----------|------|-------------|
-| `formatRequestDate(s)` | 826 | Short date for request rows. |
-| `peopleRow(req, actions, extraClass)` | 832 | One person row with action buttons (44px). |
-| `renderHubPeople(lists)` | 861 | `#hubPeopleCard`: **Requests** (with count and **Approve all**), **Approved** (Block), and a collapsed **Declined** list (Approve); Hub-blocked people are listed under Approved with Unblock. |
-| `loadHubPeople()` | 897 | Organiser of an Invite only Hub: GET `access_requests`. |
-| `decideHubRequest(req, action, btn)` | 913 | POST `decide_access_request` (approve / decline / block / unblock), then redraws. |
+| `initCreateAccessField()` | 927 | Shows the emoji switch on the create form. |
 
 ### UI
 
 | Function | Line | Description |
 |----------|------|-------------|
 | `showSaveHubPanel(meta)` | 514 | Post-create modal: copy, download, share, email, poster, ack checkbox. |
-| `createHub()` | 568 | POST `create_group` (optional `organiser_name`, `invite_only`), then show save panel (with the Invite only line `#saveHubInvite`). |
+| `createHub()` | 568 | POST `create_group` (optional `organiser_name`), then show the save panel. |
 | `renderCalendarGrid()` | 627 | Lists child calendars with links to `calendar.html?c=`. |
 | `updateHubPublicUI()` | 690 | Link bar, copy handlers, Create new calendar link. |
 | `updateOrganiserUI()` | 714 | "Organiser: X (you)" badge, organiser-only Share/Email/Poster/Download/Settings/Remove, and the **Claim this Hub** button for old Hubs. |
-| `loadHubView()` | 793 | GET `group_meta`, sets `organiserName`, `auth` (from `is_organiser`), `claimable` and `inviteOnly` (badge in the title), renders the calendar grid, then `loadHubPeople()`. |
+| `loadHubView()` | 786 | GET `group_meta`, sets `organiserName`, `auth` (from `is_organiser`), `claimable` and `hubEmoji`, then renders the calendar grid. |
 | `initViewMode()` | 892 | `Account.require()`, account badge, then `loadHubView()`. |
 | `initCreateMode()` | 918 | `Account.require()`, account badge, profile name as the organiser name placeholder. |
-| `init()` | 946 | Picks create or view mode on `DOMContentLoaded`. |
+| `init()` | 947 | Picks create or view mode on `DOMContentLoaded`. |
 
 ---
 
@@ -459,16 +443,15 @@ Loaded on every page after `passkey.js`. Exposes `window.Account`. Builds everyt
 | `passkeySignup(statusEl)` | 172 | `account_passkey_signup_begin` -> create a passkey -> `account_passkey_signup_finish` (with `device_label`), then setup. |
 | `renderSignInButtons(methods)` | 192 | **Continue with Google** (`googleButton`) / **Continue with Facebook** (when on in `config.php`), **Sign in with a passkey** and **New here? Create an account with a passkey**. All share Google's layout: icon 12px from the left, label centred. |
 | `showSignIn(info, opts)` | 223 | Full-screen sign-in panel that cannot be dismissed. With `opts.dismissible` (home page while signed out) it gets a lighter backdrop and closes with the X button, Escape or a tap outside. |
-| `require()` | 251 | Resolves with `account_me` once signed in and set up; otherwise shows the sign-in panel or goes to `account.html` to finish setup, and never resolves. |
-| `pageTarget()` | 260 | `{c}` or `{g}` from the page URL, for Request access calls. |
-| `showInvite(invite)` | 284 | Invite only panel (`#acctInvite`, cannot be dismissed). States: none (**Request access**), pending (**Check again** / **Cancel request**), declined (Not approved), blocked (Blocked). Links to Home, Your profile and FAQs. |
-| `handleApiError(data)` | 353 | For `ACCOUNT_REQUIRED` / `ACCOUNT_SETUP` responses from any call: shows sign-in or goes to setup; for `INVITE_ONLY` / `BLOCKED` shows `showInvite()`. Returns true when handled. |
-| `takeSigninResult()` | 274 | Reads and strips `?signin=` after a Google / Facebook redirect (messages in `SIGNIN_MESSAGES`). |
-| `toast(message)` | 287 | Small notice for sign-in results. |
-| `fitBadgeToHead(badge)` | 416 | Inside `.acct-page-head` (home page): if the full badge would wrap under the `h1`, adds `acct-head-compact` (no wrap, icon-only 44px badge). Re-checks on resize and after `document.fonts.ready`. |
-| `renderBadge(info, parent)` | 435 | Account badge link (profile name) to `account.html`; `aria-label` "Your profile: NAME". Calls `fitBadgeToHead()`. |
-| `renderSignInBadge(parent, onClick)` | 447 | Signed-out **Sign in** button in the badge spot (`acct-badge acct-badge-signin`, `login` icon). Calls `fitBadgeToHead()`. |
-| `logout()` | 303 | POST `account_logout`. |
+| `require()` | 273 | Resolves with `account_me` once signed in and set up; otherwise shows the sign-in panel or goes to `account.html` to finish setup, and never resolves. |
+| `showBlocked()` | 285 | Blocked panel (`#acctBlocked`, cannot be dismissed): the organiser has blocked this account from the calendar. Links to Home, Your profile and FAQs. |
+| `handleApiError(data)` | 313 | For `ACCOUNT_REQUIRED` / `ACCOUNT_SETUP` responses from any call: shows sign-in or goes to setup; for `BLOCKED` shows `showBlocked()`. Returns true when handled. |
+| `takeSigninResult()` | 331 | Reads and strips `?signin=` after a Google / Facebook redirect (messages in `SIGNIN_MESSAGES`). |
+| `toast(message)` | 344 | Small notice for sign-in results. |
+| `fitBadgeToHead(badge)` | 354 | Inside `.acct-page-head` (home page): if the full badge would wrap under the `h1`, adds `acct-head-compact` (no wrap, icon-only 44px badge). Re-checks on resize and after `document.fonts.ready`. |
+| `renderBadge(info, parent)` | 373 | Account badge link (profile name) to `account.html`; `aria-label` "Your profile: NAME". Calls `fitBadgeToHead()`. |
+| `renderSignInBadge(parent, onClick)` | 385 | Signed-out **Sign in** button in the badge spot (`acct-badge acct-badge-signin`, `login` icon). Calls `fitBadgeToHead()`. |
+| `logout()` | 396 | POST `account_logout`. |
 
 ## account.js (~340 lines)
 
@@ -479,15 +462,14 @@ Profile page (`account.html`).
 | `saveProfile(form, errorEl, body)` | 83 | POST `account_update`; reports `renamed` / `conflicts`. |
 | `initSetup()` | 99 | First-time setup form: username + profile name, then back to the page the person came from. |
 | `initProfile()` | 117 | Profile form (name and private username). |
-| `tag(text, extraClass)` / `pendingTag(n)` | 72 / 80 | Small labels on list rows; `pendingTag` shows "N requests waiting". |
-| `loadMemberships()` | 149 | GET `account_memberships`: calendars (role, name, Hub, "Blocked", requests waiting) and Hubs (organiser or opened, requests waiting). |
-| `renderWaiting(requests)` | 191 | **Waiting for approval** section (`#waitingSection`): your pending and declined Invite only requests. |
-| `renderMethods(methods)` / `loadMethods()` | 182 / 204 | **Ways to sign in** list with Remove (disabled when only one is left), then redraws the Add buttons. |
-| `removeMethod(m, btn)` | 210 | POST `account_remove_method`. |
-| `addPasskey()` | 225 | `account_passkey_add_begin` -> create -> `account_passkey_add_finish`; "already has a passkey" when the device refuses a duplicate. |
-| `renderAddButtons(linked)` | 243 | **Add sign-in with Google** / **Add sign-in with Facebook** (`oauth_start` with `mode=link`), each hidden when already in `linked`; **Add a passkey on this device** always. |
-| `initSignOutAndDelete()` | 267 | Sign out; delete account (GET `account_delete_preview`, type the username, POST `account_delete`). |
-| `init()` | 317 | Handles `?signin=`, then setup or profile. |
+| `tag(text, extraClass)` | 72 | Small label on list rows (e.g. "Organiser", "Blocked"). |
+| `loadMemberships()` | 142 | GET `account_memberships`: calendars (role, name, Hub, "Blocked" tag) and Hubs (organiser or opened). |
+| `renderMethods(methods)` / `loadMethods()` | 181 / 203 | **Ways to sign in** list with Remove (disabled when only one is left), then redraws the Add buttons. |
+| `removeMethod(m, btn)` | 209 | POST `account_remove_method`. |
+| `addPasskey()` | 224 | `account_passkey_add_begin` -> create -> `account_passkey_add_finish`; "already has a passkey" when the device refuses a duplicate. |
+| `renderAddButtons(linked)` | 242 | **Add sign-in with Google** / **Add sign-in with Facebook** (`oauth_start` with `mode=link`), each hidden when already in `linked`; **Add a passkey on this device** always. |
+| `initSignOutAndDelete()` | 266 | Sign out; delete account (GET `account_delete_preview`, type the username, POST `account_delete`). |
+| `init()` | 319 | Handles `?signin=`, then setup or profile. |
 
 ---
 
@@ -531,7 +513,7 @@ Admin panel logic, split like the calendar page into classic scripts sharing glo
 
 | File | Contents |
 |------|----------|
-| `admin-core.js` | Tokens, `apiRequest(action, method, body, params)`, `formatDate()`, `truncateToken()`, `escapeHtml()`, password login (`handleLogin()`), account login (`handleAccountLogin(silent)`, POST `admin_login_account`), `startAdminSession()`, logout (stops the automatic account login for the tab), `checkExistingSession()` (runs on `DOMContentLoaded`; tries the account login silently when there is no admin token), `emojiBadge()`, `inviteBadge(inviteOnly, pending)` (Invite only badge with the waiting count), `clearAccessEmoji()`, Escape-key handler, `switchTab()` (loads Accounts the first time its tab opens) |
+| `admin-core.js` | Tokens, `apiRequest(action, method, body, params)`, `formatDate()`, `truncateToken()`, `escapeHtml()`, password login (`handleLogin()`), account login (`handleAccountLogin(silent)`, POST `admin_login_account`), `startAdminSession()`, logout (stops the automatic account login for the tab), `checkExistingSession()` (runs on `DOMContentLoaded`; tries the account login silently when there is no admin token), `emojiBadge()`, `clearAccessEmoji()`, Escape-key handler, `switchTab()` (loads Accounts the first time its tab opens) |
 | `admin-calendars.js` | Calendars tab: `loadCalendars()`, filters, sort, `renderTable()`, selection, `handleTogglePermanent()`, `executeDelete()`, bulk delete, pagination, Users expander (`toggleUsersExpand()`, `executeDeleteUser()`) |
 | `admin-hubs.js` | Hubs tab: `loadHubs()`, filters, sort, `renderHubTable()`, selection, delete, bulk delete, pagination, calendars expander |
 | `admin-accounts.js` | Accounts tab: `loadAccounts()` (GET `admin_accounts`, optional `q` username prefix, debounced search), `renderAccountStats()` (Google / Facebook / passkey on or off, totals, unclaimed old names and Hubs), `renderAccountTable()`, `deleteAdminAccount()` (type the username, or DELETE for an account without one; POST `admin_delete_account`), `calendarsNeedReload()` |
