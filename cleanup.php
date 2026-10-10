@@ -472,7 +472,7 @@ try {
         $pdo->query("SELECT status FROM reports LIMIT 0");
     } catch (PDOException $e) {
         $reportsReady = false;
-        echo "[12] Reports: skipped - run migrations/011_report_users.sql\n";
+        echo "[11] Reports: skipped - run migrations/011_report_users.sql\n";
     }
     if ($reportsReady) {
         $reportsKeepDays = max(1, (int)($config['accounts']['reports_keep_days'] ?? 180));
@@ -483,11 +483,11 @@ try {
         ");
         $stmt->execute([':days' => $reportsKeepDays]);
         $stats['reports_deleted'] = $stmt->rowCount();
-        echo "[12] Closed reports deleted (>{$reportsKeepDays} days): {$stats['reports_deleted']}\n";
+        echo "[11] Closed reports deleted (>{$reportsKeepDays} days): {$stats['reports_deleted']}\n";
     }
 } catch (Throwable $e) {
     $stats['errors'][] = "Reports: " . $e->getMessage();
-    echo "[12] ERROR cleaning reports: " . $e->getMessage() . "\n";
+    echo "[11] ERROR cleaning reports: " . $e->getMessage() . "\n";
 }
 
 // -------------------------------------------------------------------------
