@@ -1290,11 +1290,11 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   if (rankingMode === 'weights') up.style.display = 'none';
 
   row.appendChild(up);
+  row.appendChild(del);
   row.appendChild(colorPicker);
   row.appendChild(input);
   row.appendChild(weightNum);
   row.appendChild(defCol);
-  row.appendChild(del);
   row.appendChild(err);
   return row;
 }
