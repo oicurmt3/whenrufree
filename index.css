@@ -325,7 +325,7 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 .default-toggle:focus-visible{ outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* What the Default option box on each Option row means (migrations/013), shown above the
-   + Add Slot button. The box is the same shape organisers tick on an Option row. */
+   + Add status button. The box is the same shape organisers tick on an Option row. */
 .slot-default-hint{
   display: flex;
   align-items: center;
