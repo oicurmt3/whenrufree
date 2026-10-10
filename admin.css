@@ -858,6 +858,12 @@ html, body {
     display: none;
   }
 
+  /* Reports: drop the reporter and date columns first; reason and calendar matter most */
+  #reportTable .rp-reporter,
+  #reportTable .rp-when {
+    display: none;
+  }
+
   .modal-content {
     padding: 16px;
   }
@@ -1301,6 +1307,30 @@ html, body {
 /* Reports tab: count badge on the tab, details under the reason, closed rows dimmed */
 .tab-badge{display:inline-block;margin-left:6px;font-size:0.72rem;font-weight:700;color:#fff;background:var(--danger);border-radius:999px;padding:1px 7px;vertical-align:middle;}
 .tab-badge.hide{display:none;}
-.report-details{margin-top:4px;font-size:0.82rem;color:var(--text-muted);white-space:normal;max-width:280px;}
 .report-closed{opacity:0.6;}
 .report-done{font-size:0.8rem;font-weight:600;color:var(--text-muted);}
+
+/* Reports table: its own column widths (name and username stay tight, reason and calendar get the room) */
+#reportTable .rp-id { width: 56px; }
+#reportTable .rp-name { width: 150px; max-width: 150px; }
+#reportTable .rp-username { width: 110px; max-width: 110px; }
+#reportTable .rp-reason { min-width: 170px; }
+#reportTable .rp-calendar { min-width: 170px; }
+#reportTable .rp-reporter { width: 110px; max-width: 110px; }
+#reportTable .rp-when { width: 90px; }
+#reportTable .rp-actions { width: 150px; text-align: center; }
+
+#reportTable .rp-name,
+#reportTable .rp-username,
+#reportTable .rp-reporter,
+#reportTable .rp-calendar {
+  overflow-wrap: anywhere;
+}
+
+.report-details {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

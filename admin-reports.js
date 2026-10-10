@@ -50,14 +50,14 @@ function reportRow(r) {
     const closed = r.status !== 'open';
     return `
         <tr class="${closed ? 'report-closed' : ''}">
-            <td class="col-id">${r.id}</td>
-            <td class="col-title">${label}${details}</td>
-            <td class="col-organiser">${username}</td>
-            <td class="col-created">${escapeHtml(reasonLabel(r.reason))}</td>
-            <td class="col-activity">${calendar}</td>
-            <td class="col-users">${r.reporter_username ? escapeHtml(r.reporter_username) : '&mdash;'}</td>
-            <td class="col-created">${formatDate(r.created_at)}</td>
-            <td class="col-actions">
+            <td class="rp-id">${r.id}</td>
+            <td class="rp-name">${label}${details}</td>
+            <td class="rp-username">${username}</td>
+            <td class="rp-reason">${escapeHtml(reasonLabel(r.reason))}</td>
+            <td class="rp-calendar">${calendar}</td>
+            <td class="rp-reporter">${r.reporter_username ? escapeHtml(r.reporter_username) : '&mdash;'}</td>
+            <td class="rp-when">${formatDate(r.created_at)}</td>
+            <td class="rp-actions">
                 <div class="action-buttons">
                     ${closed ? '<span class="report-done">Closed</span>' : `
                     <button type="button" class="btn btn-ghost btn-small"
