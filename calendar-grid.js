@@ -87,7 +87,11 @@ function setSlotClass(el, status){
 function updateOrganiserDot(slotEl, dateStr, slotId){
   // Remove any existing organiser border classes
   slotEl.classList.remove('org-border-1','org-border-2','org-border-3','org-border-4','org-border-5');
-  
+
+  // Reading someone else's Slots: the left border belongs to your own answers (updateOwnEdge),
+  // so the organiser's edge steps aside instead of fighting over the same border
+  if(state.viewUserId) return;
+
   // Don't show indicator in Blind mode - no individual choices visible
   if(!shouldShowOrganiserDots()) return;
   
@@ -106,8 +110,8 @@ function updateOrganiserDot(slotEl, dateStr, slotId){
 
 /**
  * Updates your own left-edge indicator while you are reading someone else's calendar.
- * The fill colour is the person you are viewing, so this puts YOUR answer alongside theirs
- * (and the organiser's, which keeps the outer border) to compare at a glance.
+ * The fill colour is the person you are viewing, so the left border becomes YOUR answer instead,
+ * letting you compare at a glance. While viewing, the organiser's edge steps aside for it.
  * Only shown while viewing: on your own calendar the fill already is your answer.
  * @param {HTMLElement} slotEl - The slot element
  * @param {string} dateStr - Date in YYYY-MM-DD format

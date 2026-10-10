@@ -384,7 +384,8 @@ main{
   font-weight:600;
   position:relative;
   /* Transparent left border by default -- reserves space so layout
-     doesn't shift when the organiser indicator appears */
+     doesn't shift when an edge appears (the organiser's, or yours
+     while reading someone else's Slots) */
   border-left:8px solid transparent;
 }
 
@@ -407,27 +408,16 @@ main{
 
 /* ============================================
    YOUR OWN EDGE - While reading someone else's
-   Slots, your answers as a strip just inside the
-   left border, so the fill (them), the border
-   (organiser) and this (you) compare at a glance
+   Slots your answers take the left border, the
+   same way the organiser's does on your own
+   calendar, so the fill (them) and the border
+   (you) compare at a glance
    ============================================ */
-.time-slot.own-border-1::before,
-.time-slot.own-border-2::before,
-.time-slot.own-border-3::before,
-.time-slot.own-border-4::before,
-.time-slot.own-border-5::before{
-  content:'';
-  position:absolute;
-  left:0;
-  top:0;
-  bottom:0;
-  width:6px;
-}
-.time-slot.own-border-1::before{background:var(--status-1);}
-.time-slot.own-border-2::before{background:var(--status-2);}
-.time-slot.own-border-3::before{background:var(--status-3);}
-.time-slot.own-border-4::before{background:var(--status-4);}
-.time-slot.own-border-5::before{background:var(--status-5);}
+.time-slot.own-border-1{border-left-color:var(--status-1);}
+.time-slot.own-border-2{border-left-color:var(--status-2);}
+.time-slot.own-border-3{border-left-color:var(--status-3);}
+.time-slot.own-border-4{border-left-color:var(--status-4);}
+.time-slot.own-border-5{border-left-color:var(--status-5);}
 
 /* ============================================
    DATE FILTER INDICATORS
