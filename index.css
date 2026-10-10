@@ -260,6 +260,7 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 
 .status-row .move-up{ background:#fff; border:1px solid var(--border); border-radius:6px; padding:8px 10px; line-height:1; }
 .status-row .move-up .material-symbols-outlined{ font-size:20px; }
+.status-row .remove{ background:#fff; border:1px solid var(--border); border-radius:6px; }
 
 /* Weight input (small number box) */
 .status-row .weight-num{
@@ -279,7 +280,7 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 /* Default option (migrations/013): the option every Slot begins with, so Slots are never
    un-answered. One button per Option row: an empty box while it is off, a ticked box once it is
    the default. The muted line above + Add status says what the box is for. */
-.status-default-col{ flex: 0 0 48px; width: 48px; display: flex; justify-content: center; }
+.status-default-col{ flex: 0 0 76px; width: 76px; display: flex; justify-content: center; }
 .default-toggle{
   position: relative;
   width: 36px;

@@ -1225,6 +1225,13 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   weightNum.title = 'Weight 0-5';
   weightNum.style.display = rankingMode === 'weights' ? '' : 'none';
 
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'btn-small remove';
+  del.setAttribute('aria-label', 'Delete');
+  del.setAttribute('title', 'Delete');
+  del.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">delete</span>`;
+
   const err = document.createElement('span');
   err.className = 'inline-error';
 
@@ -1267,6 +1274,7 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
     if (v > 5) v = 5;
     weightNum.value = v;
   });
+  del.addEventListener('click', () => { row.remove(); applyDefaultColors(); paintDefaultToggles(); validateStatusesUI(); });
 
   up.addEventListener('click', () => {
     const prev = row.previousElementSibling;
@@ -1286,6 +1294,7 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   row.appendChild(input);
   row.appendChild(weightNum);
   row.appendChild(defCol);
+  row.appendChild(del);
   row.appendChild(err);
   return row;
 }
