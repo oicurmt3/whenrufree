@@ -387,6 +387,7 @@ function openManageModal(u){
     user: u,
     currentBlocked: u.blocked === true,
     blocked: u.blocked === true ? 0 : 1, // Action the toggle starts on
+    touched: false, // The organiser has tapped the toggle themselves
     delete: false,
     reason: '',
     details: '',
@@ -418,9 +419,12 @@ function closeManageModal(){
 }
 
 /** Two-way toggle: the button you press is the action that will be applied. */
-function setManageBlock(value){
+function setManageBlock(value, fromUser){
   const v = Number(value) === 1 ? 1 : 0;
-  if(state.manage) state.manage.blocked = v;
+  if(state.manage){
+    state.manage.blocked = v;
+    if(fromUser) state.manage.touched = true; // An explicit tap is a decision, even a restating one
+  }
   els.manageBlockToggle.querySelectorAll('.block-mode').forEach(b => {
     const on = Number(b.dataset.blocked) === v;
     b.classList.toggle('active', on);
@@ -451,8 +455,9 @@ function fillManageReasons(){
 
 /**
  * Reflect the choices. Block and Delete are independent, so the toggle stays live even when
- * deleting (a change of mind is one tap away); Confirm only lights up once something would
- * actually change. The line under the toggle names whichever side is selected.
+ * deleting (a change of mind is one tap away). Confirm lights up as soon as there is something to
+ * confirm: a delete, a report, or any block choice the organiser made themselves. The line under
+ * the toggle names whichever side is selected.
  */
 function updateManageState(){
   const m = state.manage;
@@ -463,7 +468,7 @@ function updateManageState(){
     : `${name} can use this calendar as normal.`;
   els.manageDeleteHint.hidden = !m.delete;
   const currentAsInt = m.currentBlocked ? 1 : 0;
-  const changes = m.delete || m.reason !== '' || m.blocked !== currentAsInt;
+  const changes = m.delete || m.reason !== '' || m.touched || m.blocked !== currentAsInt;
   els.manageUserConfirm.disabled = !changes;
   els.manageUserConfirm.classList.toggle('btn-danger', m.delete);
   els.manageUserConfirm.classList.toggle('btn-confirm', !m.delete);
@@ -539,7 +544,12 @@ async function applyManageChoices(){
       return;
     }
     const name = m.user.display_name;
-    const parts = [res.deleted ? 'deleted' : (res.blocked ? 'blocked' : 'unblocked')];
+    // A block choice that restates the current state changes nothing, so say so rather than
+    // claiming the organiser just blocked someone who was already blocked.
+    const restated = !res.deleted && !res.reported && res.blocked === m.currentBlocked;
+    const parts = restated
+      ? [`was already ${res.blocked ? 'blocked' : 'unblocked'}`]
+      : [res.deleted ? 'deleted' : (res.blocked ? 'blocked' : 'unblocked')];
     if(res.reported) parts.push('reported');
     closeConfirmChoices();
     closeManageModal();

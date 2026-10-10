@@ -1086,6 +1086,13 @@ main{
   font-weight:600;
 }
 
+/* A button that cannot be pressed must not look like it can */
+.modal .btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
 /* ============================================
    USER SELECT LIST (in modal)
    ============================================ */
