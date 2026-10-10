@@ -838,7 +838,7 @@ function peopleRow(req, actions, extraClass = '') {
   const when = formatRequestDate(req.decided_at || req.created_at);
   if (when) {
     const small = document.createElement('small');
-    small.textContent = extraClass === 'is-blocked' ? `Paused ${when}` : (req.decided_at ? `Since ${when}` : `Asked ${when}`);
+    small.textContent = extraClass === 'is-blocked' ? `Blocked ${when}` : (req.decided_at ? `Since ${when}` : `Asked ${when}`);
     name.appendChild(small);
   }
   li.appendChild(name);
@@ -878,7 +878,7 @@ function renderHubPeople(lists) {
   appList.innerHTML = '';
   approved.forEach(r => appList.appendChild(peopleRow(r, [
     { label: 'Block', icon: 'block', cls: 'btn-secondary', decision: 'block',
-      confirm: `Pause ${r.display_name}'s access to every calendar in this Hub? You can undo this.` }
+      confirm: `Block ${r.display_name} from every calendar in this Hub? You can undo this.` }
   ])));
   blocked.forEach(r => appList.appendChild(peopleRow(r, [
     { label: 'Unblock', icon: 'undo', cls: 'btn-secondary', decision: 'unblock' }

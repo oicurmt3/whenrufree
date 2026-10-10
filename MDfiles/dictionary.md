@@ -1,4 +1,4 @@
-# Data Dictionary
+﻿# Data Dictionary
 
 Database schema for When RU Free. MariaDB 10.x, utf8mb4 charset.
 
@@ -190,7 +190,7 @@ Names on a calendar. Each belongs to an account, except old names from before ac
 | locked_until | DATETIME | NULL | Claim locked until this time. NULL = not locked |
 | lockout_level | TINYINT UNSIGNED | 0 | Lockouts so far (0-4); picks the next lock length. Migration 002 |
 | last_locked_at | DATETIME | NULL | When the last lockout started; used for the 30-day reset. Migration 002 |
-| blocked | TINYINT(1) | 0 | 1 = the organiser paused this person: 403 `BLOCKED`, answers left out of views and Best Match (bookings still count). Never set on the organiser. Migration 009 |
+| blocked | TINYINT(1) | 0 | 1 = the organiser has blocked this person: 403 `BLOCKED`, answers left out of views and Best Match (bookings still count). Never set on the organiser. Migration 009 |
 
 **Indexes:**
 - PRIMARY KEY (`id`)
@@ -416,6 +416,34 @@ Requests to join an Invite only calendar or Hub. Created by `migrations/009_invi
 - Declined accounts cannot ask again (403 `REQUEST_DECLINED`) but can still be approved
 - Max 200 pending per calendar/Hub; max 10 new requests per IP per hour
 - Deleted with the calendar or Hub, when the person's name is deleted from the calendar, and with the account. cleanup.php deletes pending rows older than 30 days and orphaned rows
+
+---
+
+## Table: reports
+
+Reports an organiser sends about a person from the **Manage person** menu. Created by `migrations/011_report_users.sql`.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
+| calendar_id | BIGINT UNSIGNED | - | calendars.id the person was on (no FK: the report outlives the calendar) |
+| user_id | BIGINT UNSIGNED | NULL | users.id at the time of the report (snapshot, no FK) |
+| account_id | BIGINT UNSIGNED | NULL | The reported account, when the name had one (no FK) |
+| reporter_account_id | BIGINT UNSIGNED | - | The organiser's accounts.id |
+| display_name | VARCHAR(40) | NULL | The name the person was using, as it was then |
+| reason | VARCHAR(32) | - | Reason key from `reportReasons()` (e.g. `inappropriate_name`, `spam`) |
+| details | VARCHAR(200) | NULL | Optional free text from the organiser |
+| status | VARCHAR(10) | 'open' | `open` until the super admin decides, then `closed` |
+| created_at | DATETIME | - | When the report was sent |
+| decided_at | DATETIME | NULL | When the super admin decided |
+
+**Indexes:** PRIMARY KEY (`id`), INDEX `idx_reports_status` (`status`, `created_at`), INDEX `idx_reports_calendar` (`calendar_id`), INDEX `idx_reports_account` (`account_id`)
+
+**Business rules:**
+- No foreign keys on purpose: a report is a snapshot and survives the calendar, the name and the account it names
+- Usernames are never stored here (they stay private to the super admin)
+- Written by `manage_calendar_user` *before* any block or delete, so a report sent with a delete still records the name and account
+- Super admin resolves them in the admin **Reports** tab (`admin_reports`, `admin_report_decide`); cleanup.php step 12 prunes decided reports
 
 ---
 

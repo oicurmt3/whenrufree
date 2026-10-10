@@ -4,14 +4,33 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
+## 2026-10-10
+
+### Added
+- **Manage person menu:** the People list's separate block and delete buttons are replaced by one `more_vert` control per person, which opens a **Manage person** window: a two-way **Block / Unblock** toggle that opens on the person's current status, a **Delete this person** checkbox, and a **Report** dropdown with optional details. **Confirm choices** opens a review step listing exactly what will happen, with **Back** to change it and **Apply** to go ahead. The Apply button turns red when a delete is included
+- **Reporting to the super admin:** organisers can report a person (with a reason and up to 200 characters of detail) on its own or alongside a block or delete. Reports appear in the admin **Reports** tab (`admin_reports`, `admin_report_decide`), where the super admin dismisses a report or deletes the account. Needs `migrations/011_report_users.sql`; until it runs the Report dropdown is hidden
+- **Private usernames:** accounts get a fixed, auto-assigned username (`user######`) at sign-up, visible only to the super admin (and organisers, for reporting). Usernames are no longer editable; the profile name is what appears on calendars
+
+### Changed
+- **API:** `set_user_blocked`, `report_user` and `delete_user` are replaced by one `manage_calendar_user` action, which applies the choices in a fixed order - the report first (while the name and account still exist), then the block, then the delete - so a report sent alongside a delete is never lost. Sensitive POST list now carries `manage_calendar_user` and `admin_report_decide`
+- **Blocking is called blocking:** the profile tag, blocked panel and People list row now read "Blocked" instead of "Access paused", and the 403 body reads "The organiser has blocked you from this calendar" / "...from this Hub"
+- **Reports tab wording:** the admin intro now says reports come from the Manage person menu, not from blocking alone
+
+---
+
 ## 2026-10-09
 
 ### Added
-- **See someone's calendar (read only):** tap a name in the **People** list ("Tap to see") to show their answers in the grid. A bar above the calendar reads "Viewing NAME (read only)"; its close button or Escape goes back to yours. Taps on slots only show a message, your own unsaved changes are kept, and the organiser's coloured edge still shows unless you are viewing the organiser. Follows the Best Match names rule: joined people on Open calendars, the organiser on Hidden calendars, nobody on Blind calendars. Not on booking calendars or for blocked people. No server change: the page only draws answers the server already sends
+- **See someone's calendar (read only):** in the **People** list, tap the eye button beside a name to show their answers in the grid; tap it again (`visibility_off`) to hide them. A bar above the calendar reads "Viewing NAME"; its close button or Escape also goes back to yours. Taps on slots only show a message, your own unsaved changes are kept, and the organiser's coloured edge still shows unless you are viewing the organiser. Follows the Best Match names rule: joined people on Open calendars, the organiser on Hidden calendars, nobody on Blind calendars. Not on booking calendars or for blocked people. No server change: the page only draws answers the server already sends
 - **Organiser's coloured edge is optional:** on Open calendars the organiser can untick **Show my answers on everyone's calendar** in Calendar settings (gear) so people aren't steered towards their choices. On by default. API: new `set_organiser_marks`; `calendar_meta` adds `organiser_marks` and `organiser_marks_available`. New `migrations/010_organiser_marks.sql` adds `calendars.show_organiser_marks`; until it runs the edge always shows and the setting is hidden. The gear now shows for organisers of Open calendars even without the access emoji
 - **Home page while signed out:** the create page is visible instead of hidden behind the sign-in panel. The header shows a **Sign in** button, and tapping anything in the form opens the sign-in panel, which can now be closed (X, Escape or tapping outside). Hub links (`?g=`) and unfinished account set-up still go straight to the sign-in panel. Creating still needs an account on the server
 
 ### Changed
+- **Rename moved into People:** the separate **Your name** (`person_edit`) toolbar button is gone. Your own line in the People list (listed first) now has a `person_edit` button, the only way to open the rename window. Tapping your line shows your own Slots again. The People button's tooltip reads "People and your name" once you have joined
+- **Calendar header:** removed the name label after the title (`#currentUserDisplay`), which repeated the account badge. When you organise the calendar, the account badge turns dark (like the organiser's avatar in People) with an `admin_panel_settings` icon; its label adds "organiser of this calendar"
+- **Account badge on narrow screens:** beside the home page title, the **Sign in** / profile badge shrinks to just its icon instead of wrapping under the title, and returns to full size when there is room
+- **Templates page:** cards can set **Privacy** and **Who can join**. Template links accept `privacy=open|hidden|blind` and `join=invite` (plus the existing `names=hidden`); booking templates fall back from Blind to Hidden. Showcase uses Hidden with Hide names too and Invite only; interview and parent-teacher bookings use Hidden with Hide names too; Yes/No Decision uses Blind; Babysitting Roster and Party RSVP use Invite only. New tips cover the organiser's coloured edge, Invite only Hubs and seeing one person's calendar. Demo links point to the emoji-guarded example calendar
+- **Privacy page:** fixed a missing section wrapper that made the page too wide
 - **Home page wording:** new intro ("...or create a bookings calendar... plan events and take bookings. Sign in with Google, Facebook or a passkey."). Sign-in panel: "You need a free account to open, join or create calendars and Hubs." Organiser name hint: "Leave blank to use your profile name. You manage the calendar from this account." Private names hint: "People only see their own name, organiser name (yours), and how many have joined."
 - **Save-your-link warnings:** removed the home page "cannot be recovered if lost" warning. The Hub save panel and Hub text file now say the link is the invite and that the Hub is also listed on your profile page
 - **Inactivity default is 40 days everywhere:** admin Setup and the `admin_save_config` fallback used 30 while `cleanup.php` used 40. Saved site settings are unchanged

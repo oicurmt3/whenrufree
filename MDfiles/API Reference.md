@@ -1,4 +1,4 @@
-# API Reference
+﻿# API Reference
 
 Complete reference for the When RU Free backend API (`api.php`).
 
@@ -46,7 +46,7 @@ All requests are rate-limited per IP address. Default: 120 requests per minute. 
 
 Client IP is taken from `REMOTE_ADDR` by default. `X-Forwarded-For` is honoured only when the direct connection comes from an IP listed in `config.php` `trusted_proxies` (empty by default).
 
-If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `admin_login_account`, `claim_name`, `claim_hub`, `create_calendar`, `create_group`, `save`, `join_calendar`, `account_update`, `account_remove_method`, `account_delete`, the six `account_passkey_*` actions, `access_check`, `set_access_emoji`, `set_group_access_emoji`, `set_bookings_closed`, `request_access`, `cancel_access_request`, `decide_access_request`, `set_user_blocked` and `set_organiser_marks`) return HTTP 503 instead of running unthrottled.
+If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `admin_login_account`, `claim_name`, `claim_hub`, `create_calendar`, `create_group`, `save`, `join_calendar`, `account_update`, `account_remove_method`, `account_delete`, the six `account_passkey_*` actions, `access_check`, `set_access_emoji`, `set_group_access_emoji`, `set_bookings_closed`, `request_access`, `cancel_access_request`, `decide_access_request`, `manage_calendar_user`, `admin_report_decide` and `set_organiser_marks`) return HTTP 503 instead of running unthrottled.
 
 Exceeding the limit returns HTTP 429:
 ```json
@@ -137,7 +137,7 @@ Implemented in `includes/members.php`; inactive until `migrations/009_invite_onl
 - **Who can join** is set only at creation (`invite_only` on `create_calendar` / `create_group`) and never changes. A calendar created in an Invite only Hub is always Invite only, and its requests belong to the Hub: one Hub approval opens every calendar in it.
 - **Gate:** runs after the access emoji gate, with the same target resolution and the same exemptions plus `request_access` and `cancel_access_request`. These pass: the Hub organiser, anyone with a name on the calendar (organisers included) that is not blocked, and accounts with an approved request. Otherwise HTTP 403 `{ code: "INVITE_ONLY", message, invite: { kind: "calendar"|"hub", status: "none"|"pending"|"declined", title, profile_name } }`, or 403 `{ code: "BLOCKED", message }` for a blocked name or a Hub-wide block.
 - **Requests** (`access_requests`): one per account per calendar/Hub, with a copy of the profile name when asked. Pending requests expire after 30 days (`cleanup.php`). Declined people cannot ask again but can still be approved. No notifications: organisers see `pending_requests` counts.
-- **Blocking:** `users.blocked` pauses one person on a calendar. Their availability is left out of `availability` and its `summary` (not on booking calendars, where their bookings still hold their places), and other members don't see them in `users`.
+- **Blocking:** `users.blocked` blocks one person on a calendar. Their availability is left out of `availability` and its `summary` (not on booking calendars, where their bookings still hold their places), and other members don't see them in `users`.
 
 ### POST request_access
 
@@ -155,9 +155,9 @@ CSRF + `c` or `g`. Withdraws the account's pending request. **Response:** `{ sta
 
 CSRF + `c` or `g`, same roles as `access_requests`. Body: `decision` = `approve` / `decline` / `block` / `unblock` with `request_id`, or `decision` = `approve_all`. Approve works from pending, declined or blocked; decline from pending or approved; block (approved) and unblock (blocked) only on Hub requests. **Response:** `{ status, requests }` (the updated lists). Invalid change: 400; unknown request: 404.
 
-### POST set_user_blocked
+### POST manage_calendar_user
 
-CSRF + `c`, calendar organiser only. Body: `user_id`, `blocked` (1 pause, 0 restore). Organisers cannot be blocked. Nothing is deleted. **Response:** `{ status, blocked }`
+CSRF + `c`, calendar organiser only. One call for the whole Manage person menu. Body: `user_id`, plus any of `blocked` (1 block, 0 unblock), `delete` (1) and a report (`report_reason`, optional `report_details`). Organisers cannot be changed here, and the organiser cannot act on their own row. Choices are applied in a fixed order - the report first (while the name and account still exist), then the block, then the delete - so a report sent alongside a delete is never lost. Block is reversible and keeps the answers; delete cascades to availability. At least one of `blocked` or `delete` is required (400 otherwise). **Response:** `{ status, blocked, deleted, reported, report_id }`
 
 ---
 
@@ -193,7 +193,7 @@ CSRF. Body: `type`, `id`. The last method can never be removed (409 `LAST_METHOD
 
 ### GET account_memberships
 
-**Response:** `{ status, calendars: [{ token, title, start_date, end_date, role, display_name, name_custom, hub: {token, title}|null, blocked, pending_requests }], hubs: [{ token, title, is_organiser, calendar_count, pending_requests }], requests: [{ kind: "calendar"|"hub", token, title, status: "pending"|"declined", created_at }] }` - calendars the account has a name on, Hubs it organises or has opened, and its own Invite only requests that are waiting or were declined. `pending_requests` is the number of requests waiting where this account decides them, otherwise `null`; `blocked` is `true` when the organiser has paused the account on that calendar.
+**Response:** `{ status, calendars: [{ token, title, start_date, end_date, role, display_name, name_custom, hub: {token, title}|null, blocked, pending_requests }], hubs: [{ token, title, is_organiser, calendar_count, pending_requests }], requests: [{ kind: "calendar"|"hub", token, title, status: "pending"|"declined", created_at }] }` - calendars the account has a name on, Hubs it organises or has opened, and its own Invite only requests that are waiting or were declined. `pending_requests` is the number of requests waiting where this account decides them, otherwise `null`; `blocked` is `true` when the organiser has blocked the account on that calendar.
 
 ### GET account_delete_preview
 
@@ -347,7 +347,7 @@ Returns all names on a calendar.
 
 `mine` marks the signed-in account's name; `claimable` marks an old PIN name that nobody has claimed yet.
 
-- The organiser gets everyone, each with `blocked` (true when paused).
+- The organiser gets everyone, each with `blocked` (true when blocked).
 - Others never see blocked people, except on booking calendars (their bookings still hold places).
 - When names are private (Blind, or Hidden with `hide_names`) and the caller is not the organiser, `names_hidden` is `true` and `users` holds only the caller, the organisers and claimable old names. `total` is the number of people on the calendar, not counting blocked people the caller can't see.
 
@@ -437,12 +437,6 @@ CSRF + `c`, joined. Body: `user_id` (defaults to your own) and `display_name`, o
 Claims an old name (created before accounts) once, with its PIN. CSRF + `c`. Body: `user_id`, `pin`. The account must not already have a name on the calendar. The name, its role and its availability then belong to the account and the PIN hash is deleted.
 
 **Response:** `{ status, user: { id, display_name, role, name_custom } }`. Wrong PIN: 401 `Wrong PIN`; locked: 429 `ACCOUNT_LOCKED`; 409 `ALREADY_CLAIMED` or `ALREADY_JOINED`.
-
-### POST delete_user
-
-Organiser deletes a participant (not themselves). Cascades to availability.
-
-**Organiser only.** Body: `user_id`
 
 ---
 
@@ -597,7 +591,7 @@ Deletes a Hub. Child calendars are detached (`group_id` set to NULL), not delete
 
 ### GET admin_list_users
 
-Lists users for a specific calendar. Query param: `calendar_id`. Each user: `{id, display_name, role, locked_seconds, has_account, blocked}` (`locked_seconds` is 0 when not locked; `has_account` is false for an old name not claimed yet; `blocked` is true when the organiser paused them).
+Lists users for a specific calendar. Query param: `calendar_id`. Each user: `{id, display_name, role, locked_seconds, has_account, blocked}` (`locked_seconds` is 0 when not locked; `has_account` is false for an old name not claimed yet; `blocked` is true when the organiser blocked them).
 
 ### POST admin_delete_user
 
@@ -624,6 +618,16 @@ Accounts tab. Optional query `q` (username prefix, `[a-z0-9_]{1,20}`).
 ### POST admin_delete_account
 
 CSRF + admin session. Body: `account_id`. Same as the person deleting their own account. **Response:** `{status}`
+
+### GET admin_reports
+
+Reports tab. Needs `migrations/011_report_users.sql`.
+
+**Response:** `{ status, available, open, reasons, reports }` - `available` false (with `open` 0 and no `reports`) until migration 011 has run; `open` is the number still awaiting a decision and `reasons` is the key => label map the organiser saw. Up to 200 reports, open ones first then newest first. Each report: `{ id, calendar_id, calendar_title, calendar_token, user_id, account_id, display_name, account_username, account_display_name, reporter_username, reason, details, status, created_at, decided_at }` - `display_name` is the name as it was when reported, `account_username` is the reported account's private username (null for an unclaimed old name) and `reporter_username` identifies the organiser.
+
+### POST admin_report_decide
+
+CSRF + admin session. Body: `report_id`, `decision` = `dismiss` (close the report, leave the person alone) or `delete` (delete the reported account and everything it owns, then close the report - this also closes every other open report naming that account). Deleting needs the report to name an account (400 "That person has no account to delete. Dismiss the report instead."), and an already-closed report is 409. **Response:** `{ status }`
 
 ---
 
@@ -657,7 +661,7 @@ All security-relevant actions are logged to `grape_private/logs/security_YYYY-MM
 | ORGANISER_DELETE_USER | Organiser deletes a participant |
 | ACCESS_REQUESTED | Account asks to join an Invite only calendar or Hub |
 | ACCESS_REQUEST_DECIDED | Organiser approves, declines, blocks or unblocks a request, or approves all (`decision`, `count`) |
-| USER_BLOCKED | Organiser pauses or restores a person on a calendar (`blocked`) |
+| USER_BLOCKED | Organiser blocks or unblocks a person on a calendar (`blocked`) |
 | CHOOSE_SLOT | Organiser locks in a date+slot |
 | UNCHOOSE_SLOT | Organiser reopens the calendar |
 | BOOKINGS_CLOSED | Organiser closes bookings on a booking calendar |

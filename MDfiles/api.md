@@ -1,4 +1,4 @@
-# api.md - Quick Reference
+﻿# api.md - Quick Reference
 
 Concise endpoint list for `api.php?action=...&c=TOKEN`. Endpoints are in `api.php`; helpers are in `includes/*.php`.
 
@@ -40,7 +40,7 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `cancel_access_request` | POST | Account | - | Withdraw your pending request (`c` or `g`) |
 | `access_requests` | GET | Account | organiser / Hub organiser | Pending, approved, declined and blocked requests (`c` or `g`); `managed_by` hub or calendar |
 | `decide_access_request` | POST | Account | organiser / Hub organiser | `decision` approve / decline / block / unblock with `request_id`, or `approve_all` |
-| `set_user_blocked` | POST | Account | organiser | Pause (`blocked` 1) or restore (0) a person (`user_id`) on the calendar |
+| `manage_calendar_user` | POST | Account | organiser | One person, one decision (`user_id`): `blocked` 1/0, `delete` 1, `report_reason` / `report_details`; applied report, then block, then delete |
 | `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}`, `invite_only`, `invite_via_hub`, `hide_names`, `names_private`, `pending_requests` (organiser), `organiser_marks`, `organiser_marks_available` |
 | `group_meta` | GET | Account | - | Hub listing (`g` param, not `c`) with `organiser_name`, `is_organiser`, `claimable`, `invite_only`, `pending_requests` (organiser) |
 | `create_group` | POST | Account | - | Create Hub (optional `organiser_name`, `invite_only`) |
@@ -56,7 +56,6 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `save` | POST | Account | joined (self) / organiser | Save availability changes (booking calendars: capacity checks, returns `rejected`) |
 | `reset_user` | POST | Account | joined (self) / organiser | Delete user's availability |
 | `reset_all` | POST | Account | organiser | Delete ALL availability |
-| `delete_user` | POST | Account | organiser | Remove participant |
 | `save_date_filter` | POST | Account | organiser | Update date filter selections |
 | `save_rank_sort` | POST | Account | organiser | Set score/date sort order |
 | `save_organiser_message` | POST | Account | organiser | Update organiser note |
@@ -80,6 +79,8 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `admin_set_access_emoji` | POST | Admin | super | Remove a calendar's or Hub's emoji (`kind`, `id`) |
 | `admin_accounts` | GET | Admin | super | Account totals and list (optional `q` username prefix) |
 | `admin_delete_account` | POST | Admin | super | Delete an account (`account_id`) |
+| `admin_reports` | GET | Admin | super | Reports sent by organisers (reporter, reason, details, calendar) |
+| `admin_report_decide` | POST | Admin | super | Close a report, or delete the reported account, with `report_id` and `decision` dismiss / delete |
 
 "Account" in the Auth column also means CSRF on POSTs.
 

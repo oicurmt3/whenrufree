@@ -296,7 +296,7 @@
       `Waiting for the organiser to approve you. Come back to this link later: ${what.toLowerCase()} opens once you are approved. It is also listed on your profile under "Waiting for approval".`,
     ],
     declined: () => ['Not approved', 'The organiser did not approve your request.'],
-    blocked: () => ['Blocked', 'The organiser has paused your access.'],
+    blocked: () => ['Blocked', 'The organiser has blocked you from this calendar.'],
   };
 
   /**

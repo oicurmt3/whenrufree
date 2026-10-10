@@ -24,7 +24,7 @@ Tap your name in the top corner of any page to open your profile (`account.html`
 - Change your username or profile name. A new profile name updates every calendar where you use it (not the ones where you chose a different name). If that name is already taken on a calendar, you are told which one keeps the old name.
 - Manage **Ways to sign in**: add Google, Facebook or a passkey for this device, or remove one (you always keep at least one). The Google and Facebook buttons disappear once linked; you can add a passkey on each device you use.
 - Usernames are 3-20 lowercase letters, numbers or `_`. A few, such as `admin` and `whenrufree`, are reserved.
-- See all your **calendars** and **Hubs** - handy if you lose a link. Organisers of Invite only calendars and Hubs see "N requests waiting", and a calendar where the organiser paused you shows "Access paused".
+- See all your **calendars** and **Hubs** - handy if you lose a link. Organisers of Invite only calendars and Hubs see "N requests waiting", and a calendar where the organiser blocked you shows "Blocked".
 - **Waiting for approval** lists the Invite only calendars and Hubs you have asked to join (and any that were not approved).
 - **Sign out** of this device.
 - **Delete your account**: shows what will be removed (the calendars and Hubs you organise, and your names on other calendars), then asks you to type your username.
@@ -88,12 +88,12 @@ As the organiser, you can:
 - **Add a message**: Tap the message area below the rankings to leave a note for participants (max 250 characters).
 - **Change sort order**: Toggle between "By Match" (highest score first) and "By Date" (chronological) in the analysis panel. Your choice is saved as the default for all users.
 - **Filter dates**: If you chose "only" or "except" mode, tap date column headers to select/deselect which dates participants can see. Changes auto-save.
-- **Delete users**: Open the People list and tap the delete icon next to a participant's name.
-- **Block users**: In the People list, tap the **block** icon next to a name to pause that person. They see "The organiser has paused your access" and their answers are left out of the calendar and Best Match (bookings still hold their places). Tap the **undo** icon to restore them; nothing is deleted.
+- **Block users**: In the People list, tap the **more** menu next to a name to open **Manage person**. Choose **Block** and confirm: that person sees "The organiser has blocked you from this calendar" and their answers are left out of the calendar and Best Match (bookings still hold their places). Choose **Unblock** the same way to restore them; nothing is deleted.
+- **Delete or report a person**: the same **Manage person** menu can delete someone (permanently) or send a report to the super admin. You can combine the choices; a review step shows exactly what will happen before you apply it.
 - **Reset availability**: Use the delete icon to clear your own selections, or the warning icon to reset ALL users (requires typing "RESET" to confirm).
-- **Rename**: Tap the **Your name** (person edit) icon to change your name on this calendar, or tap **Use my profile name** to follow your profile name again.
+- **Rename**: Open the **People** list and tap the **person edit** icon on your own line (listed first) to change your name on this calendar, or tap **Use my profile name** to follow your profile name again.
 - **Your coloured edge**: on Open calendars, your own answers show as a coloured left edge on everyone's time slots. If you don't want to steer people's choices, open **Settings** (gear) and untick **Show my answers on everyone's calendar**. People can still see your answers in Best Match and the People list.
-- **See someone's calendar**: in the People list, tap a name ("Tap to see") to view their answers, read only. On Hidden calendars only you can do this.
+- **See someone's calendar**: in the People list, tap the **eye** icon beside a name to view their Slots, read only; tap it again (eye crossed out) to hide them. On Hidden calendars only you can do this.
 
 ### Choosing a Final Slot
 
@@ -131,7 +131,11 @@ You can create pre-configured calendar links from the Ideas page. These pre-fill
 index.html?template=1&title=...&category=...&slots=...&statuses=...&range=1week
 ```
 
-Add `&cap=1` (people per slot, 1-20) to make a booking calendar, and optionally `&per=2` (bookings per person, counted per day; `0` = no limit, default 1) and `&total=1` (count `per` across the whole calendar instead). With `cap`, the first `statuses` label becomes the booking label. The Templates page has ready-made booking examples (interviews, parent-teacher nights, workshops, tours, volunteer rosters, court hire, hot desks, gym, school-run seats, pet care, holiday house, shared car, meeting room) in its Bookings section.
+Add `&cap=1` (people per slot, 1-20) to make a booking calendar, and optionally `&per=2` (bookings per person, counted per day; `0` = no limit, default 1) and `&total=1` (count `per` across the whole calendar instead). With `cap`, the first `statuses` label becomes the booking label.
+
+Add `&privacy=open|hidden|blind` to preset the privacy mode (booking calendars fall back from Blind to Hidden), `&names=hidden` for Hidden with **Hide names too**, and `&join=invite` for **Invite only** (calendars in an Invite only Hub are Invite only anyway). The access emoji is never put in a link: pick it on the create page.
+
+The Templates page has ready-made booking examples (interviews, parent-teacher nights, workshops, tours, volunteer rosters, court hire, hot desks, gym, school-run seats, pet care, holiday house, shared car, meeting room) in its Bookings section.
 
 ### Calendar Hubs
 
@@ -187,7 +191,7 @@ If the organiser set an emoji, a grid of 35 emoji appears before the calendar or
 
 If the organiser made it Invite only, you see a **Request access** panel (after the emoji, if there is one). Tap it and wait: the panel shows "Request sent", with **Check again** and **Cancel request**, and it is listed on your profile page under **Waiting for approval**. Once approved, open the link again and join as usual. Requests not answered within 30 days expire, so you can ask again. If the organiser declines, you can't ask again.
 
-If you see "The organiser has paused your access", the organiser has blocked you on that calendar or Hub. Your answers are kept; ask the organiser if you think it's a mistake.
+If you see "The organiser has blocked you from this calendar", the organiser has blocked you on that calendar or Hub. Your answers are kept; ask the organiser if you think it's a mistake.
 
 ### Joining a Calendar
 
@@ -226,7 +230,8 @@ A passkey signs you in with your fingerprint, face, Windows Hello or device scre
 - Tap "View" on a rank card to see who responded and their statuses
 - You can add the date to Google Calendar or download an ICS file from expanded cards
 - If the organiser has locked in a choice, you will see a green "Decided" banner
-- On Open calendars, tap the **People** button and then a name ("Tap to see") to see that person's calendar, read only. A bar above the calendar shows whose it is; tap its X (or press Escape) to go back to yours. Your own unsaved changes are kept
+- On Open calendars, tap the **People** button and then the **eye** icon beside a name to see that person's Slots, read only. A bar above the calendar shows whose they are; tap the eye again (now crossed out), the bar's X, or press Escape to go back to yours. Your own unsaved changes are kept
+- To change your name on this calendar, open **People** and tap the **person edit** icon on your own line
 
 ### Privacy Modes
 

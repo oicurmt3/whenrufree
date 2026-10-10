@@ -19,7 +19,7 @@ declare(strict_types=1);
 const REPORTS_MAX_DETAILS = 200;
 const REPORTS_DEFAULT_LIMIT = 200;
 
-/** The reasons the block modal offers: key => label. First entry is the default. */
+/** The reasons the manage person modal offers: key => label. First entry is the default. */
 function reportReasons(): array {
     return [
         'inappropriate_name' => 'Inappropriate name',

@@ -16,7 +16,7 @@ An organiser signs in, creates a calendar with custom time slots, date ranges, a
 - No PINs: the unique link is the invite, and who you are comes from your account. Names and Hubs from before accounts can be claimed once with their old PIN
 - Optional access emoji: the organiser picks 1 of 35 emoji for a calendar or Hub as an invite confirmation; each account picks it once (calendars in a Hub use the Hub's emoji unless they have their own)
 - Who can join (set when creating): Direct link, or Invite only - people tap Request access and the organiser approves or declines (one Hub approval covers all its calendars)
-- Organisers can block (pause) anyone on a calendar; their answers are left out until unblocked
+- Organisers can block anyone on a calendar; their answers are left out until unblocked
 - Three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices). Names are private on Blind, and on Hidden with "Hide names too"
 - Customisable time slots (1-6), status options (1-5 with colours and weights), and date ranges (up to 360 days)
 - Date filtering: organiser can show/hide specific dates for participants

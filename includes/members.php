@@ -8,8 +8,8 @@
  * organiser and Hub approval opens every calendar in it. Approval only opens the gate; the
  * person then joins with the normal join modal.
  *
- * Blocking: users.blocked pauses one person on one calendar (any calendar); an access_requests
- * row with status 'blocked' pauses an approved person on a whole Invite only Hub.
+ * Blocking: users.blocked blocks one person on one calendar (any calendar); an access_requests
+ * row with status 'blocked' blocks an approved person on a whole Invite only Hub.
  *
  * Private names: on Blind calendars, and Hidden calendars created with hide_names, participants
  * only see themselves, the organisers and a count.
@@ -166,8 +166,8 @@ function membersRespondBlocked(string $kind): void {
         'status' => 'error',
         'code' => 'BLOCKED',
         'message' => $kind === 'group'
-            ? 'The organiser has paused your access to this Hub.'
-            : 'The organiser has paused your access to this calendar.',
+            ? 'The organiser has blocked you from this Hub.'
+            : 'The organiser has blocked you from this calendar.',
         'invite' => ['kind' => $kind === 'group' ? 'hub' : 'calendar', 'status' => 'blocked'],
     ]);
 }
