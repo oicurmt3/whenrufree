@@ -208,6 +208,7 @@ function handleLogout() {
     expandedHubIds.clear();
     expandedHubCalendars = {};
     hubsLoaded = false;
+    reportsLoaded = false;
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('csrfToken');
     sessionStorage.setItem('adminNoAutoAccount', '1');
@@ -363,6 +364,7 @@ function switchTab(tabName) {
         calendars: 'tabCalendars',
         hubs: 'tabHubs',
         accounts: 'tabAccounts',
+        reports: 'tabReports',
         setup: 'tabSetup'
     };
     const target = document.getElementById(panelMap[tabName] || 'tabCalendars');
@@ -376,6 +378,9 @@ function switchTab(tabName) {
     }
     if (tabName === 'accounts' && accountsLoaded === false) {
         loadAccounts();
+    }
+    if (tabName === 'reports' && reportsLoaded === false) {
+        loadReports();
     }
 }
 

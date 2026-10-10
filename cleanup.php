@@ -27,6 +27,8 @@
  *     emoji picks for deleted calendars/Hubs, and accounts unused for accounts.inactive_days
  *     (default 730) that no longer have any calendar name or Hub
  * 11) Invite only: delete pending requests after 30 days, and requests for deleted calendars/Hubs
+ * 12) Reports: delete reports decided more than accounts.reports_keep_days ago (default 180);
+ *     open reports are left for the super admin
  *
  * Steps 3 and 6 clean the old PIN session tables and are skipped once migration 008 drops them.
  *
@@ -187,6 +189,7 @@ $stats = [
     'account_sessions_deleted' => 0,
     'accounts_deleted' => 0,
     'access_requests_deleted' => 0,
+    'reports_deleted' => 0,
     'errors' => [],
 ];
 
@@ -489,6 +492,34 @@ try {
     echo "[11] ERROR cleaning requests: " . $e->getMessage() . "\n";
 }
 
+// 12. Reports (migrations/011_report_users.sql)
+// -----------------------------------------------------------------------------
+// Open reports are never touched: they are waiting for the super admin. Closed ones are kept
+// for reports.keep_days (default 180) as an audit trail, then removed.
+try {
+    $reportsReady = true;
+    try {
+        $pdo->query("SELECT status FROM reports LIMIT 0");
+    } catch (PDOException $e) {
+        $reportsReady = false;
+        echo "[12] Reports: skipped - run migrations/011_report_users.sql\n";
+    }
+    if ($reportsReady) {
+        $reportsKeepDays = max(1, (int)($config['accounts']['reports_keep_days'] ?? 180));
+        $stmt = $pdo->prepare("
+            DELETE FROM reports
+            WHERE status <> 'open'
+              AND COALESCE(decided_at, created_at) < DATE_SUB(NOW(), INTERVAL :days DAY)
+        ");
+        $stmt->execute([':days' => $reportsKeepDays]);
+        $stats['reports_deleted'] = $stmt->rowCount();
+        echo "[12] Closed reports deleted (>{$reportsKeepDays} days): {$stats['reports_deleted']}\n";
+    }
+} catch (Throwable $e) {
+    $stats['errors'][] = "Reports: " . $e->getMessage();
+    echo "[12] ERROR cleaning reports: " . $e->getMessage() . "\n";
+}
+
 // -------------------------------------------------------------------------
 // Summary
 // -------------------------------------------------------------------------
@@ -505,6 +536,7 @@ echo "Access picks deleted:  {$stats['access_attempts_deleted']}\n";
 echo "Account sessions:      {$stats['account_sessions_deleted']}\n";
 echo "Accounts deleted:      {$stats['accounts_deleted']}\n";
 echo "Requests deleted:      {$stats['access_requests_deleted']}\n";
+echo "Reports deleted:       {$stats['reports_deleted']}\n";
 
 if (!empty($stats['errors'])) {
     echo "\nErrors encountered:\n";

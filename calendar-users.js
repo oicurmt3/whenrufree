@@ -76,6 +76,10 @@ async function loadCalendarMeta(){
     state.namesPrivate = meta.calendar.names_private === true;
     state.organiserMarks = meta.calendar.organiser_marks !== false;
     state.organiserMarksAvailable = meta.calendar.organiser_marks_available === true;
+    // Blocking can offer a report once the reports table exists (migrations/011)
+    state.reportsAvailable = meta.calendar.reports_available === true;
+    state.reportReasons = meta.calendar.report_reasons && typeof meta.calendar.report_reasons === 'object'
+      ? meta.calendar.report_reasons : null;
     state.pendingRequests = Number.isInteger(meta.calendar.pending_requests) ? meta.calendar.pending_requests : null;
     updatePeopleBadge();
     updatePrivacyIndicator();
@@ -170,7 +174,7 @@ function setViewBarText(u){
   const name = document.createElement('b');
   name.textContent = u.display_name;
   text.textContent = '';
-  text.append('Viewing ', name, ' (read only)');
+  text.append('Viewing ', name);
 }
 
 function openUserView(u){
@@ -192,26 +196,34 @@ function closeUserView(){
   refreshCalendarValues();
 }
 
-/*** Update current user display in header (after title) */
+/*** Header state for your name here: People button tooltip, organiser marker, join banner */
 function updateCurrentUserDisplay(){
-  if(state.currentUserId){
-    const u = state.users.find(x => x.id === state.currentUserId);
-    if(u){
-      const displayText = u.role === 'admin' ? `${u.display_name} (organiser)` : u.display_name;
-      els.currentUserDisplay.textContent = displayText;
-      els.currentUserDisplay.classList.add('visible');
-      els.currentUserDisplay.classList.toggle('is-admin', u.role === 'admin');
-      els.userSelectBtn.classList.add('has-user');
-      els.userSelectBtn.title = `Viewing as: ${displayText}`;
-    }
+  const u = state.currentUserId ? state.users.find(x => x.id === state.currentUserId) : null;
+  if(u){
+    const displayText = u.role === 'admin' ? `${u.display_name} (organiser)` : u.display_name;
+    els.userSelectBtn.classList.add('has-user');
+    els.userSelectBtn.title = `People and your name (${displayText})`;
   } else {
-    els.currentUserDisplay.textContent = '';
-    els.currentUserDisplay.classList.remove('visible', 'is-admin');
     els.userSelectBtn.classList.remove('has-user');
     els.userSelectBtn.title = 'People';
   }
+  markBadgeOrganiser(!!u && u.role === 'admin');
   // Join banner until you have a name here
   els.nameBanner.style.display = state.currentUserId ? 'none' : '';
+}
+
+/** Account badge: organiser icon and tint while you organise this calendar. */
+function markBadgeOrganiser(isOrganiser){
+  const badge = els.accountBadge && els.accountBadge.querySelector('.acct-badge');
+  if(!badge) return;
+  if(badge.dataset.label === undefined) badge.dataset.label = badge.getAttribute('aria-label') || '';
+  badge.classList.toggle('is-organiser', isOrganiser);
+  const icon = badge.querySelector('.material-symbols-outlined');
+  if(icon) icon.textContent = isOrganiser ? 'admin_panel_settings' : 'account_circle';
+  badge.setAttribute('aria-label', badge.dataset.label + (isOrganiser ? ', organiser of this calendar' : ''));
+  badge.title = isOrganiser
+    ? "You're the organiser of this calendar. Tap for your profile, calendars and Hubs"
+    : 'Your profile, calendars and Hubs';
 }
 
 /*** People button badge: requests waiting (whoever decides them) */
@@ -221,9 +233,10 @@ function updatePeopleBadge(){
   const n = state.pendingRequests || 0;
   badge.hidden = n < 1;
   badge.textContent = n > 99 ? '99+' : String(n);
+  const label = state.currentUserId ? 'People on this calendar and your name' : 'People on this calendar';
   els.userSelectBtn.setAttribute('aria-label', n > 0
-    ? `People on this calendar, ${n} ${n === 1 ? 'request' : 'requests'} waiting`
-    : 'People on this calendar');
+    ? `${label}, ${n} ${n === 1 ? 'request' : 'requests'} waiting`
+    : label);
 }
 
 /*** People modal: everyone on the calendar, your name first */
@@ -280,7 +293,8 @@ function populateUserSelectModal(){
     const canView = canViewUser(u);
     const roleText = u.role === 'admin' ? 'Organiser' : (u.blocked ? 'Access paused' : '');
     const claimText = canClaim && u.claimable ? 'Yours from before? Tap to claim it' : '';
-    const viewText = canView ? (u.id === state.viewUserId ? 'Showing their calendar' : 'Tap to see') : '';
+    const viewing = canView && u.id === state.viewUserId;
+    const viewText = viewing ? 'Showing' : '';
     if(roleText || claimText || viewText){
       const role = document.createElement('div');
       role.className = 'user-select-role';
@@ -291,11 +305,32 @@ function populateUserSelectModal(){
     item.appendChild(avatar);
     item.appendChild(info);
 
-    if(u.mine || (canView && u.id === state.viewUserId)){
-      const check = document.createElement('span');
-      check.className = 'material-symbols-outlined user-select-check';
-      check.textContent = u.mine ? 'check_circle' : 'visibility';
-      item.appendChild(check);
+    if(u.mine){
+      const editBtn = document.createElement('button');
+      editBtn.className = 'user-select-edit';
+      editBtn.type = 'button';
+      editBtn.title = 'Change your name on this calendar';
+      editBtn.setAttribute('aria-label', editBtn.title);
+      editBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">person_edit</span>';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeUserSelectModal();
+        openUserModal('rename');
+      });
+      item.appendChild(editBtn);
+    } else if(canView){
+      const viewBtn = document.createElement('button');
+      viewBtn.className = 'user-select-view' + (viewing ? ' is-on' : '');
+      viewBtn.type = 'button';
+      viewBtn.title = (viewing ? 'Hide ' : 'Show ') + u.display_name + "'s Slots";
+      viewBtn.setAttribute('aria-label', viewBtn.title);
+      viewBtn.setAttribute('aria-pressed', viewing ? 'true' : 'false');
+      viewBtn.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${viewing ? 'visibility_off' : 'visibility'}</span>`;
+      viewBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleUserView(u);
+      });
+      item.appendChild(viewBtn);
     }
 
     // Organiser can pause (block) or restore other people
@@ -357,23 +392,107 @@ async function refreshPeopleAndViews(){
  * Pause or restore one person (organiser). Paused people can't open the calendar and their
  * answers are left out of the views and Best Match; nothing is deleted.
  */
-async function setCalendarUserBlocked(u, blocked, btn){
+function setCalendarUserBlocked(u, blocked, btn){
   if(!isCurrentUserOrganiser()) return;
-  if(blocked && !confirm(`Block "${u.display_name}"?\n\nThey can't open this calendar and their answers are hidden until you unblock them. Nothing is deleted.`)) return;
-  btn.disabled = true;
+  // Blocking opens a modal (Block, or Report & block); unblocking stays a quick confirm
+  if(blocked){ openBlockModal(u); return; }
+  if(!confirm(`Unblock "${u.display_name}"?\n\nThey can open this calendar again and their answers show in the views.`)) return;
+  applyBlockChange(u, false, null, btn);
+}
+
+/** Open the Block / Report & block modal for one person, always starting on plain Block. */
+function openBlockModal(u){
+  if(!els.blockUserModal) return;
+  state.blockTarget = u;
+  const reportable = state.reportsAvailable === true;
+  els.blockUserTitle.textContent = `Block ${u.display_name}?`;
+  els.blockUserText.textContent = `You can block ${u.display_name}, or report them to the super admin and block at the same time.`;
+  els.blockUserHint.textContent = "They can't open this calendar and their answers are hidden until you unblock them. Nothing is deleted.";
+  els.blockUserError.textContent = '';
+  els.blockDetails.value = '';
+  // The Report option only exists once migrations/011 has been applied
+  els.blockModeToggle.hidden = !reportable;
+  els.blockReportModeBtn.hidden = !reportable;
+  if(reportable) fillBlockReasons();
+  setBlockMode('block');
+  els.blockUserModal.classList.add('active');
+  els.blockUserCancel.focus();
+}
+
+function closeBlockModal(){
+  if(els.blockUserModal) els.blockUserModal.classList.remove('active');
+  state.blockTarget = null;
+}
+
+/** Two-way toggle: the button you press is the mode ("block" or "report"). */
+function setBlockMode(mode){
+  const report = mode === 'report';
+  els.blockModeToggle.querySelectorAll('.block-mode').forEach(b => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  els.blockReportFields.hidden = !report;
+  els.blockUserConfirm.textContent = report ? 'Report & block' : 'Block';
+}
+
+/** Reason options come from the server (includes/reports.php) so both sides agree. */
+function fillBlockReasons(){
+  const sel = els.blockReason;
+  if(!sel || sel.dataset.filled === '1') return;
+  sel.textContent = '';
+  const reasons = state.reportReasons;
+  const entries = reasons && typeof reasons === 'object' ? Object.entries(reasons) : [];
+  for(const [key, label] of entries){
+    const o = document.createElement('option');
+    o.value = key;
+    o.textContent = String(label);
+    sel.appendChild(o);
+  }
+  sel.dataset.filled = '1';
+}
+
+async function confirmBlockPerson(){
+  const u = state.blockTarget;
+  if(!u) return;
+  const wantsReport = !els.blockReportFields.hidden;
+  if(wantsReport && !els.blockReason.value){
+    els.blockUserError.textContent = 'Choose a reason for the report.';
+    return;
+  }
+  const report = wantsReport ? { reason: els.blockReason.value, details: els.blockDetails.value.trim() } : null;
+  await applyBlockChange(u, true, report, els.blockUserConfirm);
+}
+
+/**
+ * Pause one person (organiser), and optionally report them to the super admin at the same time.
+ * The block is what stops them; if the report fails the block still stands and we say so.
+ */
+async function applyBlockChange(u, blocked, report, btn){
+  if(btn) btn.disabled = true;
   try{
     const res = await apiPost('set_user_blocked', { user_id: u.id, blocked: blocked ? 1 : 0 });
     if(res.status !== 'success'){
-      showToast(res.message || 'Could not change that');
+      if(btn && btn === els.blockUserConfirm) els.blockUserError.textContent = res.message || 'Could not block this person.';
+      else showToast(res.message || 'Could not change that');
       return;
     }
-    showToast(blocked ? `${u.display_name} blocked` : `${u.display_name} unblocked`);
+    let reported = false;
+    if(report){
+      const rr = await apiPost('report_user', { user_id: u.id, reason: report.reason, details: report.details });
+      reported = rr.status === 'success';
+      if(!reported) showToast(rr.message || 'Blocked, but the report did not send');
+    }
+    closeBlockModal();
+    if(reported) showToast(`${u.display_name} blocked and reported`);
+    else if(!report) showToast(blocked ? `${u.display_name} blocked` : `${u.display_name} unblocked`);
     await refreshPeopleAndViews();
   } catch(e){
     console.error('Error blocking user:', e);
-    showToast('Could not change that');
+    if(btn && btn === els.blockUserConfirm) els.blockUserError.textContent = 'Could not block this person.';
+    else showToast('Could not change that');
   } finally {
-    btn.disabled = false;
+    if(btn) btn.disabled = false;
   }
 }
 
@@ -518,17 +637,30 @@ async function confirmDeleteCalendarUser(userId, displayName){
   }
 }
 
-/*** People modal: tap your name to change it, an old name to claim it, or someone else to see their calendar */
+/*** People modal: tap your name to see your own Slots, an old name to claim it, or someone else to see theirs */
 function onUserSelectItemClick(userId){
   const uid = Number(userId);
   const u = state.users.find(x => x.id === uid);
   if(!u) return;
-  closeUserSelectModal();
   if(u.mine){
-    openUserModal('rename');
+    closeUserSelectModal();
+    closeUserView();
+    document.querySelector('.calendar-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } else if(!state.currentUserId && u.claimable){
+    closeUserSelectModal();
     openClaimModal(u);
   } else if(canViewUser(u)){
+    toggleUserView(u);
+  }
+}
+
+/** Show someone's Slots (closes the People list), or hide them again (list stays open). */
+function toggleUserView(u){
+  if(state.viewUserId === u.id){
+    closeUserView();
+    populateUserSelectModal();
+  } else {
+    closeUserSelectModal();
     openUserView(u);
   }
 }
@@ -573,7 +705,7 @@ function setLoading(isLoading, message='Loading...'){
  * - Submit/Save button: visible only when authenticated
  * - Reset Mine button: visible for all authenticated users
  * - Reset All button: visible only for authenticated admin
- * - Edit name and Share: admin only
+ * - Share: admin only
  */
 function updateUserUI(){
   const hasUser = !!state.currentUserId;
@@ -590,9 +722,7 @@ function updateUserUI(){
   const showSubmit = isAuthenticated && !isCalendarFrozen() && !(isBookingClosed() && !isAdmin);
   els.submitBtn.style.display = showSubmit ? 'inline-flex' : 'none';
   
-  // Your name on this calendar: anyone who has joined. Share: organiser only
-  els.renameBtn.style.display = isAuthenticated ? 'inline-flex' : 'none';
-  els.renameBtn.disabled = !isAuthenticated;
+  // Share: organiser only (your own name is changed from your row in the People list)
   els.shareBtn.style.display = isAdmin ? 'inline-flex' : 'none';
   const hasSettings = (state.accessAvailable && window.AccessEmoji) || organiserMarksSettingShown();
   els.settingsBtn.style.display = (isAdmin && hasSettings) ? 'inline-flex' : 'none';

@@ -1297,3 +1297,10 @@ html, body {
 .booking-badge{display:inline-block;margin-left:6px;font-size:0.72rem;font-weight:600;color:#8a5300;background:#fff4e5;border-radius:999px;padding:2px 8px;vertical-align:middle;}
 .invite-badge{display:inline-block;margin-left:6px;font-size:0.72rem;font-weight:600;color:#283593;background:#e8eaf6;border-radius:999px;padding:2px 8px;vertical-align:middle;}
 .emoji-badge-hub{font-size:0.72rem;font-weight:600;color:#3f51b5;background:#e8eaf6;border-radius:999px;padding:2px 8px;font-family:inherit;}
+
+/* Reports tab: count badge on the tab, details under the reason, closed rows dimmed */
+.tab-badge{display:inline-block;margin-left:6px;font-size:0.72rem;font-weight:700;color:#fff;background:var(--danger);border-radius:999px;padding:1px 7px;vertical-align:middle;}
+.tab-badge.hide{display:none;}
+.report-details{margin-top:4px;font-size:0.82rem;color:var(--text-muted);white-space:normal;max-width:280px;}
+.report-closed{opacity:0.6;}
+.report-done{font-size:0.8rem;font-weight:600;color:var(--text-muted);}

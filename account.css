@@ -336,6 +336,14 @@ body.acct-locked {
   white-space: nowrap;
 }
 
+/* Calendar page: you organise this calendar (matches the organiser's avatar in People) */
+.acct-badge.is-organiser {
+  background: #212121;
+  border-color: #212121;
+  color: #fff;
+}
+.acct-badge.is-organiser:hover { background: #000; }
+
 /* Page title with the profile badge on the right */
 .acct-page-head {
   display: flex;
@@ -426,6 +434,33 @@ body.acct-locked {
 .acct-hint {
   font-size: 0.85rem;
   color: var(--acct-muted);
+}
+
+/* The private username: assigned at sign-up, shown read-only, never edited */
+.acct-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--acct-border);
+  border-radius: 8px;
+  background: #f4f5f7;
+  font-size: 0.95rem;
+}
+
+.acct-readonly .acct-readonly-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--acct-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.acct-readonly b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1rem;
+  word-break: break-all;
 }
 
 .acct-error {

@@ -8,7 +8,7 @@
   <meta name="description" content="Your When RU Free profile: your name, sign-in methods, calendars and Hubs.">
   <title>Your profile - When RU Free</title>
   <link rel="stylesheet" href="page.css">
-  <link rel="stylesheet" href="account.css?v=20261009b">
+  <link rel="stylesheet" href="account.css?v=20261010a">
 </head>
 <body class="acct-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -29,20 +29,20 @@
         <div id="signInButtons"></div>
       </section>
 
-      <!-- First sign-in: choose a username and a name -->
+      <!-- First sign-in: choose the name used on calendars -->
       <section id="setup" class="acct-section hide" aria-labelledby="setupTitle">
         <h2 id="setupTitle">Welcome! Set up your account</h2>
         <form id="setupForm" novalidate>
-          <div class="acct-field">
-            <label for="setupUsername">Username</label>
-            <input id="setupUsername" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required>
-            <span class="acct-hint">Private - only you see it. 3-20 lowercase letters, numbers or _.</span>
-          </div>
           <div class="acct-field">
             <label for="setupName">Your name on calendars</label>
             <input id="setupName" name="display_name" autocomplete="nickname" maxlength="32" required>
             <span class="acct-hint">Others see this on calendars you join. You can use a different name on any calendar.</span>
           </div>
+          <p class="acct-readonly">
+            <span class="acct-readonly-label">Private username</span>
+            <b id="setupUsernameValue">&mdash;</b>
+            <span class="acct-hint">Generated for your account. It is a reference only you and the super admin can see, never shown to other people, and it never changes.</span>
+          </p>
           <p id="setupError" class="acct-error" role="alert"></p>
           <button type="submit" class="acct-btn acct-btn-primary">Save and continue</button>
         </form>
@@ -58,10 +58,11 @@
               <input id="profileName" name="display_name" autocomplete="nickname" maxlength="32" required>
               <span class="acct-hint">Changing it also changes your name on every calendar where you haven't picked a different one.</span>
             </div>
-            <div class="acct-field">
-              <label for="profileUsername">Username (private)</label>
-              <input id="profileUsername" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required>
-            </div>
+            <p class="acct-readonly">
+              <span class="acct-readonly-label">Private username</span>
+              <b id="profileUsernameValue">&mdash;</b>
+              <span class="acct-hint">Fixed at sign-up. Only you and the super admin can see it; it is never shown on calendars.</span>
+            </p>
             <p id="profileError" class="acct-error" role="alert"></p>
             <p id="profileNote" class="acct-hint" role="status"></p>
             <button type="submit" class="acct-btn acct-btn-primary">Save profile</button>
@@ -106,7 +107,7 @@
           <div id="deleteConfirm" class="hide" style="margin-top:12px;">
             <div id="deleteSummary" class="acct-hint"></div>
             <div class="acct-field" style="margin-top:10px;">
-              <label for="deleteTyped">Type your username to confirm</label>
+              <label for="deleteTyped" id="deleteTypedLabel">Type your private username to confirm</label>
               <input id="deleteTyped" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="20">
             </div>
             <p id="deleteError" class="acct-error" role="alert"></p>
@@ -132,6 +133,6 @@
 
   <script src="passkey.js?v=20260927a"></script>
   <script src="account-core.js?v=20261009b"></script>
-  <script src="account.js?v=20261008b"></script>
+  <script src="account.js?v=20261010a"></script>
 </body>
 </html>

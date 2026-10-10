@@ -93,8 +93,6 @@ els.organiserMessageInput.addEventListener('keydown', (e)=>{
 });
 
 els.bannerAddBtn.addEventListener('click', ()=> openUserModal('add'));
-els.renameBtn.addEventListener('click', ()=>{ if(!state.currentUserId) return; openUserModal('rename'); });
-
 // "Add Your Name" link in User Select modal
 els.userSelectAddLink.addEventListener('click', (e)=>{
   e.preventDefault();
@@ -112,6 +110,19 @@ els.userSelectCancel.addEventListener('click', ()=> closeUserSelectModal());
 document.getElementById('viewBarClose').addEventListener('click', closeUserView);
 document.addEventListener('keydown', (e)=>{
   if(e.key === 'Escape' && state.viewUserId && !document.querySelector('.modal-overlay.active')) closeUserView();
+});
+
+// Block / Report & block modal (organiser). Two-way toggle: the button you press sets the mode.
+if(els.blockModeToggle){
+  els.blockModeToggle.addEventListener('click', (e)=>{
+    const b = e.target.closest('.block-mode');
+    if(b) setBlockMode(b.dataset.mode);
+  });
+}
+if(els.blockUserCancel) els.blockUserCancel.addEventListener('click', closeBlockModal);
+if(els.blockUserConfirm) els.blockUserConfirm.addEventListener('click', confirmBlockPerson);
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape' && els.blockUserModal && els.blockUserModal.classList.contains('active')) closeBlockModal();
 });
 
 // Info modal event listeners

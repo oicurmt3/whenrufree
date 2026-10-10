@@ -637,7 +637,6 @@ function getDayOfWeek(date){return date.getDay();}
 /*** Page elements and state */
 const els = {
   calendarTitle: qs('#calendarTitle'),
-  currentUserDisplay: qs('#currentUserDisplay'),
   serverStatus: qs('#serverStatus'),
   // User select button (icon) and modal
   userSelectBtn: qs('#userSelectBtn'),
@@ -645,10 +644,22 @@ const els = {
   userSelectList: qs('#userSelectList'),
   userSelectCancel: qs('#userSelectCancel'),
   userSelectAddLink: qs('#userSelectAddLink'),
+  // Block / Report & block modal (organiser)
+  blockUserModal: qs('#blockUserModal'),
+  blockUserTitle: qs('#blockUserTitle'),
+  blockUserText: qs('#blockUserText'),
+  blockModeToggle: qs('#blockModeToggle'),
+  blockReportModeBtn: qs('#blockReportModeBtn'),
+  blockReportFields: qs('#blockReportFields'),
+  blockReason: qs('#blockReason'),
+  blockDetails: qs('#blockDetails'),
+  blockUserHint: qs('#blockUserHint'),
+  blockUserError: qs('#blockUserError'),
+  blockUserCancel: qs('#blockUserCancel'),
+  blockUserConfirm: qs('#blockUserConfirm'),
   // Other elements
   bannerAddBtn: qs('#bannerAddBtn'),
   nameBanner: qs('#nameBanner'),
-  renameBtn: qs('#renameBtn'),
   monthLabel: qs('#monthLabel'),
   togglePastDatesBtn: qs('#togglePastDatesBtn'),
   legendWrap: qs('#legendWrap'),
@@ -719,6 +730,9 @@ const state = {
   namesPrivate:false, // Blind, or Hidden with Hide names too
   organiserMarks:true, // Organiser's answers as a coloured slot edge (Open calendars; organiser can turn off)
   organiserMarksAvailable:false, // Server has calendars.show_organiser_marks (migration 010)
+  reportsAvailable:false, // Server has the reports table (migration 011): offer Report & block
+  reportReasons:null, // reason key => label, from the server so both sides agree
+  blockTarget:null, // Person the block modal is open for
   pendingRequests:null, // Requests waiting (only for whoever decides them)
   users:[],
   usersTotal:0, // Everyone who has joined (users may be trimmed when names are private)

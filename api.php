@@ -57,6 +57,7 @@ require_once __DIR__ . '/includes/oauth.php';
 require_once __DIR__ . '/includes/access.php';
 require_once __DIR__ . '/includes/booking.php';
 require_once __DIR__ . '/includes/members.php';
+require_once __DIR__ . '/includes/reports.php';
 
 // -------------------------
 // Main routing
@@ -149,24 +150,12 @@ if ($action === 'account_me' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     ]);
 }
 
-// Choose or change the private username and/or the profile name used on calendars
+// Change the profile name used on calendars. The private username is fixed at sign-up.
 if ($action === 'account_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     $acct = requireAccount($pdo, false);
     enforceActionRateLimit($pdo, clientIp(), 'acu' . gmdate('YmdHi'), 20, 'Too many changes. Try again shortly.');
 
-    $username = null;
-    if (array_key_exists('username', $_POST)) {
-        $isAdmin = in_array($acct['id'], adminAccountIds($config), true);
-        $username = accountNormaliseUsername($_POST['username'], $isAdmin);
-        if ($username === null) {
-            if (is_string($_POST['username']) && accountUsernameReserved($_POST['username'])) {
-                respond(400, ['status' => 'error', 'code' => 'USERNAME_RESERVED', 'message' => 'That username is reserved. Please choose another.']);
-            }
-            respond(400, ['status' => 'error', 'code' => 'USERNAME_INVALID', 'message' => 'Usernames are 3-20 lowercase letters, numbers or _.']);
-        }
-        if ($username === $acct['username']) $username = null;
-    }
     $displayName = null;
     if (array_key_exists('display_name', $_POST)) {
         $displayName = accountNormaliseName($_POST['display_name']);
@@ -175,11 +164,11 @@ if ($action === 'account_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($displayName === $acct['display_name']) $displayName = null;
     }
-    if (($acct['username'] === null && $username === null) || ($acct['display_name'] === null && $displayName === null)) {
-        respond(400, ['status' => 'error', 'message' => 'Choose a username and a name.']);
+    if ($acct['display_name'] === null && $displayName === null) {
+        respond(400, ['status' => 'error', 'message' => 'Choose a name for your calendars.']);
     }
 
-    $result = accountUpdateProfile($pdo, $acct['id'], $username, $displayName);
+    $result = accountUpdateProfile($pdo, $acct['id'], $displayName);
     $GLOBALS['_wruf_account_loaded'] = false;
     $now = accountCurrent($pdo);
     respond(200, [
@@ -526,6 +515,47 @@ if ($action === 'set_user_blocked' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$check->fetchColumn()) respond(404, ['status' => 'error', 'message' => 'Person not found']);
     logSecurityEvent('USER_BLOCKED', ['calendar_id' => $calId, 'user_id' => $userId, 'blocked' => $blocked === 1]);
     respond(200, ['status' => 'success', 'blocked' => $blocked === 1]);
+}
+
+// Report a person to the super admin (calendar organiser). Sent together with blocking from the
+// block modal; blocking works on its own too, and a report without a block is not offered.
+if ($action === 'report_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!reportsTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Reporting is not available yet']);
+    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can report someone']);
+    }
+    $reason = (string)($_POST['reason'] ?? '');
+    if (!reportReasonValid($reason)) {
+        respond(400, ['status' => 'error', 'message' => 'Choose a reason for the report.']);
+    }
+    $userId = (int)($_POST['user_id'] ?? 0);
+    $stmt = $pdo->prepare("SELECT id, account_id, display_name, role FROM users WHERE id = :uid AND calendar_id = :cid LIMIT 1");
+    $stmt->execute([':uid' => $userId, ':cid' => $calId]);
+    $person = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$person) respond(404, ['status' => 'error', 'message' => 'Person not found']);
+    if ((string)$person['role'] === 'admin') respond(403, ['status' => 'error', 'message' => 'Organisers cannot be reported']);
+    if ((int)($person['account_id'] ?? 0) === (int)$session['account_id']) {
+        respond(400, ['status' => 'error', 'message' => 'You cannot report yourself']);
+    }
+    $reportId = reportCreate(
+        $pdo,
+        $calId,
+        (int)$person['id'],
+        $person['account_id'] !== null ? (int)$person['account_id'] : null,
+        (int)$session['account_id'],
+        $person['display_name'] !== null ? (string)$person['display_name'] : null,
+        $reason,
+        reportCleanDetails($_POST['details'] ?? null)
+    );
+    logSecurityEvent('USER_REPORTED', ['calendar_id' => $calId, 'user_id' => (int)$person['id'], 'report_id' => $reportId, 'reason' => $reason]);
+    respond(200, ['status' => 'success', 'report_id' => $reportId]);
 }
 
 // Show or hide the organiser's answers as a coloured edge on everyone's slots (calendar organiser)
@@ -1110,6 +1140,10 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     // Organiser's answers as a coloured edge on Open calendars; the organiser can turn it off
     $cal['organiser_marks'] = !$marksReady || (int)($cal['show_organiser_marks'] ?? 1) === 1;
     $cal['organiser_marks_available'] = $marksReady;
+
+    // Reporting a person when blocking them (migrations/011); the option is hidden until it runs
+    $cal['reports_available'] = $members && reportsTablesReady($pdo);
+    $cal['report_reasons'] = $cal['reports_available'] ? reportReasons() : null;
 
     unset($cal['group_id'], $cal['group_token'], $cal['group_title'], $cal['group_invite_only'], $cal['show_organiser_marks']);
 
@@ -2289,6 +2323,59 @@ if ($action === 'admin_accounts' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         ];
     }
     respond(200, ['status' => 'success', 'available' => true, 'methods' => $methods, 'totals' => $totals, 'accounts' => $accounts]);
+}
+
+/**
+ * Reports queue (super admin only): reports sent by organisers when blocking someone, open
+ * first, newest first. The reported account's private username is included here and nowhere else.
+ */
+if ($action === 'admin_reports' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    requireAdminSession();
+    if (!reportsTablesReady($pdo)) {
+        respond(200, ['status' => 'success', 'available' => false, 'open' => 0, 'reports' => []]);
+    }
+    respond(200, [
+        'status' => 'success',
+        'available' => true,
+        'open' => reportsOpenCount($pdo),
+        'reasons' => reportReasons(),
+        'reports' => reportList($pdo),
+    ]);
+}
+
+/**
+ * Decide a report (super admin only): 'dismiss' closes it and leaves the person alone, or
+ * 'delete' removes their account (same as the person deleting it themselves) and closes it.
+ */
+if ($action === 'admin_report_decide' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAdminSession();
+    requireCsrf();
+    if (!reportsTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Reporting is not available yet']);
+    $reportId = (int)($_POST['report_id'] ?? 0);
+    $decision = (string)($_POST['decision'] ?? '');
+    if (!in_array($decision, ['dismiss', 'delete'], true)) {
+        respond(400, ['status' => 'error', 'message' => 'Invalid decision']);
+    }
+    $report = reportFind($pdo, $reportId);
+    if (!$report) respond(404, ['status' => 'error', 'message' => 'Report not found']);
+    if ((string)$report['status'] !== 'open') respond(409, ['status' => 'error', 'message' => 'That report is already closed']);
+
+    if ($decision === 'delete') {
+        accountRequireTables($pdo);
+        $accountId = $report['account_id'] !== null ? (int)$report['account_id'] : 0;
+        if ($accountId <= 0) {
+            respond(400, ['status' => 'error', 'message' => 'That person has no account to delete. Dismiss the report instead.']);
+        }
+        $stmt = $pdo->prepare("SELECT 1 FROM accounts WHERE id = :id");
+        $stmt->execute([':id' => $accountId]);
+        if (!$stmt->fetchColumn()) respond(404, ['status' => 'error', 'message' => 'That account no longer exists']);
+        accountDelete($pdo, $accountId);
+        logSecurityEvent('ADMIN_REPORT_DELETE_ACCOUNT', ['report_id' => $reportId, 'account_id' => $accountId]);
+    } else {
+        logSecurityEvent('ADMIN_REPORT_DISMISSED', ['report_id' => $reportId]);
+    }
+    reportClose($pdo, $reportId);
+    respond(200, ['status' => 'success', 'open' => reportsOpenCount($pdo)]);
 }
 
 /**

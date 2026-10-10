@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Admin - When RU Free?</title>
-  <link rel="stylesheet" href="admin.css?v=20261008b">
+  <link rel="stylesheet" href="admin.css?v=20261010a">
 </head>
 <body>
 
@@ -62,6 +62,10 @@
         </button>
         <button class="admin-tab" data-tab="accounts" role="tab" aria-selected="false" aria-controls="tabAccounts">
           <span class="material-symbols-outlined">account_circle</span> Accounts
+        </button>
+        <button class="admin-tab" data-tab="reports" role="tab" aria-selected="false" aria-controls="tabReports">
+          <span class="material-symbols-outlined">flag</span> Reports
+          <span class="tab-badge hide" id="reportsTabBadge">0</span>
         </button>
         <button class="admin-tab" data-tab="setup" role="tab" aria-selected="false" aria-controls="tabSetup">
           <span class="material-symbols-outlined">tune</span> Setup Page
@@ -266,6 +270,51 @@
         <div id="accountErrorState" class="state-msg error hide"></div>
 
       </div><!-- /tabAccounts -->
+
+      <!-- ============================================
+           TAB: REPORTS
+           ============================================ -->
+      <div id="tabReports" class="tab-panel hide" role="tabpanel">
+
+        <div class="setup-header">
+          <p class="setup-intro">Reports sent by calendar organisers when they block someone. <strong>Dismiss</strong> closes a report and leaves the person alone; <strong>Delete account</strong> removes their account and everything it owns. Usernames are shown here only.</p>
+          <div class="setup-save-bar">
+            <span id="reportsStatus" class="setup-status"></span>
+            <button id="reportsRefreshBtn" class="btn btn-ghost btn-small">
+              <span class="material-symbols-outlined">refresh</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table id="reportTable" class="admin-table">
+            <thead>
+              <tr>
+                <th class="col-id">ID</th>
+                <th class="col-title">Reported name</th>
+                <th class="col-organiser">Username</th>
+                <th class="col-created">Reason</th>
+                <th class="col-activity">Calendar</th>
+                <th class="col-users">Reported by</th>
+                <th class="col-created">Reported</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody">
+            </tbody>
+          </table>
+        </div>
+        <p class="account-note">Open reports come first. Details, when given, show under the reason.</p>
+
+        <div id="reportLoadingState" class="state-msg hide">
+          <span class="material-symbols-outlined spin">progress_activity</span> Loading reports...
+        </div>
+        <div id="reportEmptyState" class="state-msg hide">
+          <span class="material-symbols-outlined">flag</span> No reports
+        </div>
+        <div id="reportErrorState" class="state-msg error hide"></div>
+
+      </div><!-- /tabReports -->
 
       <!-- ============================================
            TAB: SETUP PAGE CUSTOMISER
@@ -531,10 +580,11 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0">
 
   <script src="emoji.js?v=20261008b"></script>
-  <script src="admin-core.js?v=20261008b"></script>
+  <script src="admin-core.js?v=20261010a"></script>
   <script src="admin-calendars.js?v=20261008b"></script>
   <script src="admin-hubs.js?v=20261008b"></script>
   <script src="admin-accounts.js?v=20260927a"></script>
+  <script src="admin-reports.js?v=20261010a"></script>
   <script src="admin-setup.js?v=20261009a"></script>
 </body>
 </html>

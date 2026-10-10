@@ -101,30 +101,6 @@ h1{
   flex-wrap:wrap;
 }
 
-/* Current user display - shown after title */
-.current-user-display{
-  font-size:1rem;
-  font-weight:600;
-  color:rgba(255,255,255,.95);
-  display:none; /* Hidden when no user selected */
-  align-items:center;
-  gap:6px;
-  background:rgba(0,0,0,.2);
-  padding:4px 8px;
-  border-radius:6px;
-  white-space:nowrap;
-}
-
-.current-user-display.visible{
-  display:inline-flex;
-}
-
-
-
-.current-user-display.is-admin{
-  background:rgba(0,0,0,.35);
-}
-
 .controls{
   display:flex;
   align-items:center;
@@ -984,6 +960,64 @@ main{
 
 .btn-cancel{background:#e0e0e0;color:#333;}
 .btn-confirm{background:var(--primary);color:white;}
+.btn-danger{background:#b3261e;color:white;}
+
+/* Block / Report & block modal */
+.modal select,
+.modal textarea{
+  width:100%;
+  padding:10px 12px;
+  border:1px solid #d7dbe0;
+  border-radius:10px;
+  font-size:1rem;
+  font-family:inherit;
+  margin-top:6px;
+  background:#fff;
+}
+
+.block-toggle{
+  display:flex;
+  gap:6px;
+  padding:4px;
+  margin:12px 0 4px;
+  background:#eceef1;
+  border-radius:10px;
+}
+
+.block-toggle[hidden]{display:none;}
+
+.block-mode{
+  flex:1;
+  min-height:44px;
+  padding:8px 10px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:#444;
+  font-size:0.95rem;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.block-mode[hidden]{display:none;}
+
+.block-mode.active{
+  background:#fff;
+  color:#b3261e;
+  box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+
+.block-note{
+  margin:8px 0 0;
+  font-size:0.85rem;
+  color:#5a5f66;
+  line-height:1.4;
+}
+
+#blockReportFields .fieldish label{
+  font-weight:600;
+  font-size:0.9rem;
+}
 
 /* ============================================
    USER SELECT LIST (in modal)
@@ -1063,11 +1097,25 @@ main{
   font-weight:500;
 }
 
-.user-select-check{
-  color:var(--status-yes);
-  font-size:24px;
+/* Show / hide someone's Slots (read-only view) */
+.user-select-view{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:44px;
+  height:44px;
+  border:none;
+  background:transparent;
+  color:#555;
+  border-radius:50%;
+  cursor:pointer;
   flex-shrink:0;
+  padding:0;
+  transition:background .15s, color .15s;
 }
+.user-select-view:hover{background:#e8eaf6;color:#283593;}
+.user-select-view.is-on{background:#e8eaf6;color:#3f51b5;}
+.user-select-view .material-symbols-outlined{font-size:22px;}
 
 /* Delete button in user select list (organiser only) */
 .user-select-delete{
@@ -1116,6 +1164,25 @@ main{
 .user-select-block.is-undo{color:#2e7d32;}
 .user-select-block.is-undo:hover{background:#e8f5e9;color:#1b5e20;}
 .user-select-block .material-symbols-outlined{font-size:20px;}
+
+/* Change your own name (your row) */
+.user-select-edit{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:44px;
+  height:44px;
+  border:none;
+  background:#e8eaf6;
+  color:#3f51b5;
+  border-radius:50%;
+  cursor:pointer;
+  flex-shrink:0;
+  padding:0;
+  transition:background .15s, color .15s;
+}
+.user-select-edit:hover{background:#c5cae9;color:#283593;}
+.user-select-edit .material-symbols-outlined{font-size:22px;}
 .user-select-item.is-blocked .user-select-avatar,
 .user-select-item.is-blocked .user-select-info{opacity:.45;}
 
@@ -1298,12 +1365,6 @@ main{
 
   .day-column{min-width:0;}
 
-  /* Adjust current user display for tablet */
-  .current-user-display{
-    font-size:.9rem;
-    padding:3px 10px;
-  }
-  
   /* Ensure toggles stay on same row */
   .analysis-title{
     flex-wrap:nowrap;
@@ -1358,12 +1419,6 @@ main{
 
   .day-column{min-width:0;}
 
-  /* Adjust current user display for tablet */
-  .current-user-display{
-    font-size:.9rem;
-    padding:3px 10px;
-  }
-  
   /* Ensure toggles stay on same row */
   .analysis-title{
     flex-wrap:nowrap;
@@ -1418,12 +1473,6 @@ main{
 
   .day-column{min-width:0;}
 
-  /* Adjust current user display for tablet */
-  .current-user-display{
-    font-size:.9rem;
-    padding:3px 10px;
-  }
-  
   /* Ensure toggles stay on same row */
   .analysis-title{
     flex-wrap:nowrap;
@@ -1461,11 +1510,6 @@ main{
     font-size:1rem;
   }
 
-  .current-user-display{
-    font-size:.85rem;
-    padding:3px 8px;
-  }
-  
   /* Keep toggles on same row with smaller sizing */
   .analysis-title{
     flex-wrap:nowrap;
@@ -1507,10 +1551,6 @@ main{
     font-size:.95rem;
   }
 
-  .current-user-display{
-    font-size:.8rem;
-  }
-  
   /* Hide text labels on small screens, show only icons */
   .sort-toggle .sort-btn span:not(.material-symbols-outlined){
     display:none;

@@ -103,13 +103,12 @@ async function saveProfile(form, errorEl, body) {
 
 function initSetup() {
   show('setup', true);
-  $('setupUsername').value = info.username || '';
+  $('setupUsernameValue').textContent = info.username || 'generated when you save';
   $('setupName').value = info.display_name || '';
-  $('setupUsername').focus();
+  $('setupName').focus();
   $('setupForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = await saveProfile($('setupForm'), $('setupError'), {
-      username: $('setupUsername').value.trim().toLowerCase(),
       display_name: $('setupName').value.trim(),
     });
     if (!data) return;
@@ -121,12 +120,11 @@ function initSetup() {
 
 function initProfile() {
   $('profileName').value = info.display_name || '';
-  $('profileUsername').value = info.username || '';
+  $('profileUsernameValue').textContent = info.username || 'not assigned';
   $('profileForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('profileNote').textContent = '';
     const data = await saveProfile($('profileForm'), $('profileError'), {
-      username: $('profileUsername').value.trim().toLowerCase(),
       display_name: $('profileName').value.trim(),
     });
     if (!data) return;
@@ -312,6 +310,9 @@ function initSignOutAndDelete() {
       p.textContent = t;
       summary.appendChild(p);
     });
+    $('deleteTypedLabel').textContent = info.username
+      ? `Type your private username (${info.username}) to confirm`
+      : 'Type your private username to confirm';
     show('deleteConfirm', true);
     $('deleteStartBtn').classList.add('hide');
     $('deleteTyped').focus();

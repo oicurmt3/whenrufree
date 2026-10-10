@@ -167,7 +167,8 @@ function accountCurrent(PDO $pdo): ?array {
         accountSetCookie($token, $expires);
     }
 
-    $username = $row['username'] !== null ? (string)$row['username'] : null;
+    // Accounts made before usernames were assigned get one the first time they are seen
+    $username = $row['username'] !== null ? (string)$row['username'] : accountEnsureUsername($pdo, (int)$row['id']);
     $GLOBALS['_wruf_account'] = [
         'id' => (int)$row['id'],
         'username' => $username,
@@ -177,7 +178,7 @@ function accountCurrent(PDO $pdo): ?array {
     return $GLOBALS['_wruf_account'];
 }
 
-/** True until the account has chosen a username and profile name. */
+/** True until the account has a name to use on calendars (its username is assigned at sign-up). */
 function accountNeedsSetup(PDO $pdo, int $accountId): bool {
     $stmt = $pdo->prepare("SELECT username, display_name FROM accounts WHERE id = :id");
     $stmt->execute([':id' => $accountId]);
@@ -185,7 +186,7 @@ function accountNeedsSetup(PDO $pdo, int $accountId): bool {
     return !$row || $row['username'] === null || $row['display_name'] === null;
 }
 
-/** Respond 401 unless signed in (and, by default, with a username and profile name chosen). */
+/** Respond 401 unless signed in (and, by default, with a name for calendars chosen). */
 function requireAccount(PDO $pdo, bool $setupDone = true): array {
     accountRequireTables($pdo);
     $acct = accountCurrent($pdo);
@@ -193,7 +194,7 @@ function requireAccount(PDO $pdo, bool $setupDone = true): array {
         respond(401, ['status' => 'error', 'code' => 'ACCOUNT_REQUIRED', 'message' => 'Please sign in.']);
     }
     if ($setupDone && $acct['needs_setup']) {
-        respond(403, ['status' => 'error', 'code' => 'ACCOUNT_SETUP', 'message' => 'Choose a username and name first.']);
+        respond(403, ['status' => 'error', 'code' => 'ACCOUNT_SETUP', 'message' => 'Choose the name to show on calendars first.']);
     }
     return $acct;
 }
@@ -241,9 +242,40 @@ function accountIdForIdentity(PDO $pdo, string $provider, string $hash): ?int {
     return $id === false ? null : (int)$id;
 }
 
+/**
+ * A free private username: "user" + six digits. Assigned at sign-up and never shown to anyone
+ * but the account itself and the super admin, so it is not chosen by the person.
+ */
+function accountGenerateUsername(PDO $pdo): string {
+    $stmt = $pdo->prepare("SELECT 1 FROM accounts WHERE username = :u LIMIT 1");
+    for ($i = 0; $i < 20; $i++) {
+        $candidate = 'user' . sprintf('%06d', random_int(0, 999999));
+        if (accountNormaliseUsername($candidate) !== $candidate) continue;
+        $stmt->execute([':u' => $candidate]);
+        if (!$stmt->fetchColumn()) return $candidate;
+    }
+    logSecurityEvent('ACCOUNT_USERNAME_GENERATE_FAILED');
+    respond(500, ['status' => 'error', 'message' => 'Server busy. Please try again.']);
+}
+
+/** Give an account without a username one (accounts made before usernames were assigned). */
+function accountEnsureUsername(PDO $pdo, int $accountId): ?string {
+    try {
+        $pdo->prepare("UPDATE accounts SET username = :u WHERE id = :id AND username IS NULL")
+            ->execute([':u' => accountGenerateUsername($pdo), ':id' => $accountId]);
+    } catch (Throwable $e) {
+        logSecurityEvent('ACCOUNT_USERNAME_BACKFILL_FAILED', ['account_id' => $accountId]);
+        return null;
+    }
+    $stmt = $pdo->prepare("SELECT username FROM accounts WHERE id = :id");
+    $stmt->execute([':id' => $accountId]);
+    $v = $stmt->fetchColumn();
+    return is_string($v) && $v !== '' ? $v : null;
+}
+
 function accountCreate(PDO $pdo): int {
-    $pdo->prepare("INSERT INTO accounts (created_at, last_seen_at) VALUES (:now, :now2)")
-        ->execute([':now' => accountNow(), ':now2' => accountNow()]);
+    $pdo->prepare("INSERT INTO accounts (username, created_at, last_seen_at) VALUES (:u, :now, :now2)")
+        ->execute([':u' => accountGenerateUsername($pdo), ':now' => accountNow(), ':now2' => accountNow()]);
     return (int)$pdo->lastInsertId();
 }
 
@@ -335,23 +367,13 @@ function accountNameForCalendar(array $acct, mixed $posted): array {
 }
 
 /**
- * Change the username and/or profile name. A new profile name is copied to every calendar
+ * Change the profile name. The username is assigned at sign-up and never changes.
+ * A new profile name is copied to every calendar
  * name that follows it (name_custom = 0); calendars where that name is already taken keep
  * the old name and are returned so the page can say so.
  * @return array{renamed:int, conflicts:list<string>}
  */
-function accountUpdateProfile(PDO $pdo, int $accountId, ?string $username, ?string $displayName): array {
-    if ($username !== null) {
-        try {
-            $pdo->prepare("UPDATE accounts SET username = :u WHERE id = :id")
-                ->execute([':u' => $username, ':id' => $accountId]);
-        } catch (PDOException $e) {
-            if ((string)$e->getCode() === '23000') {
-                respond(409, ['status' => 'error', 'code' => 'USERNAME_TAKEN', 'message' => 'That username is taken. Try another.']);
-            }
-            throw $e;
-        }
-    }
+function accountUpdateProfile(PDO $pdo, int $accountId, ?string $displayName): array {
     $result = ['renamed' => 0, 'conflicts' => []];
     if ($displayName === null) return $result;
 

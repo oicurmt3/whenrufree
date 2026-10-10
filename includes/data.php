@@ -168,6 +168,21 @@ function organiserMarksColumnReady(PDO $pdo): bool {
     return $cache[$key];
 }
 
+/** True once migrations/011_report_users.sql has been applied. */
+function reportsTablesReady(PDO $pdo): bool {
+    static $cache = [];
+    $key = spl_object_id($pdo);
+    if (!isset($cache[$key])) {
+        try {
+            $pdo->query('SELECT id FROM reports LIMIT 0');
+            $cache[$key] = true;
+        } catch (PDOException $e) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
+}
+
 /** Respond 409 when a unique display_name constraint is violated. */
 function respondDuplicateName(): void {
     respond(409, ['status' => 'error', 'code' => 'NAME_TAKEN', 'message' => 'Someone on this calendar already uses that name. Add a letter or number to make it unique.']);

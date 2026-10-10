@@ -114,6 +114,8 @@ function isSensitivePostAction(string $action): bool {
         'cancel_access_request',
         'decide_access_request',
         'set_user_blocked',
+        'report_user',
+        'admin_report_decide',
         'set_organiser_marks',
         'account_update',
         'account_remove_method',
