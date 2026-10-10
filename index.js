@@ -1094,12 +1094,6 @@ function applyRankingMode(){
       if (weightNum) weightNum.style.display = '';
     }
   });
-  // Keep the Default option column heading lined up with the row controls it sits above.
-  // Rows hide the control they do not use, so the matching heading spacer is taken out of the flow.
-  const headUp = document.getElementById('statusHeadUp');
-  const headWeight = document.getElementById('statusHeadWeight');
-  if (headUp) headUp.style.display = rankingMode === 'rank' ? '' : 'none';
-  if (headWeight) headWeight.style.display = rankingMode === 'weights' ? '' : 'none';
   refreshStatusReorderUI();
 }
 
@@ -1231,13 +1225,6 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   weightNum.title = 'Weight 0-5';
   weightNum.style.display = rankingMode === 'weights' ? '' : 'none';
 
-  const del = document.createElement('button');
-  del.type = 'button';
-  del.className = 'btn-small remove';
-  del.setAttribute('aria-label', 'Delete');
-  del.setAttribute('title', 'Delete');
-  del.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">delete</span>`;
-
   const err = document.createElement('span');
   err.className = 'inline-error';
 
@@ -1280,7 +1267,6 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
     if (v > 5) v = 5;
     weightNum.value = v;
   });
-  del.addEventListener('click', () => { row.remove(); applyDefaultColors(); paintDefaultToggles(); validateStatusesUI(); });
 
   up.addEventListener('click', () => {
     const prev = row.previousElementSibling;
@@ -1300,7 +1286,6 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   row.appendChild(input);
   row.appendChild(weightNum);
   row.appendChild(defCol);
-  row.appendChild(del);
   row.appendChild(err);
   return row;
 }

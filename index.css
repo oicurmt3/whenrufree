@@ -260,7 +260,6 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 
 .status-row .move-up{ background:#fff; border:1px solid var(--border); border-radius:6px; padding:8px 10px; line-height:1; }
 .status-row .move-up .material-symbols-outlined{ font-size:20px; }
-.status-row .remove{ background:#fff; border:1px solid var(--border); border-radius:6px; }
 
 /* Weight input (small number box) */
 .status-row .weight-num{
@@ -279,26 +278,8 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 
 /* Default option (migrations/013): the option every Slot begins with, so Slots are never
    un-answered. One button per Option row: an empty box while it is off, a ticked box once it is
-   the default. Its heading sits above the column the buttons belong to, wrapped to two lines. */
-.status-head{
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  max-width: 440px;
-  margin: 0 0 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-.status-head-slot{ flex: 0 0 auto; }
-#statusHeadUp{ width: 42px; }
-#statusHeadColor{ width: 36px; }
-#statusHeadWeight{ width: 38px; }
-.status-head-grow{ flex: 1; }
-.status-head-label{ flex: 0 0 76px; width: 76px; text-align: center; line-height: 1.15; }
-.status-head-del{ width: 50px; }
-
-.status-default-col{ flex: 0 0 76px; width: 76px; display: flex; justify-content: center; }
+   the default. The muted line above + Add status says what the box is for. */
+.status-default-col{ flex: 0 0 48px; width: 48px; display: flex; justify-content: center; }
 .default-toggle{
   position: relative;
   width: 36px;
