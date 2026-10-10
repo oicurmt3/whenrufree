@@ -459,8 +459,8 @@ function updateManageState(){
   if(!m) return;
   const name = m.user.display_name;
   els.manageBlockHint.textContent = m.blocked === 1
-    ? `Block: ${name} cannot open this calendar and their answers are hidden from the views and Best Match.`
-    : `Unblock: ${name} can open this calendar again and their answers count as normal.`;
+    ? `${name} is blocked and their answers are hidden.`
+    : `${name} can use this calendar as normal.`;
   els.manageDeleteHint.hidden = !m.delete;
   const currentAsInt = m.currentBlocked ? 1 : 0;
   const changes = m.delete || m.reason !== '' || m.blocked !== currentAsInt;
