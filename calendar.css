@@ -411,8 +411,12 @@ main{
    Slots your answers take the left border, the
    same way the organiser's does on your own
    calendar, so the fill (them) and the border
-   (you) compare at a glance
+   (you) compare at a glance. No answer yet uses
+   the same null grey as an un-answered fill, so
+   "I haven't picked" reads as a choice, not as
+   a missing indicator
    ============================================ */
+.time-slot.own-border-0{border-left-color:var(--status-null);}
 .time-slot.own-border-1{border-left-color:var(--status-1);}
 .time-slot.own-border-2{border-left-color:var(--status-2);}
 .time-slot.own-border-3{border-left-color:var(--status-3);}

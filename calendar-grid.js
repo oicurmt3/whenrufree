@@ -112,20 +112,21 @@ function updateOrganiserDot(slotEl, dateStr, slotId){
  * Updates your own left-edge indicator while you are reading someone else's calendar.
  * The fill colour is the person you are viewing, so the left border becomes YOUR answer instead,
  * letting you compare at a glance. While viewing, the organiser's edge steps aside for it.
- * Only shown while viewing: on your own calendar the fill already is your answer.
+ * An un-answered slot shows the null grey edge rather than no edge, so "I haven't picked" is
+ * never mistaken for a missing indicator. Only shown while viewing: on your own calendar the fill
+ * already is your answer.
  * @param {HTMLElement} slotEl - The slot element
  * @param {string} dateStr - Date in YYYY-MM-DD format
  * @param {string} slotId - The slot ID
  */
 function updateOwnEdge(slotEl, dateStr, slotId){
-  slotEl.classList.remove('own-border-1','own-border-2','own-border-3','own-border-4','own-border-5');
+  slotEl.classList.remove('own-border-0','own-border-1','own-border-2','own-border-3','own-border-4','own-border-5');
 
   // Only while viewing someone else, and only if you have a name here to compare
   if(!state.viewUserId || !state.currentUserId) return;
 
+  // STATUS_NULL (0) is a real answer state here, so it colours the edge instead of clearing it
   const {status} = getStatus(state.currentUserId, dateStr, slotId);
-  if(status === STATUS_NULL) return;
-
   slotEl.classList.add(`own-border-${status}`);
 }
 
