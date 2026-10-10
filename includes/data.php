@@ -168,6 +168,38 @@ function organiserMarksColumnReady(PDO $pdo): bool {
     return $cache[$key];
 }
 
+/** True once migrations/012_null_color.sql has been applied. */
+function nullColorColumnReady(PDO $pdo): bool {
+    static $cache = [];
+    $key = spl_object_id($pdo);
+    if (!isset($cache[$key])) {
+        try {
+            $pdo->query('SELECT null_color FROM calendars LIMIT 0');
+            $cache[$key] = true;
+        } catch (PDOException $e) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
+}
+
+/**
+ * The five greys an organiser may pick for a Slot nobody has answered yet (migrations/012).
+ * INFO: keep in sync with NULL_COLOR_CHOICES in calendar-core.js and index.js.
+ */
+const NULL_COLOR_CHOICES = ['#000000', '#404040', '#808080', '#bfbfbf', '#ffffff'];
+
+/**
+ * Normalise a submitted un-answered Slot colour.
+ * @return string|null|false One of the five greys, null for empty (the default grey), false when invalid.
+ */
+function nullColorValue(mixed $v): string|null|false {
+    if ($v === null || $v === '') return null;
+    if (!is_string($v)) return false;
+    $v = strtolower(trim($v));
+    return in_array($v, NULL_COLOR_CHOICES, true) ? $v : false;
+}
+
 /** True once migrations/011_report_users.sql has been applied. */
 function reportsTablesReady(PDO $pdo): bool {
     static $cache = [];

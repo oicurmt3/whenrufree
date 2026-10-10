@@ -39,7 +39,7 @@
     </style>
 
   <!-- Page styles -->
-  <link rel="stylesheet" href="index.css?v=20261008b">
+  <link rel="stylesheet" href="index.css?v=20261010q">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
   <link rel="stylesheet" href="account.css?v=20261009b">
 </head>
@@ -261,6 +261,13 @@ celebration
       </div>
       <div id="statusError" class="error"></div>
       </div>
+
+      <!-- Un-answered Slots colour (migrations/012): five fixed greys for a Slot nobody has answered -->
+      <div class="field null-field" id="nullColorField">
+        <label id="nullColorLabel">Unanswered Slots</label>
+        <div class="null-swatches" id="nullSwatches" role="radiogroup" aria-labelledby="nullColorLabel"></div>
+        <p class="hint">The colour of a Slot nobody has answered yet. Leave it as the default light grey if you don't mind.</p>
+      </div>
     </div>
 
     <!-- Date range -->
@@ -480,6 +487,6 @@ celebration
   <script src="passkey.js?v=20260927a" defer></script>
   <script src="account-core.js?v=20261010m" defer></script>
   <script src="emoji.js?v=20261008b" defer></script>
-  <script src="index.js?v=20261009b" defer></script>
+  <script src="index.js?v=20261010q" defer></script>
 </body>
 </html>

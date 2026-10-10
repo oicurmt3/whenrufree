@@ -76,6 +76,10 @@ async function loadCalendarMeta(){
     state.namesPrivate = meta.calendar.names_private === true;
     state.organiserMarks = meta.calendar.organiser_marks !== false;
     state.organiserMarksAvailable = meta.calendar.organiser_marks_available === true;
+    // Colour of Slots nobody has answered yet (migrations/012); null = the default light grey
+    state.nullColorAvailable = meta.calendar.null_color_available === true;
+    state.nullColor = typeof meta.calendar.null_color === 'string' ? meta.calendar.null_color : null;
+    applyNullColor(state.nullColor);
     // Blocking can offer a report once the reports table exists (migrations/011)
     state.reportsAvailable = meta.calendar.reports_available === true;
     state.reportReasons = meta.calendar.report_reasons && typeof meta.calendar.report_reasons === 'object'
@@ -766,7 +770,7 @@ function updateUserUI(){
   
   // Share: organiser only (your own name is changed from your row in the People list)
   els.shareBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-  const hasSettings = (state.accessAvailable && window.AccessEmoji) || organiserMarksSettingShown();
+  const hasSettings = (state.accessAvailable && window.AccessEmoji) || organiserMarksSettingShown() || nullColorSettingShown();
   els.settingsBtn.style.display = (isAdmin && hasSettings) ? 'inline-flex' : 'none';
   if(isAdmin && state.accessAvailable && !state.accessEmojiLoaded) loadAccessEmoji();
   if(!isAdmin) state.accessEmojiLoaded = false;
@@ -917,6 +921,7 @@ async function openSettingsModal(){
   els.settingsError.textContent = '';
   document.getElementById('settingsMarksField').hidden = !organiserMarksSettingShown();
   document.getElementById('organiserMarksInput').checked = state.organiserMarks;
+  renderNullColorField();
   els.settingsAccessField.innerHTML = '';
   els.settingsModal.classList.add('active');
   if(!state.accessAvailable || !window.AccessEmoji) return;
@@ -964,6 +969,91 @@ async function openSettingsModal(){
 
 function hideSettingsModal(){
   els.settingsModal.classList.remove('active');
+}
+
+/**
+ * Calendar settings: the five greys for a Slot nobody has answered, plus Default to clear the
+ * choice. Picking one saves straight away; the grid repaints so the effect is visible.
+ */
+function renderNullColorField(){
+  const field = document.getElementById('settingsNullField');
+  if(!field) return;
+  field.hidden = !nullColorSettingShown();
+  if(field.hidden) return;
+  const wrap = document.getElementById('nullSwatches');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+
+  const current = typeof state.nullColor === 'string' ? state.nullColor.toLowerCase() : null;
+  const paint = () => {
+    wrap.querySelectorAll('.null-swatch').forEach(btn => {
+      const on = btn.dataset.color === current;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      btn.innerHTML = '';
+      if(on){
+        const tick = document.createElement('span');
+        tick.className = 'material-symbols-outlined';
+        tick.setAttribute('aria-hidden', 'true');
+        tick.textContent = 'check';
+        tick.style.color = getContrastTextColor(btn.dataset.color);
+        btn.appendChild(tick);
+      }
+    });
+    const def = wrap.querySelector('.null-default');
+    if(def) def.classList.toggle('active', current === null);
+  };
+
+  for(const color of NULL_COLOR_CHOICES){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'null-swatch';
+    btn.dataset.color = color;
+    btn.style.background = color;
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', 'false');
+    btn.setAttribute('aria-label', `Unanswered Slots in ${color}`);
+    btn.title = color;
+    btn.addEventListener('click', () => saveNullColor(color));
+    wrap.appendChild(btn);
+  }
+
+  const def = document.createElement('button');
+  def.type = 'button';
+  def.className = 'null-default';
+  def.textContent = 'Default';
+  def.title = 'The default light grey';
+  def.addEventListener('click', () => saveNullColor(null));
+  wrap.appendChild(def);
+
+  paint();
+}
+
+/** Calendar settings: save the un-answered Slot colour (null clears it back to the default grey). */
+async function saveNullColor(color){
+  const auth = state.auth.get(state.currentUserId || -1);
+  if(!auth || auth.role !== 'admin') return;
+  if((state.nullColor || null) === color) return;
+  els.settingsError.textContent = '';
+  const field = document.getElementById('settingsNullField');
+  const buttons = field ? field.querySelectorAll('button') : [];
+  buttons.forEach(b => { b.disabled = true; });
+  try{
+    const res = await apiPost('set_null_color', { color: color === null ? '' : color });
+    if(res.status !== 'success'){
+      els.settingsError.textContent = res.message || 'Could not save that.';
+      return;
+    }
+    state.nullColor = typeof res.null_color === 'string' ? res.null_color : null;
+    applyNullColor(state.nullColor);
+    renderNullColorField();
+    showToast(state.nullColor === null ? 'Unanswered Slots back to default' : `Unanswered Slots set to ${state.nullColor}`);
+  } catch(e){
+    console.error('Error saving un-answered colour:', e);
+    els.settingsError.textContent = 'Could not save that.';
+  } finally {
+    buttons.forEach(b => { b.disabled = false; });
+  }
 }
 
 /** Calendar settings: show or hide your answers as a coloured edge on everyone's slots. */

@@ -379,7 +379,7 @@ main{
   cursor:pointer;
   user-select:none;
   background-color:var(--status-null);
-  color:#555;
+  color:var(--status-null-text, #555);
   transition:all .15s ease, border-left-color .2s ease;
   font-weight:600;
   position:relative;
@@ -1320,6 +1320,26 @@ main{
 .settings-check{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:600;cursor:pointer;}
 .settings-check input{width:22px;height:22px;margin:0;flex:0 0 auto;accent-color:var(--primary);cursor:pointer;}
 #settingsModal p.settings-hint{margin:0;font-size:.85rem;color:var(--text-muted);line-height:1.4;}
+
+/* Un-answered Slots colour (migrations/012): five fixed greys, plus Default to clear the choice */
+.settings-null{margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid #e0e0e0;}
+.settings-null[hidden]{display:none;}
+.settings-null-label{display:block;font-weight:600;margin-bottom:10px;}
+.null-swatches{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px;}
+.null-swatch{
+  width:44px;height:44px;padding:0;border:2px solid #cfcfcf;border-radius:8px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-family:inherit;font-size:1rem;
+}
+.null-swatch .material-symbols-outlined{font-size:20px;line-height:1;}
+.null-swatch.active{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);}
+.null-swatch:focus-visible{outline:3px solid var(--primary);outline-offset:2px;}
+.null-default{
+  min-height:44px;padding:0 14px;border:2px solid #cfcfcf;border-radius:8px;background:#fff;
+  cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:600;color:#333;
+}
+.null-default.active{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);}
+.null-default:focus-visible{outline:3px solid var(--primary);outline-offset:2px;}
 
 .user-select-empty{
   padding:24px;

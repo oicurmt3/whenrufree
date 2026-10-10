@@ -444,15 +444,15 @@
           <div class="swatch">
             <div class="swatch-color dark-text" style="background:#e0e0e0;">#e0e0e0</div>
             <div class="swatch-body">
-              <p class="swatch-name">Empty slot (null)</p>
+              <p class="swatch-name">Empty slot (null, default)</p>
               <p class="swatch-hex">#e0e0e0</p>
               <p class="swatch-var">--status-null</p>
-              <p class="swatch-use">Unselected calendar grid cells.</p>
+              <p class="swatch-use">Unselected calendar grid cells. The organiser can change it to #000000, #404040, #808080, #bfbfbf or #ffffff (migrations/012).</p>
             </div>
           </div>
         </div>
         <p style="font-size:0.88rem;color:var(--text-muted);margin-top:12px;">
-          Contrast text on slots uses <code>--status-N-text</code> (#fff or #000), computed at runtime via <code>getContrastTextColor()</code> in calendar-core.js / index.js.
+          Contrast text on slots uses <code>--status-N-text</code> (#fff or #000), computed at runtime via <code>getContrastTextColor()</code> in calendar-core.js / index.js. Un-answered Slots follow the same rule through <code>--status-null-text</code>.
         </p>
       </section>
 

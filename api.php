@@ -606,6 +606,31 @@ if ($action === 'set_organiser_marks' && $_SERVER['REQUEST_METHOD'] === 'POST') 
     respond(200, ['status' => 'success', 'organiser_marks' => $on === 1]);
 }
 
+// Colour of a Slot nobody has answered yet (calendar organiser, migrations/012)
+if ($action === 'set_null_color' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!nullColorColumnReady($pdo)) respond(503, ['status' => 'error', 'message' => 'This setting is not available yet']);
+    $capCol = bookingColumnsReady($pdo) ? ', slot_capacity' : '';
+    $stmtC = $pdo->prepare("SELECT id{$capCol} FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can change settings']);
+    }
+    // Booking calendars colour their Slots with Free / Partly / Full instead
+    if (isset($cal['slot_capacity']) && $cal['slot_capacity'] !== null) {
+        respond(400, ['status' => 'error', 'message' => 'Booking calendars use their own Slot colours']);
+    }
+    $color = nullColorValue($_POST['color'] ?? null);
+    if ($color === false) respond(400, ['status' => 'error', 'message' => 'Invalid colour']);
+    $pdo->prepare("UPDATE calendars SET null_color = :c WHERE id = :id")
+        ->execute([':c' => $color, ':id' => $calId]);
+    respond(200, ['status' => 'success', 'null_color' => $color]);
+}
+
 // -------------------------
 // Actions
 // -------------------------
@@ -699,6 +724,10 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $slotsJson = json_encode($slots, JSON_UNESCAPED_UNICODE);
     $statusesJson = json_encode($statuses, JSON_UNESCAPED_UNICODE);
 
+    // Un-answered Slots colour (migrations/012): one of five greys, or nothing for the default grey
+    $nullColor = nullColorValue($_POST['null_color'] ?? null);
+    if ($nullColor === false) respond(400, ['status' => 'error', 'message' => 'Invalid unanswered colour']);
+
     $startMonth = substr($startDate, 0, 7);
     $endMonth = substr($endDate, 0, 7);
 
@@ -787,6 +816,10 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($inviteOnly || $hideNames) {
                 $pdo->prepare("UPDATE calendars SET invite_only = :io, hide_names = :hn WHERE id = :id")
                     ->execute([':io' => $inviteOnly, ':hn' => $hideNames, ':id' => $calId]);
+            }
+            if ($nullColor !== null && nullColorColumnReady($pdo)) {
+                $pdo->prepare("UPDATE calendars SET null_color = :c WHERE id = :id")
+                    ->execute([':c' => $nullColor, ':id' => $calId]);
             }
             logSecurityEvent('CALENDAR_CREATED', ['calendar_id' => $calId, 'account_id' => $acct['id']]);
             respond(200, ['status' => 'success', 'token' => $token]);
@@ -1067,6 +1100,8 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     if ($members) $bookingCols .= ' c.invite_only, c.hide_names, g.invite_only AS group_invite_only,';
     $marksReady = organiserMarksColumnReady($pdo);
     if ($marksReady) $bookingCols .= ' c.show_organiser_marks,';
+    $nullColorReady = nullColorColumnReady($pdo);
+    if ($nullColorReady) $bookingCols .= ' c.null_color,';
     $stmt = $pdo->prepare(
         "SELECT c.id, c.token, c.group_id, c.title, c.category, c.slots_json, c.statuses_json,
                 c.start_date, c.end_date, c.exclude_weekends, c.date_filter_mode, c.date_filter_dates,
@@ -1169,6 +1204,12 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     // Organiser's answers as a coloured edge on Open calendars; the organiser can turn it off
     $cal['organiser_marks'] = !$marksReady || (int)($cal['show_organiser_marks'] ?? 1) === 1;
     $cal['organiser_marks_available'] = $marksReady;
+
+    // Colour of a Slot nobody has answered yet (migrations/012); null = the default light grey.
+    // Booking calendars keep their own Free/Partly/Full colours, so the setting is not offered there.
+    $nullColor = $nullColorReady ? nullColorValue($cal['null_color'] ?? null) : null;
+    $cal['null_color'] = $booking['capacity'] === null && is_string($nullColor) ? $nullColor : null;
+    $cal['null_color_available'] = $nullColorReady && $booking['capacity'] === null;
 
     // Reporting a person when blocking them (migrations/011); the option is hidden until it runs
     $cal['reports_available'] = $members && reportsTablesReady($pdo);

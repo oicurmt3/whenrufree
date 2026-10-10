@@ -116,6 +116,7 @@ function isSensitivePostAction(string $action): bool {
         'manage_calendar_user',
         'admin_report_decide',
         'set_organiser_marks',
+        'set_null_color',
         'account_update',
         'account_remove_method',
         'account_delete',

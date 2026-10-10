@@ -348,6 +348,35 @@ function organiserMarksSettingShown(){
   return state.organiserMarksAvailable && state.privacyMode === 'open' && !isBookingMode();
 }
 
+/** Calendar settings offers the un-answered colour picker: availability calendars once migration 012 ran. */
+function nullColorSettingShown(){
+  return state.nullColorAvailable && !isBookingMode();
+}
+
+/**
+ * The five greys an organiser may pick for a Slot nobody has answered yet (migrations/012).
+ * INFO: keep in sync with NULL_COLOR_CHOICES in includes/data.php and index.js.
+ */
+const NULL_COLOR_CHOICES = ['#000000', '#404040', '#808080', '#bfbfbf', '#ffffff'];
+
+/**
+ * Paints Slots nobody has answered (status 0) in the organiser's chosen grey. Sets both the fill
+ * (--status-null) and a matching label colour; null or an unknown value falls back to the
+ * stylesheet default (light grey with dark label text). Also colours your null edge while viewing.
+ * @param {string|null} color - one of NULL_COLOR_CHOICES, or null for the default
+ */
+function applyNullColor(color){
+  const root = document.documentElement;
+  const hex = typeof color === 'string' ? color.trim().toLowerCase() : '';
+  if(!NULL_COLOR_CHOICES.includes(hex)){
+    root.style.removeProperty('--status-null');
+    root.style.removeProperty('--status-null-text');
+    return;
+  }
+  root.style.setProperty('--status-null', hex);
+  root.style.setProperty('--status-null-text', getContrastTextColor(hex));
+}
+
 /**
  * Whether you can open someone else's calendar read-only from the People list.
  * Same rule as the Best Match names (joined; Open, or Hidden for the organiser).
@@ -738,6 +767,8 @@ const state = {
   namesPrivate:false, // Blind, or Hidden with Hide names too
   organiserMarks:true, // Organiser's answers as a coloured slot edge (Open calendars; organiser can turn off)
   organiserMarksAvailable:false, // Server has calendars.show_organiser_marks (migration 010)
+  nullColor:null, // Colour of un-answered Slots (migration 012); null = the default light grey
+  nullColorAvailable:false, // Server has calendars.null_color
   reportsAvailable:false, // Server has the reports table (migration 011): offer the Report dropdown
   reportReasons:null, // reason key => label, from the server so both sides agree
   manage:null, // Choices in the manage modal for one person (block / delete / report)
