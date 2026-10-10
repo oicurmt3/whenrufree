@@ -1094,6 +1094,12 @@ function applyRankingMode(){
       if (weightNum) weightNum.style.display = '';
     }
   });
+  // Keep the Default option column heading lined up with the row controls it sits above.
+  // Rows hide the control they do not use, so the matching heading spacer is taken out of the flow.
+  const headUp = document.getElementById('statusHeadUp');
+  const headWeight = document.getElementById('statusHeadWeight');
+  if (headUp) headUp.style.display = rankingMode === 'rank' ? '' : 'none';
+  if (headWeight) headWeight.style.display = rankingMode === 'weights' ? '' : 'none';
   refreshStatusReorderUI();
 }
 
@@ -1235,6 +1241,23 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   const err = document.createElement('span');
   err.className = 'inline-error';
 
+  // Default option: the option every Slot begins with. Only one row can be on, and tapping the one
+  // that is on turns it off, so Slots start un-answered again. Tracked by row element so it follows
+  // reordering, and clears when that row is deleted.
+  const defCol = document.createElement('span');
+  defCol.className = 'status-default-col';
+  const defBtn = document.createElement('button');
+  defBtn.type = 'button';
+  defBtn.className = 'default-toggle';
+  defBtn.setAttribute('aria-pressed', 'false');
+  defBtn.setAttribute('aria-label', 'Default option');
+  defBtn.title = 'Default option';
+  defBtn.addEventListener('click', () => {
+    defaultRowEl = (defaultRowEl === row) ? null : row;
+    paintDefaultToggles();
+  });
+  defCol.appendChild(defBtn);
+
   input.addEventListener('input', validateStatusesUI);
   colorPicker.addEventListener('input', () => {
     // Mark that user has manually set this color (prevents auto-reassignment on reorder)
@@ -1251,7 +1274,7 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
     if (v > 5) v = 5;
     weightNum.value = v;
   });
-  del.addEventListener('click', () => { row.remove(); applyDefaultColors(); validateStatusesUI(); });
+  del.addEventListener('click', () => { row.remove(); applyDefaultColors(); paintDefaultToggles(); validateStatusesUI(); });
 
   up.addEventListener('click', () => {
     const prev = row.previousElementSibling;
@@ -1270,6 +1293,7 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   row.appendChild(colorPicker);
   row.appendChild(input);
   row.appendChild(weightNum);
+  row.appendChild(defCol);
   row.appendChild(del);
   row.appendChild(err);
   return row;
@@ -1285,8 +1309,33 @@ function refreshStatusReorderUI(){
   });
 }
 
+// Default option (migrations/013): the row whose option every Slot begins with, or null for none.
+let defaultRowEl = null;
+
+/** The default option as a 1-based position, or 0 when no row is set (or it was deleted). */
+function getDefaultStatus(){
+  if (!defaultRowEl) return 0;
+  const idx = Array.from(statusWrap.querySelectorAll('.status-row')).indexOf(defaultRowEl);
+  return idx >= 0 ? idx + 1 : 0;
+}
+
+/** Ticks the default option on the row that holds it and unticks the rest. */
+function paintDefaultToggles(){
+  statusWrap.querySelectorAll('.status-row').forEach(row => {
+    const btn = row.querySelector('.default-toggle');
+    if (!btn) return;
+    const on = (row === defaultRowEl);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    // Blank until chosen; the word "Default" is the only label, so it reads as a toggle
+    btn.textContent = on ? 'Default' : '';
+  });
+}
+
 function setStatuses(items){
   statusWrap.innerHTML = '';
+  // A fresh list of options has no default option until the organiser picks one
+  defaultRowEl = null;
   const safe = Array.isArray(items) ? items : [];
   const n = Math.min(safe.length, 5);
   const palette = getStrengthPalette(n);
@@ -1304,6 +1353,7 @@ function setStatuses(items){
   refreshStatusReorderUI();
   applyDefaultColors();
   applyRankingMode();
+  paintDefaultToggles();
   validateStatusesUI();
 }
 
@@ -1895,6 +1945,12 @@ async function createCalendar(){
     // Un-answered Slots colour (migrations/012). The default grey is stored as nothing, so only a
     // different grey is sent; booking calendars ignore it (their Slots use Free / Partly / Full).
     if (!isBookingMode() && nullColorChoice !== NULL_COLOR_DEFAULT) body.null_color = nullColorChoice;
+    // Default option (migrations/013): the option every Slot begins with, so there is no
+    // un-answered state. Booking calendars ignore it (their Slots are free until somebody books).
+    if (!isBookingMode()) {
+      const defStatus = getDefaultStatus();
+      if (defStatus >= 1) body.default_status = defStatus;
+    }
     const accessEmoji = accessField ? accessField.value : null;
     if (accessEmoji !== null) body.access_emoji = accessEmoji;
     const booking = isBookingMode();

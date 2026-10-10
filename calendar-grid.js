@@ -125,9 +125,10 @@ function updateOwnEdge(slotEl, dateStr, slotId){
   // Only while viewing someone else, and only if you have a name here to compare
   if(!state.viewUserId || !state.currentUserId) return;
 
-  // STATUS_NULL (0) is a real answer state here, so it colours the edge instead of clearing it
+  // STATUS_NULL (0) is a real answer state here, so it colours the edge instead of clearing it.
+  // With a default option set, an un-answered Slot reads as that option, matching your own view.
   const {status} = getStatus(state.currentUserId, dateStr, slotId);
-  slotEl.classList.add(`own-border-${status}`);
+  slotEl.classList.add(`own-border-${effectiveSlotStatus(status)}`);
 }
 
 /*** Build grid */
@@ -396,13 +397,14 @@ function refreshCalendarValues(){
     for(const slot of TIME_SLOTS){
       const el=slotMap.get(slot.id);
 
-      // Your status colour, or the person you are viewing
+      // Your status colour, or the person you are viewing. A Slot nobody has answered yet shows
+      // the organiser's default option, so the calendar opens fully coloured (migrations/013).
       if(shownUserId){
         const {status}=getStatus(shownUserId, dateStr, slot.id);
-        setSlotClass(el, status);
+        setSlotClass(el, effectiveSlotStatus(status));
       } else {
-        // No user selected - show neutral
-        setSlotClass(el, STATUS_NULL);
+        // No user selected - show the default option, or the neutral un-answered colour
+        setSlotClass(el, effectiveSlotStatus(STATUS_NULL));
       }
       
       // Update organiser dot (shows for all users)
@@ -419,10 +421,20 @@ function refreshCalendarValues(){
 /**
  * Cycles through availability statuses: NULL -> Status1 -> Status2 -> ... -> StatusN -> NULL.
  * Status values are integers: 0 = NULL, 1..N = custom options.
+ * With a default option set there is no un-answered state, so the cycle wraps among the options
+ * only: a Slot already showing the default advances to the next option, and StatusN returns to
+ * Status1 instead of NULL.
  */
 function cycleStatus(current){
   const n = Array.isArray(STATUS_OPTIONS) ? STATUS_OPTIONS.length : 0;
   if (n <= 0) return STATUS_NULL;
+  const dflt = defaultSlotStatus();
+  if (dflt !== STATUS_NULL) {
+    // What the Slot shows right now, so a click always moves on from it
+    const from = current === STATUS_NULL ? dflt : current;
+    if (from >= n) return 1;
+    return from + 1;
+  }
   if (current === STATUS_NULL) return 1;
   if (current >= 1 && current < n) return current + 1;
   return STATUS_NULL;
@@ -484,7 +496,7 @@ function onSlotClick(dateStr, slotId){
   if(!state.pending[dateStr]) state.pending[dateStr]={};
   state.pending[dateStr][slotId]=next;
   const slotEl=state.slotEls.get(dateStr).get(slotId);
-  setSlotClass(slotEl, next);
+  setSlotClass(slotEl, effectiveSlotStatus(next));
   
   // Highlight the legend item for the selected status
   highlightLegendItem(next);

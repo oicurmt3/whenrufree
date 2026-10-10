@@ -217,7 +217,7 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 .slot-row .remove{ background:#fff; border:1px solid var(--border); border-radius:6px; }
 
 /* Status options (mirrors slot rows) */
-.status-row{display:flex; gap:8px; align-items:center; margin-bottom:8px; max-width:300px;}
+.status-row{display:flex; gap:8px; align-items:center; margin-bottom:8px; max-width:440px;}
 .status-row .label-input{
   flex: 1;
   height: 44px;
@@ -276,6 +276,52 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
   flex-shrink: 0;
 }
 .status-row .weight-num:focus{ outline: none; border-color: var(--accent); }
+
+/* Default option (migrations/013): the option every Slot begins with, so Slots are never
+   un-answered. One blank button per Option row that reads "Default" when it is the one chosen,
+   with its heading above the column it belongs to. The heading wraps to two lines so it fits the
+   column and stays lined up with the buttons below. */
+.status-head{
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: 440px;
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.status-head-slot{ flex: 0 0 auto; }
+#statusHeadUp{ width: 42px; }
+#statusHeadColor{ width: 36px; }
+#statusHeadWeight{ width: 38px; }
+.status-head-grow{ flex: 1; }
+.status-head-label{ flex: 0 0 76px; width: 76px; text-align: center; line-height: 1.15; }
+.status-head-del{ width: 50px; }
+
+.status-default-col{ flex: 0 0 76px; width: 76px; display: flex; justify-content: center; }
+.default-toggle{
+  min-width: 76px;
+  height: 36px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.default-toggle:hover{ border-color: var(--text-muted); }
+.default-toggle.active{
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+}
+.default-toggle:focus-visible{ outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* Ranking mode toggle row */
 .ranking-mode-row{

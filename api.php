@@ -631,6 +631,36 @@ if ($action === 'set_null_color' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     respond(200, ['status' => 'success', 'null_color' => $color]);
 }
 
+if ($action === 'set_slot_default' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!slotDefaultColumnReady($pdo)) respond(503, ['status' => 'error', 'message' => 'This setting is not available yet']);
+    $capCol = bookingColumnsReady($pdo) ? ', slot_capacity' : '';
+    $stmtC = $pdo->prepare("SELECT id, statuses_json{$capCol} FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can change settings']);
+    }
+    // Booking calendars leave Slots free until somebody books them
+    if (isset($cal['slot_capacity']) && $cal['slot_capacity'] !== null) {
+        respond(400, ['status' => 'error', 'message' => 'Booking calendars have no default option']);
+    }
+    // Clamp to this calendar's own options
+    $maxStatus = 3;
+    if (isset($cal['statuses_json']) && is_string($cal['statuses_json']) && $cal['statuses_json'] !== '') {
+        $decoded = json_decode($cal['statuses_json'], true);
+        if (is_array($decoded) && count($decoded) >= 1 && count($decoded) <= 5) $maxStatus = count($decoded);
+    }
+    $default = slotDefaultValue($_POST['status'] ?? null, $maxStatus);
+    if ($default === false) respond(400, ['status' => 'error', 'message' => 'Invalid default option']);
+    $pdo->prepare("UPDATE calendars SET default_status = :d WHERE id = :id")
+        ->execute([':d' => $default, ':id' => $calId]);
+    respond(200, ['status' => 'success', 'default_status' => $default]);
+}
+
 // -------------------------
 // Actions
 // -------------------------
@@ -728,6 +758,11 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $nullColor = nullColorValue($_POST['null_color'] ?? null);
     if ($nullColor === false) respond(400, ['status' => 'error', 'message' => 'Invalid unanswered colour']);
 
+    // Default option (migrations/013): the option all Slots begin with, so there is no un-answered
+    // state. Not for booking calendars - their Slots are free until somebody books them.
+    $defaultStatus = $slotCapacity === null ? slotDefaultValue($_POST['default_status'] ?? null, count($statuses)) : null;
+    if ($defaultStatus === false) respond(400, ['status' => 'error', 'message' => 'Invalid default option']);
+
     $startMonth = substr($startDate, 0, 7);
     $endMonth = substr($endDate, 0, 7);
 
@@ -820,6 +855,10 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($nullColor !== null && nullColorColumnReady($pdo)) {
                 $pdo->prepare("UPDATE calendars SET null_color = :c WHERE id = :id")
                     ->execute([':c' => $nullColor, ':id' => $calId]);
+            }
+            if ($defaultStatus !== null && slotDefaultColumnReady($pdo)) {
+                $pdo->prepare("UPDATE calendars SET default_status = :d WHERE id = :id")
+                    ->execute([':d' => $defaultStatus, ':id' => $calId]);
             }
             logSecurityEvent('CALENDAR_CREATED', ['calendar_id' => $calId, 'account_id' => $acct['id']]);
             respond(200, ['status' => 'success', 'token' => $token]);
@@ -1102,6 +1141,8 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     if ($marksReady) $bookingCols .= ' c.show_organiser_marks,';
     $nullColorReady = nullColorColumnReady($pdo);
     if ($nullColorReady) $bookingCols .= ' c.null_color,';
+    $slotDefaultReadyCol = slotDefaultColumnReady($pdo);
+    if ($slotDefaultReadyCol) $bookingCols .= ' c.default_status,';
     $stmt = $pdo->prepare(
         "SELECT c.id, c.token, c.group_id, c.title, c.category, c.slots_json, c.statuses_json,
                 c.start_date, c.end_date, c.exclude_weekends, c.date_filter_mode, c.date_filter_dates,
@@ -1210,6 +1251,14 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $nullColor = $nullColorReady ? nullColorValue($cal['null_color'] ?? null) : null;
     $cal['null_color'] = $booking['capacity'] === null && is_string($nullColor) ? $nullColor : null;
     $cal['null_color_available'] = $nullColorReady && $booking['capacity'] === null;
+
+    // Default option (migrations/013): the option all Slots begin with, so there is no un-answered
+    // state. Clamped to this calendar's options; hidden until the migration runs, and never for
+    // booking calendars (their Slots are free until somebody books them).
+    $slotDefaultReady = slotDefaultColumnReady($pdo);
+    $defaultStatus = $slotDefaultReady ? slotDefaultValue($cal['default_status'] ?? null, count($statuses)) : null;
+    $cal['default_status'] = $booking['capacity'] === null && is_int($defaultStatus) ? $defaultStatus : null;
+    $cal['default_status_available'] = $slotDefaultReady && $booking['capacity'] === null;
 
     // Reporting a person when blocking them (migrations/011); the option is hidden until it runs
     $cal['reports_available'] = $members && reportsTablesReady($pdo);

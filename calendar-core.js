@@ -353,6 +353,28 @@ function nullColorSettingShown(){
   return state.nullColorAvailable && !isBookingMode();
 }
 
+/** Calendar settings offers the default option picker: availability calendars once migration 013 ran. */
+function slotDefaultSettingShown(){
+  return state.defaultStatusAvailable && !isBookingMode();
+}
+
+/**
+ * The option all Slots begin with, so there is no un-answered state. 0 (STATUS_NULL) when the
+ * organiser has not set one, or when the stored position no longer exists.
+ * Slots that show the default still count as un-answered in Best Match: only answers the person
+ * actually sent are ranked, so the default never inflates anybody's score.
+ */
+function defaultSlotStatus(){
+  const n = Array.isArray(STATUS_OPTIONS) ? STATUS_OPTIONS.length : 0;
+  const d = Number.isInteger(state.defaultStatus) ? state.defaultStatus : 0;
+  return (d >= 1 && d <= n) ? d : STATUS_NULL;
+}
+
+/** The status a Slot shows: an un-answered Slot shows the default option, when there is one. */
+function effectiveSlotStatus(status){
+  return status === STATUS_NULL ? defaultSlotStatus() : status;
+}
+
 /**
  * The five greys an organiser may pick for a Slot nobody has answered yet (migrations/012).
  * NULL_COLOR_DEFAULT is the one shown ticked when the calendar has no stored choice, and the
@@ -467,6 +489,7 @@ function renderLegend(){
   if(isBookingMode()){ renderBookingLegend(); return; }
   els.legendWrap.innerHTML='';
   const opts = Array.isArray(STATUS_OPTIONS) ? STATUS_OPTIONS : [];
+  const dflt = defaultSlotStatus();
   for(let i=0;i<opts.length;i++){
     const item=document.createElement('div'); item.className='legend-item';
     item.dataset.status = i + 1; // Store status index for highlighting
@@ -474,6 +497,15 @@ function renderLegend(){
     dot.style.background = `var(--status-${i+1})`;
     item.appendChild(dot);
     item.appendChild(document.createTextNode(' ' + (opts[i].label ?? `Status ${i+1}`)));
+    // The option all un-answered Slots begin with (migrations/013)
+    if(i + 1 === dflt){
+      item.classList.add('is-default');
+      item.title = 'Default option: every Slot starts here';
+      const tag = document.createElement('span');
+      tag.className = 'legend-default';
+      tag.textContent = 'Default';
+      item.appendChild(tag);
+    }
     els.legendWrap.appendChild(item);
   }
 }
@@ -773,6 +805,8 @@ const state = {
   organiserMarksAvailable:false, // Server has calendars.show_organiser_marks (migration 010)
   nullColor:null, // Colour of un-answered Slots (migration 012); null = the default light grey
   nullColorAvailable:false, // Server has calendars.null_color
+  defaultStatus:0, // Option all Slots begin with (migration 013); 0 = none, so Slots start un-answered
+  defaultStatusAvailable:false, // Server has calendars.default_status
   reportsAvailable:false, // Server has the reports table (migration 011): offer the Report dropdown
   reportReasons:null, // reason key => label, from the server so both sides agree
   manage:null, // Choices in the manage modal for one person (block / delete / report)

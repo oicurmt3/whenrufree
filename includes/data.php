@@ -200,6 +200,35 @@ function nullColorValue(mixed $v): string|null|false {
     return in_array($v, NULL_COLOR_CHOICES, true) ? $v : false;
 }
 
+/** True once migrations/013_slot_default.sql has been applied. */
+function slotDefaultColumnReady(PDO $pdo): bool {
+    static $cache = [];
+    $key = spl_object_id($pdo);
+    if (!isset($cache[$key])) {
+        try {
+            $pdo->query('SELECT default_status FROM calendars LIMIT 0');
+            $cache[$key] = true;
+        } catch (PDOException $e) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
+}
+
+/**
+ * Normalise a submitted default-option position.
+ * @param int $max Number of options this calendar has (1..5).
+ * @return int|null|false 1..$max for that option, null for empty ("no default option"), false when invalid.
+ */
+function slotDefaultValue(mixed $v, int $max): int|null|false {
+    if ($v === null || $v === '' || $v === false || $v === 0 || $v === '0') return null;
+    if ($max < 1) return false;
+    if (is_string($v) && !preg_match('/^\d{1,2}$/', $v)) return false;
+    if (!is_int($v) && !is_string($v)) return false;
+    $n = (int)$v;
+    return ($n >= 1 && $n <= $max) ? $n : false;
+}
+
 /** True once migrations/011_report_users.sql has been applied. */
 function reportsTablesReady(PDO $pdo): bool {
     static $cache = [];

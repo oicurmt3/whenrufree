@@ -80,6 +80,9 @@ async function loadCalendarMeta(){
     state.nullColorAvailable = meta.calendar.null_color_available === true;
     state.nullColor = typeof meta.calendar.null_color === 'string' ? meta.calendar.null_color : null;
     applyNullColor(state.nullColor);
+    // Option all Slots begin with (migrations/013); 0 = none, so Slots start un-answered
+    state.defaultStatusAvailable = meta.calendar.default_status_available === true;
+    state.defaultStatus = Number.isInteger(meta.calendar.default_status) ? meta.calendar.default_status : 0;
     // Blocking can offer a report once the reports table exists (migrations/011)
     state.reportsAvailable = meta.calendar.reports_available === true;
     state.reportReasons = meta.calendar.report_reasons && typeof meta.calendar.report_reasons === 'object'
@@ -770,7 +773,7 @@ function updateUserUI(){
   
   // Share: organiser only (your own name is changed from your row in the People list)
   els.shareBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-  const hasSettings = (state.accessAvailable && window.AccessEmoji) || organiserMarksSettingShown() || nullColorSettingShown();
+  const hasSettings = (state.accessAvailable && window.AccessEmoji) || organiserMarksSettingShown() || nullColorSettingShown() || slotDefaultSettingShown();
   els.settingsBtn.style.display = (isAdmin && hasSettings) ? 'inline-flex' : 'none';
   if(isAdmin && state.accessAvailable && !state.accessEmojiLoaded) loadAccessEmoji();
   if(!isAdmin) state.accessEmojiLoaded = false;
@@ -922,6 +925,7 @@ async function openSettingsModal(){
   document.getElementById('settingsMarksField').hidden = !organiserMarksSettingShown();
   document.getElementById('organiserMarksInput').checked = state.organiserMarks;
   renderNullColorField();
+  renderDefaultStatusField();
   els.settingsAccessField.innerHTML = '';
   els.settingsModal.classList.add('active');
   if(!state.accessAvailable || !window.AccessEmoji) return;
@@ -1048,6 +1052,98 @@ async function saveNullColor(color){
       : `Unanswered Slot colour set to ${color}`);
   } catch(e){
     console.error('Error saving un-answered colour:', e);
+    els.settingsError.textContent = 'Could not save that.';
+  } finally {
+    buttons.forEach(b => { b.disabled = false; });
+  }
+}
+
+/**
+ * Calendar settings: the default option, the one every Slot begins with. Only one can be on, and
+ * tapping the one that is on turns it off, leaving Slots un-answered until somebody answers them.
+ * Each button is blank until it is the chosen one, when it reads "Default".
+ * Picking one saves straight away; the grid repaints so the effect is visible.
+ */
+function renderDefaultStatusField(){
+  const field = document.getElementById('settingsDefaultField');
+  if(!field) return;
+  field.hidden = !slotDefaultSettingShown();
+  if(field.hidden) return;
+  const wrap = document.getElementById('defaultToggles');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+
+  const opts = Array.isArray(STATUS_OPTIONS) ? STATUS_OPTIONS : [];
+
+  const paint = () => {
+    const on = defaultSlotStatus();
+    wrap.querySelectorAll('.default-toggle-row').forEach(btn => {
+      const chosen = Number(btn.dataset.status) === on;
+      btn.classList.toggle('active', chosen);
+      btn.setAttribute('aria-pressed', chosen ? 'true' : 'false');
+      const tag = btn.querySelector('.default-toggle-tag');
+      if(tag) tag.textContent = chosen ? 'Default' : '';
+    });
+    const note = document.getElementById('settingsDefaultState');
+    if(note){
+      const label = on >= 1 ? (opts[on - 1] && opts[on - 1].label) : '';
+      note.textContent = on >= 1
+        ? `Every Slot starts as ${label || `option ${on}`} until somebody answers it.`
+        : 'Slots start un-answered.';
+    }
+  };
+
+  opts.forEach((opt, idx) => {
+    const status = idx + 1;
+    const label = opt && opt.label ? opt.label : `Option ${status}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'default-toggle-row';
+    btn.dataset.status = String(status);
+    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-label', `Default option: ${label}`);
+
+    const name = document.createElement('span');
+    name.className = 'default-toggle-label';
+    name.textContent = label;
+    btn.appendChild(name);
+
+    const tag = document.createElement('span');
+    tag.className = 'default-toggle-tag';
+    btn.appendChild(tag);
+
+    btn.addEventListener('click', () => saveDefaultStatus(defaultSlotStatus() === status ? 0 : status));
+    wrap.appendChild(btn);
+  });
+
+  paint();
+}
+
+/** Calendar settings: save the default option. 0 clears it, so Slots start un-answered again. */
+async function saveDefaultStatus(status){
+  const auth = state.auth.get(state.currentUserId || -1);
+  if(!auth || auth.role !== 'admin') return;
+  if(defaultSlotStatus() === status) return;
+  els.settingsError.textContent = '';
+  const field = document.getElementById('settingsDefaultField');
+  const buttons = field ? field.querySelectorAll('.default-toggle-row') : [];
+  buttons.forEach(b => { b.disabled = true; });
+  try{
+    const res = await apiPost('set_slot_default', { status: status >= 1 ? status : '' });
+    if(res.status !== 'success'){
+      els.settingsError.textContent = res.message || 'Could not save that.';
+      return;
+    }
+    const saved = Number.isInteger(res.default_status) ? res.default_status : 0;
+    state.defaultStatus = saved >= 1 ? saved : 0;
+    renderDefaultStatusField();
+    renderLegend();
+    refreshCalendarValues();
+    const opts = Array.isArray(STATUS_OPTIONS) ? STATUS_OPTIONS : [];
+    const label = saved >= 1 && opts[saved - 1] && opts[saved - 1].label ? opts[saved - 1].label : `option ${saved}`;
+    showToast(saved >= 1 ? `Every Slot starts as ${label}` : 'Slots start un-answered');
+  } catch(e){
+    console.error('Error saving default option:', e);
     els.settingsError.textContent = 'Could not save that.';
   } finally {
     buttons.forEach(b => { b.disabled = false; });

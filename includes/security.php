@@ -117,6 +117,7 @@ function isSensitivePostAction(string $action): bool {
         'admin_report_decide',
         'set_organiser_marks',
         'set_null_color',
+        'set_slot_default',
         'account_update',
         'account_remove_method',
         'account_delete',
