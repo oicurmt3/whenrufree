@@ -1024,7 +1024,6 @@ main{
 }
 
 .block-toggle[hidden]{display:none;}
-.block-toggle.is-off{opacity:.45;}
 
 .block-mode{
   flex:1;

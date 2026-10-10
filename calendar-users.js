@@ -453,25 +453,25 @@ function fillManageReasons(){
 }
 
 /**
- * Reflect the choices: block is skipped (and switched off) when deleting, and Confirm only lights
- * up when something would actually change.
+ * Reflect the choices. Block and Delete are independent, so the toggle stays live even when
+ * deleting (a change of mind is one tap away); Confirm only lights up once something would
+ * actually change.
  */
 function updateManageState(){
   const m = state.manage;
   if(!m) return;
-  const deleting = m.delete;
-  els.manageBlockToggle.querySelectorAll('.block-mode').forEach(b => { b.disabled = deleting; });
-  els.manageBlockToggle.classList.toggle('is-off', deleting);
-  els.manageBlockHint.hidden = deleting;
-  els.manageDeleteHint.hidden = !deleting;
+  els.manageDeleteHint.hidden = !m.delete;
   const currentAsInt = m.currentBlocked ? 1 : 0;
-  const changes = deleting || m.reason !== '' || m.blocked !== currentAsInt;
+  const changes = m.delete || m.reason !== '' || m.blocked !== currentAsInt;
   els.manageUserConfirm.disabled = !changes;
-  els.manageUserConfirm.classList.toggle('btn-danger', deleting);
-  els.manageUserConfirm.classList.toggle('btn-confirm', !deleting);
+  els.manageUserConfirm.classList.toggle('btn-danger', m.delete);
+  els.manageUserConfirm.classList.toggle('btn-confirm', !m.delete);
 }
 
-/** Plain sentences for the review popup: only what was chosen. */
+/**
+ * Plain sentences for the review popup: only what will actually happen. Delete wins over block,
+ * because a deleted person has no row left to block.
+ */
 function manageChoiceLines(){
   const m = state.manage;
   if(!m) return [];
