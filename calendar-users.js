@@ -394,9 +394,6 @@ function openManageModal(u){
   const name = u.display_name;
   els.manageUserTitle.textContent = `Manage ${name}`;
   els.manageUserText.textContent = `Block or unblock ${name}, delete them from this calendar, or report them to the super admin. You can combine these.`;
-  els.manageBlockHint.textContent = u.blocked
-    ? `${name}'s access is paused right now.`
-    : `${name} can open this calendar right now.`;
   els.manageDelete.checked = false;
   els.manageReason.value = '';
   els.manageDetails.value = '';
@@ -455,11 +452,15 @@ function fillManageReasons(){
 /**
  * Reflect the choices. Block and Delete are independent, so the toggle stays live even when
  * deleting (a change of mind is one tap away); Confirm only lights up once something would
- * actually change.
+ * actually change. The line under the toggle names whichever side is selected.
  */
 function updateManageState(){
   const m = state.manage;
   if(!m) return;
+  const name = m.user.display_name;
+  els.manageBlockHint.textContent = m.blocked === 1
+    ? `Block: ${name} cannot open this calendar and their answers are hidden from the views and Best Match.`
+    : `Unblock: ${name} can open this calendar again and their answers count as normal.`;
   els.manageDeleteHint.hidden = !m.delete;
   const currentAsInt = m.currentBlocked ? 1 : 0;
   const changes = m.delete || m.reason !== '' || m.blocked !== currentAsInt;
