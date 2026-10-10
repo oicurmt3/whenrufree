@@ -479,7 +479,7 @@ function manageChoiceLines(){
   const name = m.user.display_name;
   const lines = [];
   if(m.delete){
-    lines.push({ danger: true, text: `Delete: ${name}'s name and answers are removed from this calendar for good. This cannot be undone.` });
+    lines.push({ danger: true, text: `Delete: Permanently remove ${name} and their answers.` });
   } else if(m.blocked === 1){
     lines.push({ text: `Block: ${name} cannot open this calendar and their answers are hidden from the views and Best Match. You can undo this.` });
   } else {
