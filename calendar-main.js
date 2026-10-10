@@ -116,7 +116,7 @@ document.addEventListener('keydown', (e)=>{
 if(els.manageBlockToggle){
   els.manageBlockToggle.addEventListener('click', (e)=>{
     const b = e.target.closest('.block-mode');
-    if(b && !b.disabled) setManageBlock(b.dataset.blocked, true);
+    if(b && !b.disabled) setManageBlock(b.dataset.blocked);
   });
 }
 if(els.manageDelete){

@@ -378,16 +378,16 @@ async function refreshPeopleAndViews(){
 // -------------------------
 
 /**
- * Open the manage modal for one person. The block control shows the action that changes things
- * (Block when they are active, Unblock when they are paused); delete and report are opt-in.
+ * Open the manage modal for one person. The toggle starts on their current status, so the hint
+ * reads as a statement of where they stand and moving it is the change; delete and report are
+ * opt-in extras.
  */
 function openManageModal(u){
   if(!els.manageUserModal) return;
   state.manage = {
     user: u,
     currentBlocked: u.blocked === true,
-    blocked: u.blocked === true ? 0 : 1, // Action the toggle starts on
-    touched: false, // The organiser has tapped the toggle themselves
+    blocked: u.blocked === true ? 1 : 0, // Starts on their current status
     delete: false,
     reason: '',
     details: '',
@@ -407,7 +407,7 @@ function openManageModal(u){
   els.manageReportNone.hidden = reportable;
   if(reportable) fillManageReasons();
 
-  setManageBlock(u.blocked ? 0 : 1);
+  setManageBlock(u.blocked ? 1 : 0);
   updateManageState();
   els.manageUserModal.classList.add('active');
   els.manageUserCancel.focus();
@@ -418,13 +418,10 @@ function closeManageModal(){
   state.manage = null;
 }
 
-/** Two-way toggle: the button you press is the action that will be applied. */
-function setManageBlock(value, fromUser){
+/** Two-way toggle: the button you press is the status that will be applied. */
+function setManageBlock(value){
   const v = Number(value) === 1 ? 1 : 0;
-  if(state.manage){
-    state.manage.blocked = v;
-    if(fromUser) state.manage.touched = true; // An explicit tap is a decision, even a restating one
-  }
+  if(state.manage) state.manage.blocked = v;
   els.manageBlockToggle.querySelectorAll('.block-mode').forEach(b => {
     const on = Number(b.dataset.blocked) === v;
     b.classList.toggle('active', on);
@@ -455,9 +452,9 @@ function fillManageReasons(){
 
 /**
  * Reflect the choices. Block and Delete are independent, so the toggle stays live even when
- * deleting (a change of mind is one tap away). Confirm lights up as soon as there is something to
- * confirm: a delete, a report, or any block choice the organiser made themselves. The line under
- * the toggle names whichever side is selected.
+ * deleting (a change of mind is one tap away). The toggle opens on the person's current status,
+ * so Confirm lights up once something would actually happen: a delete, a report, or a block
+ * choice that differs from where they stand. The line under the toggle names the selected status.
  */
 function updateManageState(){
   const m = state.manage;
@@ -468,7 +465,7 @@ function updateManageState(){
     : `${name} can use this calendar as normal.`;
   els.manageDeleteHint.hidden = !m.delete;
   const currentAsInt = m.currentBlocked ? 1 : 0;
-  const changes = m.delete || m.reason !== '' || m.touched || m.blocked !== currentAsInt;
+  const changes = m.delete || m.reason !== '' || m.blocked !== currentAsInt;
   els.manageUserConfirm.disabled = !changes;
   els.manageUserConfirm.classList.toggle('btn-danger', m.delete);
   els.manageUserConfirm.classList.toggle('btn-confirm', !m.delete);
@@ -476,7 +473,8 @@ function updateManageState(){
 
 /**
  * Plain sentences for the review popup: only what will actually happen. Delete wins over block,
- * because a deleted person has no row left to block.
+ * because a deleted person has no row left to block, and the block line only appears when their
+ * access really changes.
  */
 function manageChoiceLines(){
   const m = state.manage;
@@ -485,10 +483,12 @@ function manageChoiceLines(){
   const lines = [];
   if(m.delete){
     lines.push({ danger: true, text: `Delete: Permanently remove ${name} and their answers.` });
-  } else if(m.blocked === 1){
-    lines.push({ text: `Block: ${name} cannot open this calendar and their answers are hidden from the views and Best Match. You can undo this.` });
-  } else {
-    lines.push({ text: `Unblock: ${name} can open this calendar again.` });
+  } else if(m.blocked !== (m.currentBlocked ? 1 : 0)){
+    if(m.blocked === 1){
+      lines.push({ text: `Block: ${name} cannot open this calendar and their answers are hidden from the views and Best Match. You can undo this.` });
+    } else {
+      lines.push({ text: `Unblock: ${name} can open this calendar again.` });
+    }
   }
   if(m.reason !== ''){
     const label = (state.reportReasons && state.reportReasons[m.reason]) || m.reason;
@@ -544,13 +544,11 @@ async function applyManageChoices(){
       return;
     }
     const name = m.user.display_name;
-    // A block choice that restates the current state changes nothing, so say so rather than
-    // claiming the organiser just blocked someone who was already blocked.
-    const restated = !res.deleted && !res.reported && res.blocked === m.currentBlocked;
-    const parts = restated
-      ? [`was already ${res.blocked ? 'blocked' : 'unblocked'}`]
-      : [res.deleted ? 'deleted' : (res.blocked ? 'blocked' : 'unblocked')];
+    const parts = [];
+    if(res.deleted) parts.push('deleted');
+    else if(res.blocked !== m.currentBlocked) parts.push(res.blocked ? 'blocked' : 'unblocked');
     if(res.reported) parts.push('reported');
+    if(parts.length === 0) parts.push('left unchanged');
     closeConfirmChoices();
     closeManageModal();
     showToast(`${name} ${parts.join(' and ')}`);
