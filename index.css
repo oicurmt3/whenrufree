@@ -245,19 +245,20 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 .status-row .color-pick::-webkit-color-swatch{ border-radius: 2px; border: none; }
 .status-row .color-pick::-moz-color-swatch{ border-radius: 2px; border: none; }
 
-/* Un-answered Slots colour: five fixed greys, plus Default to clear the choice (migrations/012) */
+/* Un-answered Slots colour: five fixed greys, plus Default to clear the choice (migrations/012).
+   Sized and shaped exactly like the Options colour pickers (.color-pick) so the row lines up. */
 .null-field{ margin-top: 18px; }
-.null-swatches{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 8px 0; }
+.null-swatches{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .null-swatch{
-  width: 44px; height: 44px; padding: 0; border: 2px solid var(--border); border-radius: 8px;
+  width: 36px; height: 36px; padding: 0; border: 1px solid var(--border); border-radius: 4px;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font-family: inherit; font-size: 1rem;
+  font-family: inherit; flex-shrink: 0;
 }
 .null-swatch .material-symbols-outlined{ font-size: 20px; line-height: 1; }
 .null-swatch.active{ border-color: var(--accent); box-shadow: 0 0 0 3px rgba(136,0,0,.18); }
 .null-swatch:focus-visible{ outline: 3px solid var(--accent); outline-offset: 2px; }
 .null-default{
-  min-height: 44px; padding: 0 14px; border: 2px solid var(--border); border-radius: 8px;
+  min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 4px;
   background: #fff; cursor: pointer; font-family: inherit; font-size: .85rem; font-weight: 600; color: #333;
 }
 .null-default.active{ border-color: var(--accent); box-shadow: 0 0 0 3px rgba(136,0,0,.18); }
