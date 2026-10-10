@@ -1363,7 +1363,7 @@ function initNullColorPicker(){
     btn.style.background = color;
     btn.setAttribute('role', 'radio');
     btn.setAttribute('aria-checked', 'false');
-    btn.setAttribute('aria-label', `Unanswered Slots in ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
+    btn.setAttribute('aria-label', `Unanswered Slot colour: ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
     btn.title = color;
     btn.addEventListener('click', () => { nullColorChoice = color; paint(); });
     nullSwatchesEl.appendChild(btn);

@@ -1012,7 +1012,7 @@ function renderNullColorField(){
     btn.style.background = color;
     btn.setAttribute('role', 'radio');
     btn.setAttribute('aria-checked', 'false');
-    btn.setAttribute('aria-label', `Unanswered Slots in ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
+    btn.setAttribute('aria-label', `Unanswered Slot colour: ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
     btn.title = color;
     btn.addEventListener('click', () => saveNullColor(color));
     wrap.appendChild(btn);
@@ -1044,8 +1044,8 @@ async function saveNullColor(color){
     applyNullColor(state.nullColor);
     renderNullColorField();
     showToast(color === NULL_COLOR_DEFAULT
-      ? 'Unanswered Slots back to default'
-      : `Unanswered Slots set to ${color}`);
+      ? 'Unanswered Slot colour back to default'
+      : `Unanswered Slot colour set to ${color}`);
   } catch(e){
     console.error('Error saving un-answered colour:', e);
     els.settingsError.textContent = 'Could not save that.';
