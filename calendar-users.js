@@ -972,8 +972,9 @@ function hideSettingsModal(){
 }
 
 /**
- * Calendar settings: the five greys for a Slot nobody has answered, plus Default to clear the
- * choice. Picking one saves straight away; the grid repaints so the effect is visible.
+ * Calendar settings: the five greys for a Slot nobody has answered. The default grey is ticked
+ * when the calendar has no stored choice, so exactly one is always selected. Picking one saves
+ * straight away; the grid repaints so the effect is visible.
  */
 function renderNullColorField(){
   const field = document.getElementById('settingsNullField');
@@ -984,7 +985,8 @@ function renderNullColorField(){
   if(!wrap) return;
   wrap.innerHTML = '';
 
-  const current = typeof state.nullColor === 'string' ? state.nullColor.toLowerCase() : null;
+  // A calendar that never picked one is already showing the default grey, so tick that
+  const current = (typeof state.nullColor === 'string' && state.nullColor !== '') ? state.nullColor.toLowerCase() : NULL_COLOR_DEFAULT;
   const paint = () => {
     wrap.querySelectorAll('.null-swatch').forEach(btn => {
       const on = btn.dataset.color === current;
@@ -1000,8 +1002,6 @@ function renderNullColorField(){
         btn.appendChild(tick);
       }
     });
-    const def = wrap.querySelector('.null-default');
-    if(def) def.classList.toggle('active', current === null);
   };
 
   for(const color of NULL_COLOR_CHOICES){
@@ -1012,34 +1012,30 @@ function renderNullColorField(){
     btn.style.background = color;
     btn.setAttribute('role', 'radio');
     btn.setAttribute('aria-checked', 'false');
-    btn.setAttribute('aria-label', `Unanswered Slots in ${color}`);
+    btn.setAttribute('aria-label', `Unanswered Slots in ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
     btn.title = color;
     btn.addEventListener('click', () => saveNullColor(color));
     wrap.appendChild(btn);
   }
 
-  const def = document.createElement('button');
-  def.type = 'button';
-  def.className = 'null-default';
-  def.textContent = 'Default';
-  def.title = 'The default light grey';
-  def.addEventListener('click', () => saveNullColor(null));
-  wrap.appendChild(def);
-
   paint();
 }
 
-/** Calendar settings: save the un-answered Slot colour (null clears it back to the default grey). */
+/**
+ * Calendar settings: save the un-answered Slot colour. Picking the default stores nothing, so a
+ * calendar that is already on it is left alone.
+ */
 async function saveNullColor(color){
   const auth = state.auth.get(state.currentUserId || -1);
   if(!auth || auth.role !== 'admin') return;
-  if((state.nullColor || null) === color) return;
+  const stored = (typeof state.nullColor === 'string' && state.nullColor !== '') ? state.nullColor.toLowerCase() : NULL_COLOR_DEFAULT;
+  if(stored === color) return;
   els.settingsError.textContent = '';
   const field = document.getElementById('settingsNullField');
-  const buttons = field ? field.querySelectorAll('button') : [];
+  const buttons = field ? field.querySelectorAll('.null-swatch') : [];
   buttons.forEach(b => { b.disabled = true; });
   try{
-    const res = await apiPost('set_null_color', { color: color === null ? '' : color });
+    const res = await apiPost('set_null_color', { color: color === NULL_COLOR_DEFAULT ? '' : color });
     if(res.status !== 'success'){
       els.settingsError.textContent = res.message || 'Could not save that.';
       return;
@@ -1047,7 +1043,9 @@ async function saveNullColor(color){
     state.nullColor = typeof res.null_color === 'string' ? res.null_color : null;
     applyNullColor(state.nullColor);
     renderNullColorField();
-    showToast(state.nullColor === null ? 'Unanswered Slots back to default' : `Unanswered Slots set to ${state.nullColor}`);
+    showToast(color === NULL_COLOR_DEFAULT
+      ? 'Unanswered Slots back to default'
+      : `Unanswered Slots set to ${color}`);
   } catch(e){
     console.error('Error saving un-answered colour:', e);
     els.settingsError.textContent = 'Could not save that.';

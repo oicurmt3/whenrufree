@@ -1046,10 +1046,12 @@ const addStatusBtn = document.getElementById('addStatusBtn');
 const statusError = document.getElementById('statusError');
 
 /************** UNANSWERED SLOTS COLOUR (migrations/012) **************/
-// Five fixed greys an organiser may pick for a Slot nobody has answered yet; null = the default grey.
+// Five fixed greys an organiser may pick for a Slot nobody has answered yet. There is no "clear"
+// option: the default grey is a real choice, so the picker always shows a tick.
 // NOTE: keep in sync with NULL_COLOR_CHOICES in includes/data.php and calendar-core.js.
 const NULL_COLOR_CHOICES = ['#000000', '#404040', '#808080', '#bfbfbf', '#ffffff'];
-let nullColorChoice = null;
+const NULL_COLOR_DEFAULT = '#bfbfbf';
+let nullColorChoice = NULL_COLOR_DEFAULT;
 const nullSwatchesEl = document.getElementById('nullSwatches');
 
 // Ranking mode: 'rank' (position-based) or 'weights' (custom values 0-5)
@@ -1331,8 +1333,8 @@ function updatePositionWeights(){
 addStatusBtn.addEventListener('click', () => addStatus(''));
 
 /**
- * Un-answered Slots: five fixed greys plus Default to clear the choice (migrations/012).
- * The picker is part of the Options section, so it hides with it on booking calendars.
+ * Un-answered Slots: the five fixed greys, with the default ticked from the start
+ * (migrations/012). Part of the Options section, so it hides with it on booking calendars.
  */
 function initNullColorPicker(){
   if(!nullSwatchesEl) return;
@@ -1351,8 +1353,6 @@ function initNullColorPicker(){
         btn.appendChild(tick);
       }
     });
-    const def = nullSwatchesEl.querySelector('.null-default');
-    if(def) def.classList.toggle('active', nullColorChoice === null);
   };
 
   for(const color of NULL_COLOR_CHOICES){
@@ -1363,19 +1363,11 @@ function initNullColorPicker(){
     btn.style.background = color;
     btn.setAttribute('role', 'radio');
     btn.setAttribute('aria-checked', 'false');
-    btn.setAttribute('aria-label', `Unanswered Slots in ${color}`);
+    btn.setAttribute('aria-label', `Unanswered Slots in ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
     btn.title = color;
     btn.addEventListener('click', () => { nullColorChoice = color; paint(); });
     nullSwatchesEl.appendChild(btn);
   }
-
-  const def = document.createElement('button');
-  def.type = 'button';
-  def.className = 'null-default';
-  def.textContent = 'Default';
-  def.title = 'The default light grey';
-  def.addEventListener('click', () => { nullColorChoice = null; paint(); });
-  nullSwatchesEl.appendChild(def);
 
   paint();
 }
@@ -1900,8 +1892,9 @@ async function createCalendar(){
     const inviteOnly = isInviteOnly();
     if (inviteOnly) body.invite_only = 1;
     if (hideNamesValue()) body.hide_names = 1;
-    // Un-answered Slots colour (migrations/012); omitted entirely to keep the default grey
-    if (nullColorChoice !== null) body.null_color = nullColorChoice;
+    // Un-answered Slots colour (migrations/012). The default grey is stored as nothing, so only a
+    // different grey is sent; booking calendars ignore it (their Slots use Free / Partly / Full).
+    if (!isBookingMode() && nullColorChoice !== NULL_COLOR_DEFAULT) body.null_color = nullColorChoice;
     const accessEmoji = accessField ? accessField.value : null;
     if (accessEmoji !== null) body.access_emoji = accessEmoji;
     const booking = isBookingMode();

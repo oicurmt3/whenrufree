@@ -355,15 +355,19 @@ function nullColorSettingShown(){
 
 /**
  * The five greys an organiser may pick for a Slot nobody has answered yet (migrations/012).
+ * NULL_COLOR_DEFAULT is the one shown ticked when the calendar has no stored choice, and the
+ * colour those Slots already use, so the picker always has a visible selection.
  * INFO: keep in sync with NULL_COLOR_CHOICES in includes/data.php and index.js.
  */
 const NULL_COLOR_CHOICES = ['#000000', '#404040', '#808080', '#bfbfbf', '#ffffff'];
+const NULL_COLOR_DEFAULT = '#bfbfbf';
 
 /**
  * Paints Slots nobody has answered (status 0) in the organiser's chosen grey. Sets both the fill
  * (--status-null) and a matching label colour; null or an unknown value falls back to the
- * stylesheet default (light grey with dark label text). Also colours your null edge while viewing.
- * @param {string|null} color - one of NULL_COLOR_CHOICES, or null for the default
+ * stylesheet default (NULL_COLOR_DEFAULT with dark label text). Also colours your null edge while
+ * viewing. Visiting the picker's default stores nothing, so NULL and NULL_COLOR_DEFAULT look alike.
+ * @param {string|null} color - one of NULL_COLOR_CHOICES, or null for the default grey
  */
 function applyNullColor(color){
   const root = document.documentElement;
