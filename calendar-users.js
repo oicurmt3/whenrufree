@@ -175,6 +175,9 @@ function setViewBarText(u){
   name.textContent = u.display_name;
   text.textContent = '';
   text.append('Viewing ', name);
+  // The hint only applies once you have a name here, otherwise there is no edge to compare
+  const hint = document.getElementById('viewBarHint');
+  if(hint) hint.hidden = !state.currentUserId;
 }
 
 function openUserView(u){

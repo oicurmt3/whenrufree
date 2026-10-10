@@ -300,6 +300,8 @@ main{
 .view-bar[hidden]{display:none;}
 .view-bar > .material-symbols-outlined{font-size:20px;}
 .view-bar-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.view-bar-hint{color:#5c6bc0;font-size:.82rem;white-space:nowrap;}
+@media (max-width:560px){.view-bar-hint{display:none;}}
 .view-bar-close{
   display:flex;
   align-items:center;
@@ -402,6 +404,30 @@ main{
 .time-slot.org-border-3{border-left-color:var(--status-3);}
 .time-slot.org-border-4{border-left-color:var(--status-4);}
 .time-slot.org-border-5{border-left-color:var(--status-5);}
+
+/* ============================================
+   YOUR OWN EDGE - While reading someone else's
+   Slots, your answers as a strip just inside the
+   left border, so the fill (them), the border
+   (organiser) and this (you) compare at a glance
+   ============================================ */
+.time-slot.own-border-1::before,
+.time-slot.own-border-2::before,
+.time-slot.own-border-3::before,
+.time-slot.own-border-4::before,
+.time-slot.own-border-5::before{
+  content:'';
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:6px;
+}
+.time-slot.own-border-1::before{background:var(--status-1);}
+.time-slot.own-border-2::before{background:var(--status-2);}
+.time-slot.own-border-3::before{background:var(--status-3);}
+.time-slot.own-border-4::before{background:var(--status-4);}
+.time-slot.own-border-5::before{background:var(--status-5);}
 
 /* ============================================
    DATE FILTER INDICATORS

@@ -104,6 +104,27 @@ function updateOrganiserDot(slotEl, dateStr, slotId){
   slotEl.classList.add(`org-border-${orgStatus}`);
 }
 
+/**
+ * Updates your own left-edge indicator while you are reading someone else's calendar.
+ * The fill colour is the person you are viewing, so this puts YOUR answer alongside theirs
+ * (and the organiser's, which keeps the outer border) to compare at a glance.
+ * Only shown while viewing: on your own calendar the fill already is your answer.
+ * @param {HTMLElement} slotEl - The slot element
+ * @param {string} dateStr - Date in YYYY-MM-DD format
+ * @param {string} slotId - The slot ID
+ */
+function updateOwnEdge(slotEl, dateStr, slotId){
+  slotEl.classList.remove('own-border-1','own-border-2','own-border-3','own-border-4','own-border-5');
+
+  // Only while viewing someone else, and only if you have a name here to compare
+  if(!state.viewUserId || !state.currentUserId) return;
+
+  const {status} = getStatus(state.currentUserId, dateStr, slotId);
+  if(status === STATUS_NULL) return;
+
+  slotEl.classList.add(`own-border-${status}`);
+}
+
 /*** Build grid */
 /**
  * Determines if a date should be visible to the current user based on date filter settings.
@@ -381,6 +402,9 @@ function refreshCalendarValues(){
       
       // Update organiser dot (shows for all users)
       updateOrganiserDot(el, dateStr, slot.id);
+
+      // While viewing someone else, your own answer as an inner left edge
+      updateOwnEdge(el, dateStr, slot.id);
     }
   }
   updateSubmitButtonState();
