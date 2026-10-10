@@ -112,17 +112,42 @@ document.addEventListener('keydown', (e)=>{
   if(e.key === 'Escape' && state.viewUserId && !document.querySelector('.modal-overlay.active')) closeUserView();
 });
 
-// Block / Report & block modal (organiser). Two-way toggle: the button you press sets the mode.
-if(els.blockModeToggle){
-  els.blockModeToggle.addEventListener('click', (e)=>{
+// Manage one person (organiser): block / unblock, delete and report, then the review popup
+if(els.manageBlockToggle){
+  els.manageBlockToggle.addEventListener('click', (e)=>{
     const b = e.target.closest('.block-mode');
-    if(b) setBlockMode(b.dataset.mode);
+    if(b && !b.disabled) setManageBlock(b.dataset.blocked);
   });
 }
-if(els.blockUserCancel) els.blockUserCancel.addEventListener('click', closeBlockModal);
-if(els.blockUserConfirm) els.blockUserConfirm.addEventListener('click', confirmBlockPerson);
+if(els.manageDelete){
+  els.manageDelete.addEventListener('change', ()=>{
+    if(!state.manage) return;
+    state.manage.delete = els.manageDelete.checked;
+    updateManageState();
+  });
+}
+if(els.manageReason){
+  els.manageReason.addEventListener('change', ()=>{
+    if(!state.manage) return;
+    state.manage.reason = els.manageReason.value;
+    updateManageState();
+  });
+}
+if(els.manageDetails){
+  els.manageDetails.addEventListener('input', ()=>{
+    if(state.manage) state.manage.details = els.manageDetails.value.trim();
+  });
+}
+if(els.manageUserCancel) els.manageUserCancel.addEventListener('click', closeManageModal);
+if(els.manageUserConfirm) els.manageUserConfirm.addEventListener('click', openConfirmChoices);
+if(els.choiceBack) els.choiceBack.addEventListener('click', closeConfirmChoices);
+if(els.choiceApply) els.choiceApply.addEventListener('click', applyManageChoices);
+
+// Escape closes the top layer only, so Back behaviour is predictable
 document.addEventListener('keydown', (e)=>{
-  if(e.key === 'Escape' && els.blockUserModal && els.blockUserModal.classList.contains('active')) closeBlockModal();
+  if(e.key !== 'Escape') return;
+  if(els.choiceModal && els.choiceModal.classList.contains('active')) closeConfirmChoices();
+  else if(els.manageUserModal && els.manageUserModal.classList.contains('active')) closeManageModal();
 });
 
 // Info modal event listeners

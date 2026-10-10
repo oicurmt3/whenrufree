@@ -644,19 +644,27 @@ const els = {
   userSelectList: qs('#userSelectList'),
   userSelectCancel: qs('#userSelectCancel'),
   userSelectAddLink: qs('#userSelectAddLink'),
-  // Block / Report & block modal (organiser)
-  blockUserModal: qs('#blockUserModal'),
-  blockUserTitle: qs('#blockUserTitle'),
-  blockUserText: qs('#blockUserText'),
-  blockModeToggle: qs('#blockModeToggle'),
-  blockReportModeBtn: qs('#blockReportModeBtn'),
-  blockReportFields: qs('#blockReportFields'),
-  blockReason: qs('#blockReason'),
-  blockDetails: qs('#blockDetails'),
-  blockUserHint: qs('#blockUserHint'),
-  blockUserError: qs('#blockUserError'),
-  blockUserCancel: qs('#blockUserCancel'),
-  blockUserConfirm: qs('#blockUserConfirm'),
+  // Manage one person: block / unblock, delete, report, then the review popup
+  manageUserModal: qs('#manageUserModal'),
+  manageUserTitle: qs('#manageUserTitle'),
+  manageUserText: qs('#manageUserText'),
+  manageBlockToggle: qs('#manageBlockToggle'),
+  manageBlockHint: qs('#manageBlockHint'),
+  manageDelete: qs('#manageDelete'),
+  manageDeleteHint: qs('#manageDeleteHint'),
+  manageReportRow: qs('#manageReportRow'),
+  manageReportFields: qs('#manageReportFields'),
+  manageReportNone: qs('#manageReportNone'),
+  manageReason: qs('#manageReason'),
+  manageDetails: qs('#manageDetails'),
+  manageUserError: qs('#manageUserError'),
+  manageUserCancel: qs('#manageUserCancel'),
+  manageUserConfirm: qs('#manageUserConfirm'),
+  choiceModal: qs('#confirmChoicesModal'),
+  choiceList: qs('#choiceList'),
+  choiceError: qs('#choiceError'),
+  choiceBack: qs('#choiceBack'),
+  choiceApply: qs('#choiceApply'),
   // Other elements
   bannerAddBtn: qs('#bannerAddBtn'),
   nameBanner: qs('#nameBanner'),
@@ -730,9 +738,9 @@ const state = {
   namesPrivate:false, // Blind, or Hidden with Hide names too
   organiserMarks:true, // Organiser's answers as a coloured slot edge (Open calendars; organiser can turn off)
   organiserMarksAvailable:false, // Server has calendars.show_organiser_marks (migration 010)
-  reportsAvailable:false, // Server has the reports table (migration 011): offer Report & block
+  reportsAvailable:false, // Server has the reports table (migration 011): offer the Report dropdown
   reportReasons:null, // reason key => label, from the server so both sides agree
-  blockTarget:null, // Person the block modal is open for
+  manage:null, // Choices in the manage modal for one person (block / delete / report)
   pendingRequests:null, // Requests waiting (only for whoever decides them)
   users:[],
   usersTotal:0, // Everyone who has joined (users may be trimmed when names are private)

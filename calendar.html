@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -34,7 +34,7 @@
     }
   </style>
   <!-- App styles -->
-  <link rel="stylesheet" href="calendar.css?v=20261010b">
+  <link rel="stylesheet" href="calendar.css?v=20261010c">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
   <link rel="stylesheet" href="account.css?v=20261010a">
 </head>
@@ -287,35 +287,57 @@
   </div>
 </div>
 
-<!-- Block a person, or report them to the super admin and block (organiser only) -->
-<div class="modal-overlay" id="blockUserModal">
+<!-- One person, one decision: block or unblock, delete, and/or report (organiser only) -->
+<div class="modal-overlay" id="manageUserModal">
   <div class="modal">
-    <h2 id="blockUserTitle">Block this person?</h2>
-    <p id="blockUserText"></p>
+    <h2 id="manageUserTitle">Manage this person</h2>
+    <p id="manageUserText"></p>
 
-    <div class="block-toggle" id="blockModeToggle" role="radiogroup" aria-label="Block, or report and block">
-      <button type="button" class="block-mode active" data-mode="block" role="radio" aria-checked="true">Block</button>
-      <button type="button" class="block-mode" data-mode="report" id="blockReportModeBtn" role="radio" aria-checked="false" hidden>Report &amp; block</button>
-    </div>
-
-    <div id="blockReportFields" hidden>
-      <div class="fieldish">
-        <label for="blockReason">Reason</label>
-        <select id="blockReason"></select>
+    <div class="manage-row">
+      <span class="manage-label">Block</span>
+      <div class="block-toggle" id="manageBlockToggle" role="radiogroup" aria-label="Block or unblock">
+        <button type="button" class="block-mode" data-blocked="1" role="radio" aria-checked="false">Block</button>
+        <button type="button" class="block-mode" data-blocked="0" role="radio" aria-checked="false">Unblock</button>
       </div>
-      <div class="fieldish">
-        <label for="blockDetails">Details (optional)</label>
-        <textarea id="blockDetails" rows="3" maxlength="200" placeholder="Anything the super admin should know"></textarea>
-      </div>
-      <p class="block-note">The super admin sees your report, the calendar and the name this person is using. Reporting only sends with this block.</p>
     </div>
+    <p class="block-note" id="manageBlockHint"></p>
 
-    <p class="block-note" id="blockUserHint"></p>
-    <div class="error" id="blockUserError"></div>
+    <div class="manage-row">
+      <label class="manage-check" for="manageDelete">
+        <input id="manageDelete" type="checkbox">
+        <span>Delete this person</span>
+      </label>
+    </div>
+    <p class="block-note" id="manageDeleteHint" hidden>Their name and answers are removed from this calendar for good. This cannot be undone.</p>
+
+    <div class="manage-row" id="manageReportRow">
+      <label class="manage-label" for="manageReason">Report</label>
+      <select id="manageReason"></select>
+    </div>
+    <div id="manageReportFields">
+      <textarea id="manageDetails" rows="3" maxlength="200" aria-label="Report details (optional)" placeholder="Anything the super admin should know (optional)"></textarea>
+      <p class="block-note">The super admin sees your report, this calendar and the name the person is using.</p>
+    </div>
+    <p class="block-note" id="manageReportNone" hidden>Reports are not available yet.</p>
+
+    <div class="error" id="manageUserError"></div>
 
     <div class="modal-actions">
-      <button class="btn btn-cancel" id="blockUserCancel" type="button">Cancel</button>
-      <button class="btn btn-danger" id="blockUserConfirm" type="button">Block</button>
+      <button class="btn btn-cancel" id="manageUserCancel" type="button">Cancel</button>
+      <button class="btn btn-confirm" id="manageUserConfirm" type="button" disabled>Confirm choices</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review the choices before they are applied -->
+<div class="modal-overlay modal-top" id="confirmChoicesModal">
+  <div class="modal">
+    <h2>Please check</h2>
+    <ul class="choice-list" id="choiceList"></ul>
+    <div class="error" id="choiceError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="choiceBack" type="button">Back</button>
+      <button class="btn btn-confirm" id="choiceApply" type="button">Apply</button>
     </div>
   </div>
 </div>
@@ -326,11 +348,11 @@
 <script src="passkey.js?v=20260927a"></script>
 <script src="account-core.js?v=20261009b"></script>
 <script src="emoji.js?v=20261008b"></script>
-<script src="calendar-core.js?v=20261010a"></script>
-<script src="calendar-users.js?v=20261010a"></script>
+<script src="calendar-core.js?v=20261010c"></script>
+<script src="calendar-users.js?v=20261010c"></script>
 <script src="calendar-grid.js?v=20261009a"></script>
 <script src="calendar-rank.js?v=20260927b"></script>
 <script src="calendar-booking.js?v=20260927b"></script>
-<script src="calendar-main.js?v=20261010b"></script>
+<script src="calendar-main.js?v=20261010c"></script>
 </body>
 </html>

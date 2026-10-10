@@ -333,34 +333,19 @@ function populateUserSelectModal(){
       item.appendChild(viewBtn);
     }
 
-    // Organiser can pause (block) or restore other people
+    // Organiser: one control for everything about this person (block / unblock, delete, report)
     if(isOrganiser && u.role !== 'admin'){
-      const blockBtn = document.createElement('button');
-      blockBtn.className = 'user-select-block' + (u.blocked ? ' is-undo' : '');
-      blockBtn.type = 'button';
-      blockBtn.title = (u.blocked ? 'Unblock ' : 'Block ') + u.display_name;
-      blockBtn.setAttribute('aria-label', blockBtn.title);
-      blockBtn.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${u.blocked ? 'undo' : 'block'}</span>`;
-      blockBtn.addEventListener('click', (e) => {
+      const manageBtn = document.createElement('button');
+      manageBtn.className = 'user-select-manage';
+      manageBtn.type = 'button';
+      manageBtn.title = 'Manage ' + u.display_name;
+      manageBtn.setAttribute('aria-label', manageBtn.title);
+      manageBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">more_vert</span>';
+      manageBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        setCalendarUserBlocked(u, !u.blocked, blockBtn);
+        openManageModal(u);
       });
-      item.appendChild(blockBtn);
-    }
-
-    // Organiser can remove other people (not themselves)
-    if(isOrganiser && u.role !== 'admin'){
-      const delBtn = document.createElement('button');
-      delBtn.className = 'user-select-delete';
-      delBtn.type = 'button';
-      delBtn.title = 'Delete ' + u.display_name;
-      delBtn.setAttribute('aria-label', delBtn.title);
-      delBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span>';
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        confirmDeleteCalendarUser(u.id, u.display_name);
-      });
-      item.appendChild(delBtn);
+      item.appendChild(manageBtn);
     }
 
     if(u.mine || (canClaim && u.claimable) || canView){
@@ -388,59 +373,74 @@ async function refreshPeopleAndViews(){
   renderRankings();
 }
 
+// -------------------------
+// Manage one person (organiser): block / unblock, delete, report
+// -------------------------
+
 /**
- * Pause or restore one person (organiser). Paused people can't open the calendar and their
- * answers are left out of the views and Best Match; nothing is deleted.
+ * Open the manage modal for one person. The block control shows the action that changes things
+ * (Block when they are active, Unblock when they are paused); delete and report are opt-in.
  */
-function setCalendarUserBlocked(u, blocked, btn){
-  if(!isCurrentUserOrganiser()) return;
-  // Blocking opens a modal (Block, or Report & block); unblocking stays a quick confirm
-  if(blocked){ openBlockModal(u); return; }
-  if(!confirm(`Unblock "${u.display_name}"?\n\nThey can open this calendar again and their answers show in the views.`)) return;
-  applyBlockChange(u, false, null, btn);
-}
+function openManageModal(u){
+  if(!els.manageUserModal) return;
+  state.manage = {
+    user: u,
+    currentBlocked: u.blocked === true,
+    blocked: u.blocked === true ? 0 : 1, // Action the toggle starts on
+    delete: false,
+    reason: '',
+    details: '',
+  };
+  const name = u.display_name;
+  els.manageUserTitle.textContent = `Manage ${name}`;
+  els.manageUserText.textContent = `Block or unblock ${name}, delete them from this calendar, or report them to the super admin. You can combine these.`;
+  els.manageBlockHint.textContent = u.blocked
+    ? `${name}'s access is paused right now.`
+    : `${name} can open this calendar right now.`;
+  els.manageDelete.checked = false;
+  els.manageReason.value = '';
+  els.manageDetails.value = '';
+  els.manageUserError.textContent = '';
 
-/** Open the Block / Report & block modal for one person, always starting on plain Block. */
-function openBlockModal(u){
-  if(!els.blockUserModal) return;
-  state.blockTarget = u;
+  // Reporting only exists once migrations/011 has been applied
   const reportable = state.reportsAvailable === true;
-  els.blockUserTitle.textContent = `Block ${u.display_name}?`;
-  els.blockUserText.textContent = `You can block ${u.display_name}, or report them to the super admin and block at the same time.`;
-  els.blockUserHint.textContent = "They can't open this calendar and their answers are hidden until you unblock them. Nothing is deleted.";
-  els.blockUserError.textContent = '';
-  els.blockDetails.value = '';
-  // The Report option only exists once migrations/011 has been applied
-  els.blockModeToggle.hidden = !reportable;
-  els.blockReportModeBtn.hidden = !reportable;
-  if(reportable) fillBlockReasons();
-  setBlockMode('block');
-  els.blockUserModal.classList.add('active');
-  els.blockUserCancel.focus();
+  els.manageReportRow.hidden = !reportable;
+  els.manageReportFields.hidden = !reportable;
+  els.manageReportNone.hidden = reportable;
+  if(reportable) fillManageReasons();
+
+  setManageBlock(u.blocked ? 0 : 1);
+  updateManageState();
+  els.manageUserModal.classList.add('active');
+  els.manageUserCancel.focus();
 }
 
-function closeBlockModal(){
-  if(els.blockUserModal) els.blockUserModal.classList.remove('active');
-  state.blockTarget = null;
+function closeManageModal(){
+  if(els.manageUserModal) els.manageUserModal.classList.remove('active');
+  state.manage = null;
 }
 
-/** Two-way toggle: the button you press is the mode ("block" or "report"). */
-function setBlockMode(mode){
-  const report = mode === 'report';
-  els.blockModeToggle.querySelectorAll('.block-mode').forEach(b => {
-    const on = b.dataset.mode === mode;
+/** Two-way toggle: the button you press is the action that will be applied. */
+function setManageBlock(value){
+  const v = Number(value) === 1 ? 1 : 0;
+  if(state.manage) state.manage.blocked = v;
+  els.manageBlockToggle.querySelectorAll('.block-mode').forEach(b => {
+    const on = Number(b.dataset.blocked) === v;
     b.classList.toggle('active', on);
     b.setAttribute('aria-checked', on ? 'true' : 'false');
   });
-  els.blockReportFields.hidden = !report;
-  els.blockUserConfirm.textContent = report ? 'Report & block' : 'Block';
+  updateManageState();
 }
 
 /** Reason options come from the server (includes/reports.php) so both sides agree. */
-function fillBlockReasons(){
-  const sel = els.blockReason;
+function fillManageReasons(){
+  const sel = els.manageReason;
   if(!sel || sel.dataset.filled === '1') return;
   sel.textContent = '';
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = 'No report';
+  sel.appendChild(none);
   const reasons = state.reportReasons;
   const entries = reasons && typeof reasons === 'object' ? Object.entries(reasons) : [];
   for(const [key, label] of entries){
@@ -452,47 +452,103 @@ function fillBlockReasons(){
   sel.dataset.filled = '1';
 }
 
-async function confirmBlockPerson(){
-  const u = state.blockTarget;
-  if(!u) return;
-  const wantsReport = !els.blockReportFields.hidden;
-  if(wantsReport && !els.blockReason.value){
-    els.blockUserError.textContent = 'Choose a reason for the report.';
-    return;
+/**
+ * Reflect the choices: block is skipped (and switched off) when deleting, and Confirm only lights
+ * up when something would actually change.
+ */
+function updateManageState(){
+  const m = state.manage;
+  if(!m) return;
+  const deleting = m.delete;
+  els.manageBlockToggle.querySelectorAll('.block-mode').forEach(b => { b.disabled = deleting; });
+  els.manageBlockToggle.classList.toggle('is-off', deleting);
+  els.manageBlockHint.hidden = deleting;
+  els.manageDeleteHint.hidden = !deleting;
+  const currentAsInt = m.currentBlocked ? 1 : 0;
+  const changes = deleting || m.reason !== '' || m.blocked !== currentAsInt;
+  els.manageUserConfirm.disabled = !changes;
+  els.manageUserConfirm.classList.toggle('btn-danger', deleting);
+  els.manageUserConfirm.classList.toggle('btn-confirm', !deleting);
+}
+
+/** Plain sentences for the review popup: only what was chosen. */
+function manageChoiceLines(){
+  const m = state.manage;
+  if(!m) return [];
+  const name = m.user.display_name;
+  const lines = [];
+  if(m.delete){
+    lines.push({ danger: true, text: `Delete: ${name}'s name and answers are removed from this calendar for good. This cannot be undone.` });
+  } else if(m.blocked === 1){
+    lines.push({ text: `Block: ${name} cannot open this calendar and their answers are hidden from the views and Best Match. You can undo this.` });
+  } else {
+    lines.push({ text: `Unblock: ${name} can open this calendar again.` });
   }
-  const report = wantsReport ? { reason: els.blockReason.value, details: els.blockDetails.value.trim() } : null;
-  await applyBlockChange(u, true, report, els.blockUserConfirm);
+  if(m.reason !== ''){
+    const label = (state.reportReasons && state.reportReasons[m.reason]) || m.reason;
+    lines.push({ text: `Report to the super admin: ${label}${m.details ? ` - "${m.details}"` : ''}` });
+  }
+  return lines;
+}
+
+/** Second level: show the choices before anything is applied. */
+function openConfirmChoices(){
+  const m = state.manage;
+  if(!m) return;
+  els.choiceList.textContent = '';
+  for(const line of manageChoiceLines()){
+    const li = document.createElement('li');
+    li.className = line.danger ? 'choice-item choice-danger' : 'choice-item';
+    li.textContent = line.text;
+    els.choiceList.appendChild(li);
+  }
+  els.choiceError.textContent = '';
+  els.choiceApply.classList.toggle('btn-danger', m.delete);
+  els.choiceApply.classList.toggle('btn-confirm', !m.delete);
+  els.choiceModal.classList.add('active');
+  els.choiceBack.focus();
+}
+
+/** Back returns to the manage modal with every choice still in place. */
+function closeConfirmChoices(){
+  if(els.choiceModal) els.choiceModal.classList.remove('active');
 }
 
 /**
- * Pause one person (organiser), and optionally report them to the super admin at the same time.
- * The block is what stops them; if the report fails the block still stands and we say so.
+ * Apply the choices in one call. The server writes the report first, then the block, then the
+ * delete (which removes the row). A failure keeps the popup open so nothing is half-guessed.
  */
-async function applyBlockChange(u, blocked, report, btn){
-  if(btn) btn.disabled = true;
+async function applyManageChoices(){
+  const m = state.manage;
+  if(!m) return;
+  const btn = els.choiceApply;
+  btn.disabled = true;
+  els.choiceError.textContent = '';
   try{
-    const res = await apiPost('set_user_blocked', { user_id: u.id, blocked: blocked ? 1 : 0 });
+    const body = { user_id: m.user.id };
+    if(m.delete) body.delete = 1;
+    else body.blocked = m.blocked;
+    if(m.reason !== ''){
+      body.report_reason = m.reason;
+      if(m.details) body.report_details = m.details;
+    }
+    const res = await apiPost('manage_calendar_user', body);
     if(res.status !== 'success'){
-      if(btn && btn === els.blockUserConfirm) els.blockUserError.textContent = res.message || 'Could not block this person.';
-      else showToast(res.message || 'Could not change that');
+      els.choiceError.textContent = res.message || 'Could not save that.';
       return;
     }
-    let reported = false;
-    if(report){
-      const rr = await apiPost('report_user', { user_id: u.id, reason: report.reason, details: report.details });
-      reported = rr.status === 'success';
-      if(!reported) showToast(rr.message || 'Blocked, but the report did not send');
-    }
-    closeBlockModal();
-    if(reported) showToast(`${u.display_name} blocked and reported`);
-    else if(!report) showToast(blocked ? `${u.display_name} blocked` : `${u.display_name} unblocked`);
+    const name = m.user.display_name;
+    const parts = [res.deleted ? 'deleted' : (res.blocked ? 'blocked' : 'unblocked')];
+    if(res.reported) parts.push('reported');
+    closeConfirmChoices();
+    closeManageModal();
+    showToast(`${name} ${parts.join(' and ')}`);
     await refreshPeopleAndViews();
   } catch(e){
-    console.error('Error blocking user:', e);
-    if(btn && btn === els.blockUserConfirm) els.blockUserError.textContent = 'Could not block this person.';
-    else showToast('Could not change that');
+    console.error('Error managing person:', e);
+    els.choiceError.textContent = 'Could not save that.';
   } finally {
-    if(btn) btn.disabled = false;
+    btn.disabled = false;
   }
 }
 
@@ -609,32 +665,6 @@ async function decidePeopleRequest(decision, requestId, btn){
 
 function closeUserSelectModal(){
   els.userSelectModal.classList.remove('active');
-}
-
-/**
- * Prompts the organiser to confirm deletion of a user from the calendar.
- * On confirmation, calls the delete_user API, reloads the user list,
- * and refreshes the calendar display.
- * @param {number} userId - The ID of the user to delete
- * @param {string} displayName - The display name shown in the confirmation
- */
-async function confirmDeleteCalendarUser(userId, displayName){
-  const ok = confirm('Delete "' + displayName + '" and all their availability data?\n\nThis cannot be undone.');
-  if(!ok) return;
-  if(!isCurrentUserOrganiser()) return;
-
-  try{
-    const res = await apiPost('delete_user', { user_id: userId });
-    if(res.status === 'success'){
-      showToast(displayName + ' deleted');
-      await refreshPeopleAndViews();
-    } else {
-      showToast(res.message || 'Failed to delete user');
-    }
-  } catch(e){
-    console.error('Error deleting user:', e);
-    showToast('Failed to delete user');
-  }
 }
 
 /*** People modal: tap your name to see your own Slots, an old name to claim it, or someone else to see theirs */

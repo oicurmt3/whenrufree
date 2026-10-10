@@ -491,10 +491,15 @@ if ($action === 'decide_access_request' && $_SERVER['REQUEST_METHOD'] === 'POST'
     respond(200, ['status' => 'success', 'requests' => membersRequestLists($pdo, $req['kind'], $req['id'])]);
 }
 
-// Pause or restore one person on a calendar (calendar organiser). Their answers stay stored.
-if ($action === 'set_user_blocked' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+/**
+ * One person, one decision (calendar organiser): block or unblock, delete, and/or report to the
+ * super admin. The page sends whichever were chosen together, and they are applied in a fixed
+ * order: the report first (it needs the name and account that a delete removes), then the block,
+ * then the delete. Block is reversible and keeps the answers; delete is permanent.
+ */
+if ($action === 'manage_calendar_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
-    if (!membersTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Blocking is not available yet']);
+    if (!membersTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Managing people is not available yet']);
     $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
     $stmtC->execute([':t' => requireToken()]);
     $cal = $stmtC->fetch();
@@ -502,60 +507,84 @@ if ($action === 'set_user_blocked' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $calId = (int)$cal['id'];
     $session = requireSession($pdo, $calId);
     if ($session['role'] !== 'admin') {
-        respond(403, ['status' => 'error', 'message' => 'Only the organiser can block people']);
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can manage people']);
     }
-    $userId = (int)($_POST['user_id'] ?? 0);
-    $blocked = !empty($_POST['blocked']) ? 1 : 0;
-    $stmt = $pdo->prepare(
-        "UPDATE users SET blocked = :b WHERE id = :uid AND calendar_id = :cid AND role <> 'admin'"
-    );
-    $stmt->execute([':b' => $blocked, ':uid' => $userId, ':cid' => $calId]);
-    $check = $pdo->prepare("SELECT 1 FROM users WHERE id = :uid AND calendar_id = :cid AND role <> 'admin'");
-    $check->execute([':uid' => $userId, ':cid' => $calId]);
-    if (!$check->fetchColumn()) respond(404, ['status' => 'error', 'message' => 'Person not found']);
-    logSecurityEvent('USER_BLOCKED', ['calendar_id' => $calId, 'user_id' => $userId, 'blocked' => $blocked === 1]);
-    respond(200, ['status' => 'success', 'blocked' => $blocked === 1]);
-}
 
-// Report a person to the super admin (calendar organiser). Sent together with blocking from the
-// block modal; blocking works on its own too, and a report without a block is not offered.
-if ($action === 'report_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    requireCsrf();
-    if (!reportsTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Reporting is not available yet']);
-    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
-    $stmtC->execute([':t' => requireToken()]);
-    $cal = $stmtC->fetch();
-    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
-    $calId = (int)$cal['id'];
-    $session = requireSession($pdo, $calId);
-    if ($session['role'] !== 'admin') {
-        respond(403, ['status' => 'error', 'message' => 'Only the organiser can report someone']);
-    }
-    $reason = (string)($_POST['reason'] ?? '');
-    if (!reportReasonValid($reason)) {
-        respond(400, ['status' => 'error', 'message' => 'Choose a reason for the report.']);
-    }
     $userId = (int)($_POST['user_id'] ?? 0);
-    $stmt = $pdo->prepare("SELECT id, account_id, display_name, role FROM users WHERE id = :uid AND calendar_id = :cid LIMIT 1");
+    if ($userId <= 0) respond(400, ['status' => 'error', 'message' => 'Invalid user ID']);
+    if ($userId === (int)$session['user_id']) {
+        respond(400, ['status' => 'error', 'message' => 'That is you. Use Reset Mine instead.']);
+    }
+
+    // The person, with the name and account a report needs while they still exist
+    $stmt = $pdo->prepare(
+        "SELECT id, role, account_id, display_name, blocked
+         FROM users WHERE id = :uid AND calendar_id = :cid LIMIT 1"
+    );
     $stmt->execute([':uid' => $userId, ':cid' => $calId]);
     $person = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$person) respond(404, ['status' => 'error', 'message' => 'Person not found']);
-    if ((string)$person['role'] === 'admin') respond(403, ['status' => 'error', 'message' => 'Organisers cannot be reported']);
-    if ((int)($person['account_id'] ?? 0) === (int)$session['account_id']) {
-        respond(400, ['status' => 'error', 'message' => 'You cannot report yourself']);
+    if ((string)$person['role'] === 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'The organiser cannot be changed here']);
     }
-    $reportId = reportCreate(
-        $pdo,
-        $calId,
-        (int)$person['id'],
-        $person['account_id'] !== null ? (int)$person['account_id'] : null,
-        (int)$session['account_id'],
-        $person['display_name'] !== null ? (string)$person['display_name'] : null,
-        $reason,
-        reportCleanDetails($_POST['details'] ?? null)
-    );
-    logSecurityEvent('USER_REPORTED', ['calendar_id' => $calId, 'user_id' => (int)$person['id'], 'report_id' => $reportId, 'reason' => $reason]);
-    respond(200, ['status' => 'success', 'report_id' => $reportId]);
+
+    $blocked = (int)$person['blocked'] === 1;
+    $wantsBlock = array_key_exists('blocked', $_POST) ? (!empty($_POST['blocked']) ? 1 : 0) : null;
+    $wantsDelete = !empty($_POST['delete']);
+    if ($wantsBlock === null && !$wantsDelete) {
+        respond(400, ['status' => 'error', 'message' => 'Choose something to change.']);
+    }
+
+    // 1. Report, while the person's name and account are still on this calendar
+    $reportId = null;
+    $reason = (string)($_POST['report_reason'] ?? '');
+    if ($reason !== '') {
+        if (!reportsTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Reporting is not available yet']);
+        if (!reportReasonValid($reason)) {
+            respond(400, ['status' => 'error', 'message' => 'Choose a reason for the report.']);
+        }
+        $reportId = reportCreate(
+            $pdo,
+            $calId,
+            (int)$person['id'],
+            $person['account_id'] !== null ? (int)$person['account_id'] : null,
+            (int)$session['account_id'],
+            $person['display_name'] !== null ? (string)$person['display_name'] : null,
+            $reason,
+            reportCleanDetails($_POST['report_details'] ?? null)
+        );
+        logSecurityEvent('USER_REPORTED', ['calendar_id' => $calId, 'user_id' => (int)$person['id'], 'report_id' => $reportId, 'reason' => $reason]);
+    }
+
+    // 2. Delete (permanent) or 3. block / unblock (reversible). Deleted rows have nothing to block.
+    $deleted = false;
+    if ($wantsDelete) {
+        $pdo->prepare("DELETE FROM users WHERE id = :uid AND calendar_id = :cid")
+            ->execute([':uid' => $userId, ':cid' => $calId]);
+        membersForgetCalendarAccount($pdo, $calId, $person['account_id'] !== null ? (int)$person['account_id'] : null);
+        $deleted = true;
+        logSecurityEvent('ORGANISER_DELETE_USER', [
+            'actor_id' => $session['user_id'],
+            'target_id' => $userId,
+            'target_name' => $person['display_name'],
+            'calendar_id' => $calId,
+        ]);
+    } elseif ($wantsBlock !== null && $wantsBlock !== ($blocked ? 1 : 0)) {
+        $pdo->prepare("UPDATE users SET blocked = :b WHERE id = :uid AND calendar_id = :cid AND role <> 'admin'")
+            ->execute([':b' => $wantsBlock, ':uid' => $userId, ':cid' => $calId]);
+        $blocked = $wantsBlock === 1;
+        logSecurityEvent('USER_BLOCKED', ['calendar_id' => $calId, 'user_id' => $userId, 'blocked' => $blocked]);
+    }
+
+    $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
+
+    respond(200, [
+        'status' => 'success',
+        'blocked' => $blocked,
+        'deleted' => $deleted,
+        'reported' => $reportId !== null,
+        'report_id' => $reportId,
+    ]);
 }
 
 // Show or hide the organiser's answers as a coloured edge on everyone's slots (calendar organiser)
@@ -2393,62 +2422,6 @@ if ($action === 'admin_delete_account' && $_SERVER['REQUEST_METHOD'] === 'POST')
     if (!$stmt->fetchColumn()) respond(404, ['status' => 'error', 'message' => 'Account not found']);
     accountDelete($pdo, $accountId);
     logSecurityEvent('ADMIN_DELETE_ACCOUNT', ['account_id' => $accountId]);
-    respond(200, ['status' => 'success']);
-}
-
-/**
- * Delete a specific user from a calendar (organiser only)
- * Organisers cannot delete themselves. Cascades via foreign keys.
- */
-if ($action === 'delete_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    requireCsrf();
-    $token = requireToken();
-
-    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
-    $stmtC->execute([':t' => $token]);
-    $cal = $stmtC->fetch();
-    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
-    $calId = (int)$cal['id'];
-
-    // Require organiser session
-    $session = requireSession($pdo, $calId);
-    if ($session['role'] !== 'admin') {
-        respond(403, ['status' => 'error', 'message' => 'Only the organiser can delete users']);
-    }
-
-    $targetId = (int)($_POST['user_id'] ?? 0);
-    if ($targetId <= 0) {
-        respond(400, ['status' => 'error', 'message' => 'Invalid user ID']);
-    }
-
-    // Prevent organiser from deleting themselves
-    if ($targetId === (int)$session['user_id']) {
-        respond(400, ['status' => 'error', 'message' => 'You cannot delete yourself. Use Reset Mine instead.']);
-    }
-
-    // Verify target user exists in this calendar
-    $stmtU = $pdo->prepare("SELECT id, display_name, role, account_id FROM users WHERE id = :uid AND calendar_id = :cid");
-    $stmtU->execute([':uid' => $targetId, ':cid' => $calId]);
-    $targetUser = $stmtU->fetch();
-    if (!$targetUser) {
-        respond(404, ['status' => 'error', 'message' => 'User not found']);
-    }
-
-    // Delete user (cascades to availability and sessions). On Invite only calendars they would
-    // have to request again.
-    $stmtD = $pdo->prepare("DELETE FROM users WHERE id = :uid AND calendar_id = :cid");
-    $stmtD->execute([':uid' => $targetId, ':cid' => $calId]);
-    membersForgetCalendarAccount($pdo, $calId, $targetUser['account_id'] !== null ? (int)$targetUser['account_id'] : null);
-
-    $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
-
-    logSecurityEvent('ORGANISER_DELETE_USER', [
-        'actor_id' => $session['user_id'],
-        'target_id' => $targetId,
-        'target_name' => $targetUser['display_name'],
-        'calendar_id' => $calId
-    ]);
-
     respond(200, ['status' => 'success']);
 }
 

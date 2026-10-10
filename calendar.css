@@ -962,7 +962,7 @@ main{
 .btn-confirm{background:var(--primary);color:white;}
 .btn-danger{background:#b3261e;color:white;}
 
-/* Block / Report & block modal */
+/* Manage one person: block / unblock, delete, report, then the review popup */
 .modal select,
 .modal textarea{
   width:100%;
@@ -975,20 +975,60 @@ main{
   background:#fff;
 }
 
+.manage-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:14px 0 0;
+}
+
+.manage-label{
+  flex:0 0 64px;
+  font-weight:600;
+  font-size:0.95rem;
+  color:#333;
+}
+
+.manage-row select{
+  flex:1 1 auto;
+  min-width:0;
+  width:auto;
+  margin-top:0;
+}
+
+.manage-check{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:44px;
+  font-size:0.95rem;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.modal .manage-check input{
+  width:20px;
+  height:20px;
+  margin:0;
+  padding:0;
+  accent-color:#b3261e;
+}
+
 .block-toggle{
+  flex:1;
   display:flex;
   gap:6px;
   padding:4px;
-  margin:12px 0 4px;
   background:#eceef1;
   border-radius:10px;
 }
 
 .block-toggle[hidden]{display:none;}
+.block-toggle.is-off{opacity:.45;}
 
 .block-mode{
   flex:1;
-  min-height:44px;
+  min-height:40px;
   padding:8px 10px;
   border:0;
   border-radius:8px;
@@ -1000,10 +1040,11 @@ main{
 }
 
 .block-mode[hidden]{display:none;}
+.block-mode:disabled{cursor:not-allowed;}
 
 .block-mode.active{
   background:#fff;
-  color:#b3261e;
+  color:#283593;
   box-shadow:0 1px 3px rgba(0,0,0,.15);
 }
 
@@ -1014,9 +1055,36 @@ main{
   line-height:1.4;
 }
 
-#blockReportFields .fieldish label{
+.block-note[hidden]{display:none;}
+
+#manageReportFields[hidden],
+#manageReportRow[hidden]{display:none;}
+
+/* The review popup sits above the manage modal (two levels, this is the only place they stack) */
+.modal-overlay.modal-top{z-index:2100;}
+
+.choice-list{
+  list-style:none;
+  margin:0;
+  padding:0;
+}
+
+.choice-item{
+  padding:10px 12px;
+  margin-bottom:8px;
+  border:1px solid #e0e0e0;
+  border-radius:10px;
+  background:#f7f8fa;
+  font-size:0.92rem;
+  line-height:1.45;
+  color:#333;
+}
+
+.choice-item.choice-danger{
+  border-color:#f3c4c0;
+  background:#fdecea;
+  color:#8c1d18;
   font-weight:600;
-  font-size:0.9rem;
 }
 
 /* ============================================
@@ -1117,53 +1185,24 @@ main{
 .user-select-view.is-on{background:#e8eaf6;color:#3f51b5;}
 .user-select-view .material-symbols-outlined{font-size:22px;}
 
-/* Delete button in user select list (organiser only) */
-.user-select-delete{
+/* One control per person for the organiser: opens the Block / Delete / Report modal */
+.user-select-manage{
   display:flex;
   align-items:center;
   justify-content:center;
-  width:32px;
-  height:32px;
-  border:none;
-  background:transparent;
-  color:#999;
-  border-radius:50%;
-  cursor:pointer;
-  flex-shrink:0;
-  transition:background .15s, color .15s;
-  padding:0;
-}
-.user-select-delete:hover{
-  background:#ffebee;
-  color:#b00020;
-}
-.user-select-delete .material-symbols-outlined{
-  font-size:20px;
-}
-
-/* Block / Unblock beside Delete (organiser). Only the avatar and name dim; buttons stay full colour. */
-.user-select-item .user-select-delete,
-.user-select-block{
   width:44px;
   height:44px;
-}
-.user-select-block{
-  display:flex;
-  align-items:center;
-  justify-content:center;
   border:none;
   background:transparent;
   color:#555;
   border-radius:50%;
   cursor:pointer;
   flex-shrink:0;
-  padding:0;
   transition:background .15s, color .15s;
+  padding:0;
 }
-.user-select-block:hover{background:#fff3e0;color:#8a5300;}
-.user-select-block.is-undo{color:#2e7d32;}
-.user-select-block.is-undo:hover{background:#e8f5e9;color:#1b5e20;}
-.user-select-block .material-symbols-outlined{font-size:20px;}
+.user-select-manage:hover{background:#e8eaf6;color:#283593;}
+.user-select-manage .material-symbols-outlined{font-size:22px;}
 
 /* Change your own name (your row) */
 .user-select-edit{
