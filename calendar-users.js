@@ -485,7 +485,7 @@ function manageChoiceLines(){
     lines.push({ danger: true, text: `Delete: Permanently remove ${name} and their answers.` });
   } else if(m.blocked !== (m.currentBlocked ? 1 : 0)){
     if(m.blocked === 1){
-      lines.push({ text: `Block: ${name} cannot open this calendar and their answers are hidden from the views and Best Match. You can undo this.` });
+      lines.push({ text: `Block: ${name} is blocked from this calendar and their answers are hidden. You can Unblock them.` });
     } else {
       lines.push({ text: `Unblock: ${name} can open this calendar again.` });
     }
