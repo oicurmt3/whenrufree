@@ -39,7 +39,7 @@ catGrid.addEventListener('click', (e) => {
 let csrfToken = null;
 
 /** Hub context when creating calendar inside a Hub (?g=TOKEN) */
-let hubContext = { token: null, title: null, accessEnabled: false, inviteOnly: false };
+let hubContext = { token: null, title: null, accessEnabled: false };
 
 function getHubTokenFromUrl() {
   return new URL(window.location.href).searchParams.get('g');
@@ -108,53 +108,19 @@ function updateAccessOffHint() {
   accessField.setOffHint(hubContext.accessEnabled
     ? "Uses the Hub's emoji. Switch on to give this calendar its own."
     : 'Optional emoji access security.');
-  accessField.setOnHint(isInviteOnly()
-    ? 'Asked before people request access.'
-    : 'Use this emoji to access the calendar.');
+  accessField.setOnHint('Use this emoji to access the calendar.');
 }
 
-/************** WHO CAN JOIN **************/
-// Direct link (default) or Invite only (people request access, the organiser approves).
-// Chosen at creation only. Inside an Invite only Hub the calendar is always Invite only.
-let inviteSupported = false;
-let joinMode = 'link';
+/************** HIDE NAMES **************/
+// Hidden calendars can hide participants' names too (chosen at creation only).
+let hideNamesSupported = false;
 
-const JOIN_MODE_HINTS = {
-  link: 'Anyone with the link can join.',
-  invite: "People with the link tap Request access and you approve each one. This can't be changed later."
-};
-
-function isInviteOnly() {
-  return hubContext.inviteOnly || (inviteSupported && joinMode === 'invite');
-}
-
-function renderJoinMode() {
-  const field = document.getElementById('joinModeField');
-  document.getElementById('joinModeHubNote').classList.toggle('hideme', !hubContext.inviteOnly);
-  field.classList.toggle('hideme', !inviteSupported || hubContext.inviteOnly);
-  document.querySelectorAll('#joinModeToggle .priv-btn').forEach(b => {
-    const on = b.dataset.join === joinMode;
-    b.classList.toggle('active', on);
-    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
-  document.getElementById('joinModeHint').textContent = JOIN_MODE_HINTS[joinMode];
-  updateAccessOffHint();
-}
-
-/** Shows Who can join and Hide names too once the server supports them (migrations/009). */
-function initJoinModeField(features) {
-  if (!features || features.invite_only !== true) return;
-  inviteSupported = true;
-  renderJoinMode();
+/** Shows the Hide names row once the server supports it (migrations/009). */
+function initHideNamesField(features) {
+  if (!features || features.hide_names !== true) return;
+  hideNamesSupported = true;
   updateHideNamesRow();
 }
-
-document.getElementById('joinModeToggle').addEventListener('click', (e) => {
-  const btn = e.target.closest('.priv-btn');
-  if (!btn || btn.dataset.join === joinMode) return;
-  joinMode = btn.dataset.join === 'invite' ? 'invite' : 'link';
-  renderJoinMode();
-});
 
 async function initHubContext() {
   const g = getHubTokenFromUrl();
@@ -171,8 +137,6 @@ async function initHubContext() {
     if (data.status === 'success' && data.group) {
       hubContext.title = data.group.title || 'Untitled Hub';
       hubContext.accessEnabled = data.group.access?.enabled === true;
-      hubContext.inviteOnly = data.group.invite_only === true;
-      renderJoinMode();
       titleEl.textContent = hubContext.title;
       banner.classList.remove('hideme');
     }
@@ -268,7 +232,6 @@ const calendarSaveKit = {
       emojiLine
         ? '- People need to sign in, have the link and pick the emoji to open this calendar.'
         : '- Anyone who signs in with the link can view and join this calendar.',
-      ...(meta.invite_only ? ['- Invite only: people request access and the organiser approves them.'] : []),
       '',
       window.location.origin
     );
@@ -481,7 +444,6 @@ const calendarSaveKit = {
           <div class="cal-code">${esc(token)}</div>
         </div>
         <p class="go-instruction">Go to whenrufree.net/go and enter this calendar code</p>
-        ${meta.invite_only ? '<p class="go-instruction">Invite only: people request access</p>' : ''}
         ${emojiHtml}
         <div class="link-section">
           <p><strong>Full link</strong> - share with your group:</p>
@@ -529,7 +491,6 @@ function showSaveCalendarPanel(meta) {
   document.getElementById('saveCalEmojiName').textContent = hasOwnEmoji
     ? AccessEmoji.name(meta.access_emoji)
     : "the Hub's emoji";
-  document.getElementById('saveCalInvite').classList.toggle('hideme', meta.invite_only !== true);
 
   const ack = document.getElementById('saveAckCheckbox');
   const continueBtn = document.getElementById('saveContinueBtn');
@@ -701,7 +662,7 @@ async function fetchSiteConfig() {
     if (data && data.status === 'success') {
       initAccessField(data.features);
       initBookingField(data.features);
-      initJoinModeField(data.features);
+      initHideNamesField(data.features);
     }
     if (data && data.status === 'success' && data.config && typeof data.config === 'object') {
       return data.config;
@@ -1592,13 +1553,13 @@ function updatePrivacyHint() {
 
 /** "Hide names too" is offered with Hidden only (Blind always hides names). */
 function updateHideNamesRow() {
-  const show = inviteSupported && privacyMode === 'hidden';
+  const show = hideNamesSupported && privacyMode === 'hidden';
   document.getElementById('hideNamesRow').classList.toggle('hideme', !show);
   document.getElementById('hideNamesHint').classList.toggle('hideme', !show);
 }
 
 function hideNamesValue() {
-  return inviteSupported && privacyMode === 'hidden' && document.getElementById('hideNames').checked;
+  return hideNamesSupported && privacyMode === 'hidden' && document.getElementById('hideNames').checked;
 }
 
 function setPrivacyMode(mode) {
@@ -1943,8 +1904,6 @@ async function createCalendar(){
         admin_name: adminNameValue()
     };
     if (hubContext.token) body.group_token = hubContext.token;
-    const inviteOnly = isInviteOnly();
-    if (inviteOnly) body.invite_only = 1;
     if (hideNamesValue()) body.hide_names = 1;
     // Un-answered Slots colour (migrations/012). The default grey is stored as nothing, so only a
     // different grey is sent; booking calendars ignore it (their Slots use Free / Partly / Full).
@@ -1987,7 +1946,6 @@ async function createCalendar(){
       hub_title: hubContext.title || null,
       access_emoji: accessEmoji,
       access_hub: accessEmoji === null && !!hubContext.token && hubContext.accessEnabled,
-      invite_only: inviteOnly,
       booking
     });
   }catch(e){
@@ -2017,7 +1975,6 @@ async function createCalendar(){
  *   total     - Booking: 1 = count per across the whole calendar instead of per day
  *   privacy   - "open", "hidden" or "blind" (booking calendars fall back from blind to hidden)
  *   names     - "hidden": Hidden privacy with Hide names too ticked
- *   join      - "invite": Who can join = Invite only
  */
 function parseTemplateParams() {
   const params = new URLSearchParams(window.location.search);
@@ -2167,16 +2124,9 @@ function parseTemplateParams() {
   }
 
   // names=hidden: Hidden privacy with "Hide names too" ticked (ignored until migrations/009)
-  if (params.get('names') === 'hidden' && inviteSupported) {
+  if (params.get('names') === 'hidden' && hideNamesSupported) {
     setPrivacyMode('hidden');
     document.getElementById('hideNames').checked = true;
-    applied = true;
-  }
-
-  // join=invite: Who can join = Invite only (ignored until migrations/009; a Hub's setting wins)
-  if (params.get('join') === 'invite' && inviteSupported) {
-    joinMode = 'invite';
-    renderJoinMode();
     applied = true;
   }
 

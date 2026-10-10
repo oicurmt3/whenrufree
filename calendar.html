@@ -51,7 +51,6 @@
     <!-- People on this calendar (opens modal) -->
     <button id="userSelectBtn" class="btn btn-ghost icon-btn" type="button" title="People" aria-label="People on this calendar" aria-haspopup="dialog">
       <span class="material-symbols-outlined" aria-hidden="true">group</span>
-      <span id="peopleBadge" class="people-badge" hidden></span>
     </button>
     <!-- Share (admin only) -->
     <button id="shareBtn" class="btn btn-ghost icon-btn" type="button" title="Share" aria-label="Share" style="display:none;">
@@ -187,8 +186,6 @@
   <div class="modal">
     <h2>People</h2>
     <p id="userSelectIntro"><span id="userSelectIntroText">Everyone on this calendar.</span> <a href="#" id="userSelectAddLink" class="add-name-link">Join</a></p>
-    <!-- Invite only: requests waiting (organiser) -->
-    <div id="userRequestsWrap" class="user-requests" hidden></div>
     <div class="user-select-list" id="userSelectList">
       <!-- Users will be populated here by JS -->
     </div>

@@ -385,7 +385,6 @@ function renderTable() {
                 </span>
                 ${emojiBadge(cal.access_emoji, cal.access_emoji === null && cal.group_access_emoji !== null)}
                 ${cal.slot_capacity ? `<span class="booking-badge" title="Booking: up to ${Number(cal.slot_capacity)} per slot">Booking</span>` : ''}
-                ${inviteBadge(cal.invite_only, cal.pending_requests)}
             </td>
             <td class="col-hub">${hubCell}</td>
             <td class="col-token">

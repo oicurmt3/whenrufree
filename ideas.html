@@ -115,16 +115,12 @@ celebration
           <span class="config-value"><span class="chip-preview chip-status">Hidden</span> + Hide names too</span>
         </div>
         <div class="config-row">
-          <span class="config-label">Who can join:</span>
-          <span class="config-value"><span class="chip-preview chip-status">Invite only</span> (you approve each player)</span>
-        </div>
-        <div class="config-row">
           <span class="config-label">Access emoji:</span>
           <span class="config-value">Optional &mdash; pick one on the create page and share it separately</span>
         </div>
       </div>
       <div class="tip-box">
-        <b>Non-default settings used:</b> Custom title, Sport category, 1-month range, exclude weekends, "Only chosen" date filter, custom slots, 4 custom options, Weights scoring (3, 2, 1, 0), Hidden privacy with Hide names too, and Invite only. Players tap <b>Request access</b> and you approve them in the People list; only you see who picked what. After creating, open the calendar and click date headers to select which tryout dates participants will see.
+        <b>Non-default settings used:</b> Custom title, Sport category, 1-month range, exclude weekends, "Only chosen" date filter, custom slots, 4 custom options, Weights scoring (3, 2, 1, 0), and Hidden privacy with Hide names too. Only you see who picked what. After creating, open the calendar and click date headers to select which tryout dates participants will see.
       </div>
     </div>
 
@@ -157,7 +153,7 @@ celebration
         <b>How to set up:</b> <a href="hub.html?create=1">Create a Hub</a>, save the link, then add calendars via <b>Create new calendar in this Hub</b> or attach existing ones from each calendar's organiser Hub bar.
       </div>
       <div class="tip-box" style="margin-top: 12px; margin-bottom: 0;">
-        <b>Members only?</b> Make the Hub <b>Invite only</b> when you create it. People request access once, and approving them covers every calendar in the Hub (those calendars are Invite only too). You can also block someone Hub-wide.
+        <b>Members only?</b> A Hub link is the invite: share it only with your group and anyone signed in with it can open the Hub and its calendars.
       </div>
       <a href="hub.html?create=1" class="use-template-btn" style="margin-top:12px;display:inline-flex;"><span class="material-symbols-outlined">add_circle</span> Create a Hub</a>
     </div>
@@ -1171,13 +1167,9 @@ stacks
           <span class="config-label">Scoring:</span>
           <span class="config-value">Weights (2, 1)</span>
         </div>
-        <div class="config-row">
-          <span class="config-label">Who can join:</span>
-          <span class="config-value"><span class="chip-preview chip-status">Invite only</span></span>
-        </div>
       </div>
       <div class="tip-box" style="margin-top: 12px; margin-bottom: 0;">
-        <b>Families only:</b> With <b>Invite only</b>, anyone who gets the link has to tap <b>Request access</b> and you approve them in the People list. If a forwarded link reaches the wrong person, just decline.
+        <b>Families only:</b> The calendar link is the invite. Share it only with your family; if a link reaches the wrong person, <b>Block</b> them from the People list.
       </div>
     </div>
 
@@ -1482,13 +1474,9 @@ celebration
           <span class="config-label">Scoring:</span>
           <span class="config-value">Rank</span>
         </div>
-        <div class="config-row">
-          <span class="config-label">Who can join:</span>
-          <span class="config-value"><span class="chip-preview chip-status">Invite only</span></span>
-        </div>
       </div>
       <div class="tip-box" style="margin-top: 12px; margin-bottom: 0;">
-        <b>Guests only:</b> <b>Invite only</b> lets you approve each guest, and an optional <b>access emoji</b> (shared separately from the link) adds a second check. If someone shouldn't be there, <b>Block</b> them from the People list.
+        <b>Guests only:</b> An optional <b>access emoji</b> (shared separately from the link) adds a second check before the calendar opens. If someone shouldn't be there, <b>Block</b> them from the People list.
       </div>
     </div>
     
@@ -1927,10 +1915,6 @@ help
           } else if (privText.startsWith('open')) config.privacy = 'open';
           break;
 
-        case 'who can join':
-          if (value.textContent.trim().toLowerCase().startsWith('invite only')) config.join = 'invite';
-          break;
-
         case 'scoring':
           // Extract explicit scoring mode and optional weights
           // Format: "Rank" or "Weights (3, 2, 1)"
@@ -1988,7 +1972,6 @@ help
     if (config.cap && config.total) params.set('total', config.total);
     if (config.privacy) params.set('privacy', config.privacy);
     if (config.names) params.set('names', config.names);
-    if (config.join) params.set('join', config.join);
     
     return 'index.html?' + params.toString();
   }

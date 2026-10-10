@@ -42,21 +42,7 @@
         <input type="text" id="organiserName" maxlength="32" placeholder="Your profile name" autocomplete="off">
         <p class="hint">Leave blank to use your profile name. Only your account can manage this Hub.</p>
       </div>
-      <!-- Who can join (shown once migrations/009 has run). Chosen here only; it can't be changed later. -->
-      <div class="field hideme" id="hubJoinField">
-        <label id="hubJoinLabel">Who can join</label>
-        <div class="join-toggle" id="hubJoinToggle" role="group" aria-labelledby="hubJoinLabel">
-          <button type="button" class="join-btn active" data-join="link" aria-pressed="true">
-            <span class="material-symbols-outlined" aria-hidden="true">link</span>
-            <span>Direct link</span>
-          </button>
-          <button type="button" class="join-btn" data-join="invite" aria-pressed="false">
-            <span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span>
-            <span>Invite only</span>
-          </button>
-        </div>
-        <p class="hint" id="hubJoinHint">Anyone with the link can open the Hub and its calendars.</p>
-      </div>
+      <!-- Access emoji (optional; shown once migrations/003 has run) -->
       <div class="field hideme" id="hubAccessWrap">
         <div id="hubAccessField"></div>
       </div>
@@ -135,36 +121,6 @@
           <p id="emptyHint">Create a new calendar below.</p>
         </div>
       </div>
-
-      <!-- Invite only Hub: requests and people (organiser only) -->
-      <div id="hubPeopleCard" class="hub-card hideme">
-        <h2 class="people-title">
-          <span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span>
-          People
-        </h2>
-        <p class="hint people-intro">This Hub is invite only. Approving someone opens every calendar in the Hub for them.</p>
-        <div id="hubPeopleError" class="error"></div>
-
-        <div class="people-group">
-          <div class="people-group-head">
-            <h3>Requests <span id="hubRequestCount" class="count-badge">0</span></h3>
-            <button type="button" id="hubApproveAllBtn" class="btn btn-secondary btn-small hideme">Approve all</button>
-          </div>
-          <ul id="hubRequestList" class="people-list"></ul>
-          <p id="hubRequestEmpty" class="hint">No requests waiting.</p>
-        </div>
-
-        <div class="people-group">
-          <h3>Approved</h3>
-          <ul id="hubApprovedList" class="people-list"></ul>
-          <p id="hubApprovedEmpty" class="hint">Nobody yet.</p>
-        </div>
-
-        <details class="people-group" id="hubDeclinedWrap">
-          <summary>Declined <span id="hubDeclinedCount" class="count-badge count-muted">0</span></summary>
-          <ul id="hubDeclinedList" class="people-list"></ul>
-        </details>
-      </div>
     </div>
 
     <p class="footer-links">
@@ -198,8 +154,6 @@
         <div id="saveHubEmoji" class="ae-big" aria-hidden="true"></div>
         <p class="hint">Use this emoji to access the Hub.</p>
       </div>
-
-      <p id="saveHubInvite" class="code-line hideme"><strong>Invite only:</strong> people request access and you approve them on the Hub page.</p>
 
       <div id="clipboardFailMsg" class="clipboard-fail hideme">
         Auto-copy may have failed &mdash; please use <strong>Copy Hub link</strong> below.

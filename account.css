@@ -280,21 +280,7 @@ body.acct-locked {
 
 .acct-methods .gsi-material-button { width: 100%; max-width: none; }
 
-/* ---------- Invite only / access paused panel ---------- */
-.acct-invite-name {
-  margin: 0 0 8px;
-  font-weight: 700;
-  color: var(--acct-text);
-  overflow-wrap: anywhere;
-}
-
-.acct-invite-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.acct-invite-actions .acct-btn { width: 100%; }
+/* ---------- Access paused panel ---------- */
 
 .acct-status {
   min-height: 1.2em;

@@ -70,9 +70,7 @@ async function loadCalendarMeta(){
     } else {
       state.privacyMode = 'open';
     }
-    // Invite only (own or the Hub's) and private names; set at creation
-    state.inviteOnly = meta.calendar.invite_only === true;
-    state.inviteViaHub = meta.calendar.invite_via_hub === true;
+    // Private names (Blind, or Hidden with Hide names too); set at creation
     state.namesPrivate = meta.calendar.names_private === true;
     state.organiserMarks = meta.calendar.organiser_marks !== false;
     state.organiserMarksAvailable = meta.calendar.organiser_marks_available === true;
@@ -87,8 +85,6 @@ async function loadCalendarMeta(){
     state.reportsAvailable = meta.calendar.reports_available === true;
     state.reportReasons = meta.calendar.report_reasons && typeof meta.calendar.report_reasons === 'object'
       ? meta.calendar.report_reasons : null;
-    state.pendingRequests = Number.isInteger(meta.calendar.pending_requests) ? meta.calendar.pending_requests : null;
-    updatePeopleBadge();
     updatePrivacyIndicator();
 
     // Rank sort order: 'score' (default) or 'date' (chronological)
@@ -236,19 +232,6 @@ function markBadgeOrganiser(isOrganiser){
     : 'Your profile, calendars and Hubs';
 }
 
-/*** People button badge: requests waiting (whoever decides them) */
-function updatePeopleBadge(){
-  const badge = document.getElementById('peopleBadge');
-  if(!badge) return;
-  const n = state.pendingRequests || 0;
-  badge.hidden = n < 1;
-  badge.textContent = n > 99 ? '99+' : String(n);
-  const label = state.currentUserId ? 'People on this calendar and your name' : 'People on this calendar';
-  els.userSelectBtn.setAttribute('aria-label', n > 0
-    ? `${label}, ${n} ${n === 1 ? 'request' : 'requests'} waiting`
-    : label);
-}
-
 /*** People modal: everyone on the calendar, your name first */
 function populateUserSelectModal(){
   els.userSelectList.innerHTML = '';
@@ -370,7 +353,6 @@ function populateUserSelectModal(){
 function openUserSelectModal(){
   populateUserSelectModal();
   els.userSelectModal.classList.add('active');
-  loadPeopleRequests();
 }
 
 /** After a change to who is in: reload people, answers and Best Match. */
@@ -566,117 +548,6 @@ async function applyManageChoices(){
   } catch(e){
     console.error('Error managing person:', e);
     els.choiceError.textContent = 'Could not save that.';
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-/*** Invite only: requests in the People modal (organiser) */
-async function loadPeopleRequests(){
-  const wrap = document.getElementById('userRequestsWrap');
-  if(!wrap) return;
-  wrap.textContent = '';
-  wrap.hidden = !(state.inviteOnly && isCurrentUserOrganiser());
-  if(wrap.hidden) return;
-  const data = await apiGet('access_requests');
-  if(data.status !== 'success'){ wrap.hidden = true; return; }
-  if(!data.requests){
-    const note = document.createElement('p');
-    note.className = 'modal-note';
-    note.textContent = data.managed_by === 'hub'
-      ? 'This calendar is in an invite only Hub: the Hub organiser approves requests on the Hub page.'
-      : 'Requests are not available.';
-    wrap.appendChild(note);
-    return;
-  }
-  renderPeopleRequests(data.requests);
-}
-
-function requestRow(req, actions){
-  const row = document.createElement('div');
-  row.className = 'user-request-row';
-  const name = document.createElement('span');
-  name.className = 'user-request-name';
-  name.textContent = req.display_name || 'Unnamed';
-  row.appendChild(name);
-  const box = document.createElement('div');
-  box.className = 'user-request-actions';
-  for(const a of actions){
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = `btn btn-sm ${a.cls}`;
-    b.textContent = a.label;
-    b.setAttribute('aria-label', `${a.label} ${req.display_name || ''}`.trim());
-    b.addEventListener('click', () => decidePeopleRequest(a.decision, req.id, b));
-    box.appendChild(b);
-  }
-  row.appendChild(box);
-  return row;
-}
-
-function renderPeopleRequests(lists){
-  const wrap = document.getElementById('userRequestsWrap');
-  wrap.textContent = '';
-  const pending = lists.pending || [];
-  const declined = lists.declined || [];
-  state.pendingRequests = pending.length;
-  updatePeopleBadge();
-
-  const head = document.createElement('div');
-  head.className = 'user-requests-head';
-  const h = document.createElement('h3');
-  h.textContent = `Requests (${pending.length})`;
-  head.appendChild(h);
-  if(pending.length > 1){
-    const all = document.createElement('button');
-    all.type = 'button';
-    all.className = 'btn btn-ghost btn-sm';
-    all.textContent = 'Approve all';
-    all.addEventListener('click', () => {
-      if(confirm(`Approve all ${pending.length} requests?`)) decidePeopleRequest('approve_all', null, all);
-    });
-    head.appendChild(all);
-  }
-  wrap.appendChild(head);
-
-  if(!pending.length){
-    const none = document.createElement('p');
-    none.className = 'modal-note';
-    none.textContent = 'No requests waiting. Approved people can then join with their own name.';
-    wrap.appendChild(none);
-  }
-  pending.forEach(r => wrap.appendChild(requestRow(r, [
-    { label: 'Approve', cls: 'btn-confirm', decision: 'approve' },
-    { label: 'Decline', cls: 'btn-cancel', decision: 'decline' }
-  ])));
-
-  if(declined.length){
-    const det = document.createElement('details');
-    const sum = document.createElement('summary');
-    sum.textContent = `Declined (${declined.length})`;
-    det.appendChild(sum);
-    declined.forEach(r => det.appendChild(requestRow(r, [
-      { label: 'Approve', cls: 'btn-ghost', decision: 'approve' }
-    ])));
-    wrap.appendChild(det);
-  }
-}
-
-async function decidePeopleRequest(decision, requestId, btn){
-  btn.disabled = true;
-  try{
-    const body = { decision };
-    if(requestId !== null) body.request_id = requestId;
-    const res = await apiPost('decide_access_request', body);
-    if(res.status !== 'success'){
-      showToast(res.message || 'Could not save that');
-      return;
-    }
-    renderPeopleRequests(res.requests || {});
-    if(decision !== 'decline') showToast(decision === 'approve_all' ? 'All approved' : 'Approved');
-  } catch(e){
-    console.error('Error deciding request:', e);
-    showToast('Could not save that');
   } finally {
     btn.disabled = false;
   }

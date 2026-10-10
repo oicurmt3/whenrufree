@@ -1254,58 +1254,6 @@ main{
 .user-select-item.is-blocked .user-select-avatar,
 .user-select-item.is-blocked .user-select-info{opacity:.45;}
 
-/* People button badge: requests waiting */
-#userSelectBtn{position:relative;}
-.people-badge{
-  position:absolute;
-  top:-4px;
-  right:-4px;
-  min-width:18px;
-  height:18px;
-  padding:0 5px;
-  border-radius:9px;
-  background:#b00020;
-  color:#fff;
-  font-size:.7rem;
-  font-weight:700;
-  line-height:18px;
-  text-align:center;
-  pointer-events:none;
-}
-.people-badge[hidden]{display:none;}
-
-/* People modal: Invite only requests (organiser) */
-.user-requests{
-  margin:10px 0 4px;
-  border:1px solid #c5cae9;
-  border-radius:8px;
-  background:#f5f6fc;
-  padding:10px 12px;
-}
-.user-requests[hidden]{display:none;}
-.user-requests-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  flex-wrap:wrap;
-}
-.user-requests-head h3{margin:0;font-size:.95rem;}
-.user-requests .modal-note{margin:4px 0 0;font-size:.85rem;color:#555;}
-.user-request-row{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex-wrap:wrap;
-  padding:8px 0;
-  border-bottom:1px solid #e3e5f2;
-}
-.user-request-row:last-child{border-bottom:none;}
-.user-request-name{flex:1;min-width:120px;font-weight:600;overflow-wrap:anywhere;}
-.user-request-actions{display:flex;gap:6px;}
-.user-request-actions .btn{min-height:44px;}
-.user-requests details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600;font-size:.9rem;}
-
 /* People list: only your own name and claimable old names are tappable */
 .user-select-item:not(.is-clickable){cursor:default;}
 .user-select-item:not(.is-clickable):not(.selected):hover{background:transparent;}

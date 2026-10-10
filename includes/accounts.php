@@ -485,14 +485,10 @@ function accountTouchHub(PDO $pdo, int $accountId, int $groupId): void {
  */
 function accountMemberships(PDO $pdo, int $accountId): array {
     $members = function_exists('membersTablesReady') && membersTablesReady($pdo);
-    $calPending = $members
-        ? "u.blocked, IF(u.role = 'admin' AND c.invite_only = 1 AND COALESCE(g.invite_only, 0) = 0,
-              (SELECT COUNT(*) FROM access_requests r WHERE r.kind = 'calendar' AND r.subject_id = c.id AND r.status = 'pending'),
-              NULL) AS pending_requests"
-        : '0 AS blocked, NULL AS pending_requests';
+    $calBlocked = $members ? 'u.blocked' : '0 AS blocked';
     $stmt = $pdo->prepare(
         "SELECT c.token, c.title, c.start_date, c.end_date, c.last_activity, u.role, u.display_name, u.name_custom,
-                g.token AS group_token, g.title AS group_title, {$calPending}
+                g.token AS group_token, g.title AS group_title, {$calBlocked}
          FROM users u
          JOIN calendars c ON c.id = u.calendar_id
          LEFT JOIN `groups` g ON g.id = c.group_id
@@ -512,28 +508,19 @@ function accountMemberships(PDO $pdo, int $accountId): array {
             'name_custom' => (int)$r['name_custom'] === 1,
             'hub' => $r['group_token'] !== null ? ['token' => (string)$r['group_token'], 'title' => (string)($r['group_title'] ?? '')] : null,
             'blocked' => (int)$r['blocked'] === 1,
-            'pending_requests' => $r['pending_requests'] !== null ? (int)$r['pending_requests'] : null,
         ];
     }
 
-    $hubPending = $members
-        ? "IF(g.organiser_account_id = :aid4 AND g.invite_only = 1,
-              (SELECT COUNT(*) FROM access_requests r WHERE r.kind = 'group' AND r.subject_id = g.id AND r.status = 'pending'),
-              NULL) AS pending_requests"
-        : 'NULL AS pending_requests';
     $stmt = $pdo->prepare(
         "SELECT g.token, g.title, (g.organiser_account_id = :aid) AS is_organiser,
                 (SELECT COUNT(*) FROM calendars c WHERE c.group_id = g.id) AS calendar_count,
-                {$hubPending},
                 COALESCE(ah.last_opened_at, g.created_at) AS sort_at
          FROM `groups` g
          LEFT JOIN account_hubs ah ON ah.group_id = g.id AND ah.account_id = :aid2
          WHERE g.organiser_account_id = :aid3 OR ah.account_id IS NOT NULL
          ORDER BY sort_at DESC"
     );
-    $params = [':aid' => $accountId, ':aid2' => $accountId, ':aid3' => $accountId];
-    if ($members) $params[':aid4'] = $accountId;
-    $stmt->execute($params);
+    $stmt->execute([':aid' => $accountId, ':aid2' => $accountId, ':aid3' => $accountId]);
     $hubs = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $hubs[] = [
@@ -541,11 +528,9 @@ function accountMemberships(PDO $pdo, int $accountId): array {
             'title' => (string)($r['title'] ?? ''),
             'is_organiser' => (int)$r['is_organiser'] === 1,
             'calendar_count' => (int)$r['calendar_count'],
-            'pending_requests' => $r['pending_requests'] !== null ? (int)$r['pending_requests'] : null,
         ];
     }
-    $requests = $members ? membersAccountRequests($pdo, $accountId) : [];
-    return ['calendars' => $calendars, 'hubs' => $hubs, 'requests' => $requests];
+    return ['calendars' => $calendars, 'hubs' => $hubs];
 }
 
 /** What deleting the account would remove (shown before confirming). */
@@ -575,11 +560,9 @@ function accountDelete(PDO $pdo, int $accountId): void {
         $stmt->execute([':aid' => $accountId]);
         $delCal = $pdo->prepare("DELETE FROM calendars WHERE id = :cid");
         $delAccess = $pdo->prepare("DELETE FROM account_access WHERE kind = 'calendar' AND subject_id = :cid");
-        $forgetRequests = function_exists('membersForgetSubject');
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $cid) {
             $delCal->execute([':cid' => (int)$cid]);
             $delAccess->execute([':cid' => (int)$cid]);
-            if ($forgetRequests) membersForgetSubject($pdo, 'calendar', (int)$cid);
         }
         $stmt = $pdo->prepare("SELECT id FROM `groups` WHERE organiser_account_id = :aid");
         $stmt->execute([':aid' => $accountId]);
@@ -588,7 +571,6 @@ function accountDelete(PDO $pdo, int $accountId): void {
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $gid) {
             $delGroup->execute([':gid' => (int)$gid]);
             $delGroupAccess->execute([':gid' => (int)$gid]);
-            if ($forgetRequests) membersForgetSubject($pdo, 'group', (int)$gid);
         }
         $pdo->prepare("DELETE FROM users WHERE account_id = :aid")->execute([':aid' => $accountId]);
         $pdo->prepare("DELETE FROM accounts WHERE id = :aid")->execute([':aid' => $accountId]);

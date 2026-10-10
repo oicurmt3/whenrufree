@@ -7,8 +7,8 @@ alwaysApply: true
 - Privacy-first: no tracking, no ads. Sign-in is required to open, join or create anything: Google (openid only), Facebook (user ID only) or passkey. Never store email, real name or photo; provider IDs only as keyed hashes.
 - Accounts have a private unique username and a profile name used on calendars by default, with a per-calendar override. Profile page (`account.html`): name, sign-in methods, calendars and Hubs, sign out, delete account.
 - No PINs: the unique URL is the invite; the optional access emoji is an invite confirmation remembered per account. Old PIN names and Hubs are claimed once with their PIN, then the PIN is deleted.
-- Who can join (set only at creation, never changed): Direct link, or Invite only (Request access; organiser approves/declines; Hub approval covers its calendars; calendars in an Invite only Hub are forced Invite only). The emoji is still asked before requesting; approved accounts skip it. Pending requests expire after 30 days; declined can't re-request.
-- Organisers can Block (`users.blocked`) any person on a calendar: access paused, answers left out of views and Best Match, bookings still count. Invite only Hubs can block Hub-wide.
+- Anyone signed in with the link can open and join a calendar or Hub; the link is the only access control. The optional access emoji must be picked before a new account sees it, and is remembered per account afterwards.
+- Organisers can Block (`users.blocked`) any person on a calendar: access paused, answers left out of views and Best Match, bookings still count.
 - Respect the three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices). Names are private on Blind, and on Hidden with "Hide names too": members see only themselves, the organisers and a total.
 - Calendar model: 1-6 time slots, 1-5 status options (with weights and colours), date ranges up to 360 days.
 - Auto-rank "Best Match" by weighted status scores, with expandable rosters.

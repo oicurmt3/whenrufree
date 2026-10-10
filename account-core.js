@@ -278,84 +278,22 @@
     return new Promise(() => {});
   }
 
-  /** The calendar (?c=) or Hub (?g=) this page is for, as API params. */
-  function pageTarget() {
-    const qs = new URL(location.href).searchParams;
-    if (qs.get('c')) return { c: qs.get('c') };
-    if (qs.get('g')) return { g: qs.get('g') };
-    return {};
-  }
-
-  const INVITE_TEXT = {
-    none: (what, name) => [
-      `${what} is invite only`,
-      `Ask the organiser to let you in. They will see your profile name${name ? ` (${name})` : ''}.`,
-    ],
-    pending: (what) => [
-      'Request sent',
-      `Waiting for the organiser to approve you. Come back to this link later: ${what.toLowerCase()} opens once you are approved. It is also listed on your profile under "Waiting for approval".`,
-    ],
-    declined: () => ['Not approved', 'The organiser did not approve your request.'],
-    blocked: () => ['Blocked', 'The organiser has blocked you from this calendar.'],
-  };
-
   /**
-   * Panel for an Invite only calendar or Hub (403 INVITE_ONLY) or a blocked person (403 BLOCKED).
-   * Not dismissible: the page cannot load until the organiser lets the account in.
+   * Panel for a person the organiser has blocked on this calendar (403 BLOCKED).
+   * Not dismissible: the page cannot load while the block is in place.
    */
-  function showInvite(invite) {
-    let overlay = document.getElementById('acctInvite');
+  function showBlocked() {
+    let overlay = document.getElementById('acctBlocked');
     if (!overlay) {
-      overlay = el('div', { id: 'acctInvite', className: 'acct-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'acctInviteTitle' });
+      overlay = el('div', { id: 'acctBlocked', className: 'acct-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'acctBlockedTitle' });
       document.body.appendChild(overlay);
       document.body.classList.add('acct-locked');
     }
     overlay.textContent = '';
-    const what = invite.kind === 'hub' ? 'This Hub' : 'This calendar';
-    const status = INVITE_TEXT[invite.status] ? invite.status : 'none';
-    const [title, text] = INVITE_TEXT[status](what, invite.profile_name || '');
 
     const box = el('div', { className: 'acct-box' });
-    box.appendChild(el('h2', { id: 'acctInviteTitle', className: 'acct-title' }, title));
-    if (invite.title) box.appendChild(el('p', { className: 'acct-invite-name' }, invite.title));
-    box.appendChild(el('p', { className: 'acct-text' }, text));
-
-    const msg = el('p', { className: 'acct-status', role: 'status', 'aria-live': 'polite' });
-    const actions = el('div', { className: 'acct-invite-actions' });
-    const button = (cls, iconName, label, onClick) => {
-      const b = el('button', { type: 'button', className: `acct-btn ${cls}` });
-      b.appendChild(icon(iconName));
-      b.appendChild(el('span', {}, label));
-      b.addEventListener('click', async () => {
-        b.disabled = true;
-        await onClick();
-        b.disabled = false;
-      });
-      actions.appendChild(b);
-      return b;
-    };
-
-    if (status === 'none') {
-      button('acct-btn-primary', 'how_to_reg', 'Request access', async () => {
-        const r = await postJson('request_access', {}, pageTarget());
-        if (r.ok && r.data.request_status === 'approved') { location.reload(); return; }
-        if (r.ok) { showInvite({ ...invite, status: 'pending' }); return; }
-        if (r.data.code === 'BLOCKED' || r.data.code === 'REQUEST_DECLINED') {
-          showInvite({ ...invite, status: r.data.code === 'BLOCKED' ? 'blocked' : 'declined' });
-          return;
-        }
-        msg.textContent = r.data.message || 'Could not send the request. Please try again.';
-      });
-    } else if (status === 'pending') {
-      button('acct-btn-primary', 'refresh', 'Check again', async () => { location.reload(); });
-      button('acct-btn-ghost', 'close', 'Cancel request', async () => {
-        const r = await postJson('cancel_access_request', {}, pageTarget());
-        if (r.ok) showInvite({ ...invite, status: 'none' });
-        else msg.textContent = r.data.message || 'Could not cancel. Please try again.';
-      });
-    }
-    box.appendChild(actions);
-    box.appendChild(msg);
+    box.appendChild(el('h2', { id: 'acctBlockedTitle', className: 'acct-title' }, 'Blocked'));
+    box.appendChild(el('p', { className: 'acct-text' }, 'The organiser has blocked you from this calendar.'));
 
     const links = el('p', { className: 'acct-links' });
     [['index.html', 'Home'], ['account.html', 'Your profile'], ['faq.html', 'FAQs']].forEach(([href, label], i) => {
@@ -369,7 +307,7 @@
   }
 
   /**
-   * React to an API error that means "not signed in", "not set up", "invite only" or "blocked".
+   * React to an API error that means "not signed in", "not set up" or "blocked".
    * Returns true when handled (the page should stop).
    */
   function handleApiError(data) {
@@ -382,8 +320,8 @@
       goToSetup();
       return true;
     }
-    if (code === 'INVITE_ONLY' || code === 'BLOCKED') {
-      showInvite({ ...(data.invite || {}), status: code === 'BLOCKED' ? 'blocked' : ((data.invite || {}).status || 'none') });
+    if (code === 'BLOCKED') {
+      showBlocked();
       return true;
     }
     return false;
@@ -476,7 +414,7 @@
     passkeySignup,
     renderSignInButtons,
     showSignIn,
-    showInvite,
+    showBlocked,
     handleApiError,
     takeSigninResult,
     toast,

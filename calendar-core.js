@@ -798,8 +798,6 @@ const state = {
   dateFilterDates:[], // Array of YYYY-MM-DD strings marked by organiser
   dateFilterDirty:false, // True when filter dates have unsaved changes
   privacyMode:'open', // 'open', 'hidden', or 'blind'
-  inviteOnly:false, // People request access (own setting or the Hub's)
-  inviteViaHub:false, // Requests go to the Hub organiser
   namesPrivate:false, // Blind, or Hidden with Hide names too
   organiserMarks:true, // Organiser's answers as a coloured slot edge (Open calendars; organiser can turn off)
   organiserMarksAvailable:false, // Server has calendars.show_organiser_marks (migration 010)
@@ -810,7 +808,6 @@ const state = {
   reportsAvailable:false, // Server has the reports table (migration 011): offer the Report dropdown
   reportReasons:null, // reason key => label, from the server so both sides agree
   manage:null, // Choices in the manage modal for one person (block / delete / report)
-  pendingRequests:null, // Requests waiting (only for whoever decides them)
   users:[],
   usersTotal:0, // Everyone who has joined (users may be trimmed when names are private)
   namesHidden:false, // users list trimmed for you (names private, not the organiser)

@@ -307,7 +307,6 @@ function renderHubTable() {
                     ${escapedTitle || '(untitled)'}
                 </span>
                 ${emojiBadge(group.access_emoji, false)}
-                ${inviteBadge(group.invite_only, group.pending_requests)}
             </td>
             <td class="col-token">
                 <span class="token-display" title="${group.token}">${truncateToken(group.token)}</span>

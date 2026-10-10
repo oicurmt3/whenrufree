@@ -356,26 +356,6 @@ celebration
         <div id="adminNameErr" class="error"></div>
       </div>
 
-      <!-- Who can join (shown once migrations/009 has run). Chosen here only; it can't be changed later. -->
-      <div class="field hideme" id="joinModeField">
-        <label id="joinModeLabel">Who can join</label>
-        <div class="privacy-toggle" id="joinModeToggle" role="group" aria-labelledby="joinModeLabel">
-          <button type="button" class="priv-btn active" data-join="link" aria-pressed="true">
-            <span class="material-symbols-outlined" aria-hidden="true">link</span>
-            <span>Direct link</span>
-          </button>
-          <button type="button" class="priv-btn" data-join="invite" aria-pressed="false">
-            <span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span>
-            <span>Invite only</span>
-          </button>
-        </div>
-        <p class="hint" id="joinModeHint">Anyone with the link can join.</p>
-      </div>
-      <p class="info-box hideme" id="joinModeHubNote">
-        <span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span>
-        This Hub is invite only: people request access and the Hub organiser approves them.
-      </p>
-
       <!-- Access emoji (optional; shown once migrations/003 has run) -->
       <div class="field hideme" id="accessEmojiWrap" style="max-width:420px;">
         <div id="accessEmojiField"></div>
@@ -461,8 +441,6 @@ celebration
         <div id="saveCalEmoji" class="ae-big" aria-hidden="true"></div>
         <p class="hint">Use this emoji to access the calendar.</p>
       </div>
-
-      <p id="saveCalInvite" class="code-line hideme"><strong>Invite only:</strong> people request access and you approve them in the People list.</p>
 
       <div id="clipboardFailMsg" class="clipboard-fail hideme">
         Auto-copy may have failed &mdash; please use <strong>Copy calendar link</strong> below.
