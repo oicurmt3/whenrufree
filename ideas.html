@@ -112,7 +112,7 @@ celebration
         </div>
         <div class="config-row">
           <span class="config-label">Privacy:</span>
-          <span class="config-value"><span class="chip-preview chip-status">Hidden</span> + Hide names too</span>
+          <span class="config-value"><span class="chip-preview chip-status">Hidden</span> + private names</span>
         </div>
         <div class="config-row">
           <span class="config-label">Access emoji:</span>
@@ -120,7 +120,7 @@ celebration
         </div>
       </div>
       <div class="tip-box">
-        <b>Non-default settings used:</b> Custom title, Sport category, 1-month range, exclude weekends, "Only chosen" date filter, custom slots, 4 custom options, Weights scoring (3, 2, 1, 0), and Hidden privacy with Hide names too. Only you see who picked what. After creating, open the calendar and click date headers to select which tryout dates participants will see.
+        <b>Non-default settings used:</b> Custom title, Sport category, 1-month range, exclude weekends, "Only chosen" date filter, custom slots, 4 custom options, Weights scoring (3, 2, 1, 0), and Hidden privacy with private names. Only you see who picked what. After creating, open the calendar and click date headers to select which tryout dates participants will see.
       </div>
     </div>
 
@@ -651,11 +651,11 @@ calendar_add_on
         </div>
         <div class="config-row">
           <span class="config-label">Privacy:</span>
-          <span class="config-value"><span class="chip-preview chip-status">Hidden</span> + Hide names too</span>
+          <span class="config-value"><span class="chip-preview chip-status">Hidden</span> + private names</span>
         </div>
       </div>
       <div class="tip-box">
-        <b>Tip:</b> <b>Hidden</b> privacy with <b>Hide names too</b> means candidates only see which slots are taken &mdash; not who took them, or who else is booking.
+        <b>Tip:</b> <b>Hidden</b> privacy keeps the People list private too, so candidates only see which slots are taken &mdash; not who took them, or who else is booking.
       </div>
     </div>
 
@@ -870,11 +870,11 @@ calendar_add_on
         </div>
         <div class="config-row">
           <span class="config-label">Privacy:</span>
-          <span class="config-value"><span class="chip-preview chip-status">Hidden</span> + Hide names too</span>
+          <span class="config-value"><span class="chip-preview chip-status">Hidden</span> + private names</span>
         </div>
       </div>
       <div class="tip-box">
-        <b>Tip:</b> <b>Hidden</b> privacy with <b>Hide names too</b> means families only see which times are taken, not each other's names. Rename <b>Full</b> to "Taken" when you create it.
+        <b>Tip:</b> <b>Hidden</b> privacy keeps the People list private too, so families only see which times are taken, not each other's names. Rename <b>Full</b> to "Taken" when you create it.
       </div>
     </div>
 
@@ -1906,12 +1906,12 @@ help
           break;
 
         case 'privacy':
-          // "Open", "Blind", "Hidden" or "Hidden + Hide names too"
+          // "Open", "Blind", "Hidden" or "Hidden + private names"
           const privText = value.textContent.trim().toLowerCase();
           if (privText.startsWith('blind')) config.privacy = 'blind';
           else if (privText.startsWith('hidden')) {
             config.privacy = 'hidden';
-            if (privText.includes('hide names')) config.names = 'hidden';
+            if (privText.includes('private names')) config.names = 'hidden';
           } else if (privText.startsWith('open')) config.privacy = 'open';
           break;
 

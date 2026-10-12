@@ -7,8 +7,8 @@
  * toggles it from the People list (api.php?action=manage_calendar_user) and unblocking restores
  * everything.
  *
- * Private names: on Blind calendars, and Hidden calendars created with hide_names, participants
- * only see themselves, the organisers and a count.
+ * Private names: on Blind calendars, and on Hidden calendars unless the organiser opted out at
+ * creation (hide_names), participants only see themselves, the organisers and a count.
  *
  * Needs the hide_names and blocked columns (added by migrations/009); until they exist they
  * are simply unavailable.
@@ -74,7 +74,7 @@ function membersGate(PDO $pdo, string $action): void {
     if (membersCalendarBlocked($pdo, (int)$calId, (int)$acct['id'])) membersRespondBlocked();
 }
 
-/** Blind calendars, and Hidden calendars created with hide_names, hide other participants' names. */
+/** Blind calendars, and Hidden calendars that kept hide_names, hide other participants' names. */
 function membersNamesHidden(array $calRow): bool {
     $priv = (int)($calRow['is_private'] ?? 0);
     return $priv === 2 || ($priv === 1 && (int)($calRow['hide_names'] ?? 0) === 1);

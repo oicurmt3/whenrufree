@@ -243,7 +243,7 @@ celebration
         </div>
       </div>
       <div id="statusOptionsUI">
-      <p class="muted">Add/edit (rename) <b>1</b> to <b id="statusMaxHint">5</b> Options. These are the choices people toggle in the calendar.</p>
+      <p class="muted">Add/edit (rename) <b>1</b> to <b id="statusMaxHint">5</b> Options.</p>
       
       <!-- Ranking Mode Toggle -->
       <div class="ranking-mode-row">
@@ -255,22 +255,29 @@ celebration
         <span class="ranking-hint" id="rankingHint">Position = score (top is best)</span>
       </div>
       
-      <div id="statusWrap"></div>
-      <!-- What the Default option box on each Option row above means (migrations/013) -->
-      <p class="muted slot-default-hint">
-        <span class="material-symbols-outlined" aria-hidden="true">check_box</span>
-        <span>default option</span>
-      </p>
+      <div id="statusWrap">
+        <!-- "No option" row (migrations/012): the colour of a Slot nobody has answered. It keeps
+             the Option row grid, with two blank cells where Move up and Delete sit on the rows
+             above, so the colour picker and its label line up. It sits last and hides once a
+             Default option is ticked, because then no Slot is ever un-answered. -->
+        <div class="status-null-row" id="statusNullRow">
+          <span class="status-grid-gap" aria-hidden="true"></span>
+          <span class="status-grid-gap" aria-hidden="true"></span>
+          <span class="null-color-wrap">
+            <button type="button" class="color-pick null-color-pick" id="nullColorPick" aria-haspopup="true" aria-expanded="false" aria-label="No option colour" title="No option colour (five greys)">
+              <span class="null-color-chip" id="nullColorChip"></span>
+            </button>
+            <span class="null-color-pop" id="nullColorPop" role="radiogroup" aria-label="No option colour" hidden></span>
+          </span>
+          <span class="label-input status-null-label" id="statusNullLabel">No option</span>
+          <span class="status-grid-weight" aria-hidden="true"></span>
+          <span class="status-grid-default" aria-hidden="true"></span>
+        </div>
+      </div>
       <div class="row">
         <button id="addStatusBtn" class="btn btn-ghost btn-small" type="button">+ Add status</button>
       </div>
       <div id="statusError" class="error"></div>
-      </div>
-
-      <!-- Un-answered Slots colour (migrations/012): five fixed greys for a Slot nobody has answered -->
-      <div class="field null-field" id="nullColorField">
-        <label id="nullColorLabel">No option colour</label>
-        <div class="null-swatches" id="nullSwatches" role="radiogroup" aria-labelledby="nullColorLabel"></div>
       </div>
     </div>
 
@@ -342,7 +349,7 @@ celebration
             <span>All except</span>
           </button>
         </div>
-        <p class="hint" id="dateFilterHint">Show all dates in the range to participants.</p>
+        <p class="hint" id="dateFilterHint">Show all dates in the range.</p>
       </div>
     </div>
 
@@ -378,11 +385,11 @@ celebration
             <span>Blind</span>
           </button>
         </div>
-        <p class="hint" id="privacyHint">All users can see each other's availability choices.</p>
-        <!-- Hidden only (migrations/009): the People list shows each person only themselves and you -->
+        <p class="hint" id="privacyHint">All users can see each other's responses.</p>
+        <!-- Hidden only (migrations/009): names are private unless the organiser opts out here -->
         <label class="weekend-label hideme" id="hideNamesRow" for="hideNames">
           <input id="hideNames" type="checkbox" />
-          Hide names too
+          Show everyone who has joined (but not their choices)
         </label>
         <p class="hint hideme" id="hideNamesHint">People only see their own name, organiser name (yours), and how many have joined.</p>
       </div>

@@ -348,16 +348,6 @@ function organiserMarksSettingShown(){
   return state.organiserMarksAvailable && state.privacyMode === 'open' && !isBookingMode();
 }
 
-/** Calendar settings offers the un-answered colour picker: availability calendars once migration 012 ran. */
-function nullColorSettingShown(){
-  return state.nullColorAvailable && !isBookingMode();
-}
-
-/** Calendar settings offers the default option picker: availability calendars once migration 013 ran. */
-function slotDefaultSettingShown(){
-  return state.defaultStatusAvailable && !isBookingMode();
-}
-
 /**
  * The option all Slots begin with, so there is no un-answered state. 0 (STATUS_NULL) when the
  * organiser has not set one, or when the stored position no longer exists.
@@ -798,13 +788,11 @@ const state = {
   dateFilterDates:[], // Array of YYYY-MM-DD strings marked by organiser
   dateFilterDirty:false, // True when filter dates have unsaved changes
   privacyMode:'open', // 'open', 'hidden', or 'blind'
-  namesPrivate:false, // Blind, or Hidden with Hide names too
+  namesPrivate:false, // Blind, or Hidden unless the organiser showed who has joined
   organiserMarks:true, // Organiser's answers as a coloured slot edge (Open calendars; organiser can turn off)
   organiserMarksAvailable:false, // Server has calendars.show_organiser_marks (migration 010)
   nullColor:null, // Colour of un-answered Slots (migration 012); null = the default light grey
-  nullColorAvailable:false, // Server has calendars.null_color
   defaultStatus:0, // Option all Slots begin with (migration 013); 0 = none, so Slots start un-answered
-  defaultStatusAvailable:false, // Server has calendars.default_status
   reportsAvailable:false, // Server has the reports table (migration 011): offer the Report dropdown
   reportReasons:null, // reason key => label, from the server so both sides agree
   manage:null, // Choices in the manage modal for one person (block / delete / report)

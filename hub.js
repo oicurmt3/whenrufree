@@ -759,7 +759,7 @@ async function openHubSettings() {
     label: 'Access emoji',
     pickerTitle: 'Choose Hub emoji',
     pickerHint: 'Use this emoji to access the Hub.',
-    offHint: 'Optional emoji access security.',
+    offHint: 'Optional emoji for Hub access',
     onHint: 'Use this emoji to access the Hub.',
     value: saved,
     onChange: async (next) => {
@@ -938,7 +938,7 @@ async function initCreateAccessField() {
     label: 'Access emoji',
     pickerTitle: 'Choose Hub emoji',
     pickerHint: 'Use this emoji to access the Hub.',
-    offHint: 'Optional emoji access security.',
+    offHint: 'Optional emoji for Hub access',
     onHint: 'Use this emoji to access the Hub.'
   });
   qs('#hubAccessWrap').classList.remove('hideme');

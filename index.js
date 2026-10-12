@@ -96,7 +96,7 @@ function initAccessField(features) {
     label: 'Access emoji',
     pickerTitle: 'Choose calendar emoji',
     pickerHint: 'Use this emoji to access the calendar.',
-    offHint: 'Optional emoji access security.',
+    offHint: 'Optional emoji for calendar access',
     onHint: 'Use this emoji to access the calendar.'
   });
   updateAccessOffHint();
@@ -107,15 +107,15 @@ function updateAccessOffHint() {
   if (!accessField) return;
   accessField.setOffHint(hubContext.accessEnabled
     ? "Uses the Hub's emoji. Switch on to give this calendar its own."
-    : 'Optional emoji access security.');
+    : 'Optional emoji for calendar access');
   accessField.setOnHint('Use this emoji to access the calendar.');
 }
 
 /************** HIDE NAMES **************/
-// Hidden calendars can hide participants' names too (chosen at creation only).
+// On Hidden calendars names are private by default; the organiser can opt out at creation.
 let hideNamesSupported = false;
 
-/** Shows the Hide names row once the server supports it (migrations/009). */
+/** Shows the name-visibility row once the server supports it (migrations/009). */
 function initHideNamesField(features) {
   if (!features || features.hide_names !== true) return;
   hideNamesSupported = true;
@@ -1010,13 +1010,15 @@ const addStatusBtn = document.getElementById('addStatusBtn');
 const statusError = document.getElementById('statusError');
 
 /************** UNANSWERED SLOTS COLOUR (migrations/012) **************/
-// Five fixed greys an organiser may pick for a Slot nobody has answered yet. There is no "clear"
-// option: the default grey is a real choice, so the picker always shows a tick.
+// Five fixed greys an organiser may pick for a Slot nobody has answered yet, so the palette is
+// limited to them. The default grey is one of the five, so there is always a colour to show.
 // NOTE: keep in sync with NULL_COLOR_CHOICES in includes/data.php and calendar-core.js.
 const NULL_COLOR_CHOICES = ['#000000', '#404040', '#808080', '#bfbfbf', '#ffffff'];
 const NULL_COLOR_DEFAULT = '#bfbfbf';
 let nullColorChoice = NULL_COLOR_DEFAULT;
-const nullSwatchesEl = document.getElementById('nullSwatches');
+const nullColorPickEl = document.getElementById('nullColorPick');
+const nullColorChipEl = document.getElementById('nullColorChip');
+const nullColorPopEl = document.getElementById('nullColorPop');
 
 // Ranking mode: 'rank' (position-based) or 'weights' (custom values 0-5)
 let rankingMode = 'rank';
@@ -1058,6 +1060,10 @@ function applyRankingMode(){
       if (weightNum) weightNum.style.display = '';
     }
   });
+  // The "No option" row has no weight box, so its blank cell tracks the same mode and its label
+  // stays exactly as wide as an Option row's.
+  const nullWeightGap = document.querySelector('#statusNullRow .status-grid-weight');
+  if (nullWeightGap) nullWeightGap.style.display = (rankingMode === 'rank') ? 'none' : '';
   refreshStatusReorderUI();
 }
 
@@ -1199,9 +1205,10 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   const err = document.createElement('span');
   err.className = 'inline-error';
 
-  // Default option: the option every Slot begins with. Only one row can be on, and tapping the one
-  // that is on turns it off, so Slots start un-answered again. Tracked by row element so it follows
-  // reordering, and clears when that row is deleted.
+  // Default option: the option every Slot begins with. Tapping a box ticks it and hides the
+  // "No option" row; tapping the ticked box unticks it, so Slots start un-answered again and the
+  // "No option" colour row comes back. Tracked by row element so it follows reordering, and clears
+  // when that row is deleted.
   const defCol = document.createElement('span');
   defCol.className = 'status-default-col';
   const defBtn = document.createElement('button');
@@ -1218,7 +1225,8 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   defBtn.appendChild(defIcon);
   defBtn.addEventListener('click', () => {
     defaultRowEl = (defaultRowEl === row) ? null : row;
-    paintDefaultToggles();
+    paintStatusDefaults();
+    validateStatusesUI();
   });
   defCol.appendChild(defBtn);
 
@@ -1238,7 +1246,7 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
     if (v > 5) v = 5;
     weightNum.value = v;
   });
-  del.addEventListener('click', () => { row.remove(); applyDefaultColors(); paintDefaultToggles(); validateStatusesUI(); });
+  del.addEventListener('click', () => { row.remove(); applyDefaultColors(); paintStatusDefaults(); validateStatusesUI(); });
 
   up.addEventListener('click', () => {
     const prev = row.previousElementSibling;
@@ -1274,6 +1282,7 @@ function refreshStatusReorderUI(){
 }
 
 // Default option (migrations/013): the row whose option every Slot begins with, or null for none.
+// Ticking a box hides the "No option" colour row, because then no Slot is ever un-answered.
 let defaultRowEl = null;
 
 /** The default option as a 1-based position, or 0 when no row is set (or it was deleted). */
@@ -1283,8 +1292,11 @@ function getDefaultStatus(){
   return idx >= 0 ? idx + 1 : 0;
 }
 
-/** Ticks the default option on the row that holds it and unticks the rest. */
-function paintDefaultToggles(){
+/**
+ * Paints the default-option boxes and the "No option" row: ticking any box hides the row, because
+ * that option is what every Slot begins with, so there is no un-answered state left to colour.
+ */
+function paintStatusDefaults(){
   statusWrap.querySelectorAll('.status-row').forEach(row => {
     const btn = row.querySelector('.default-toggle');
     if (!btn) return;
@@ -1295,10 +1307,19 @@ function paintDefaultToggles(){
     const icon = btn.querySelector('.material-symbols-outlined');
     if (icon) icon.textContent = on ? 'check_box' : 'check_box_outline_blank';
   });
+  const nullRow = document.getElementById('statusNullRow');
+  if (nullRow) nullRow.classList.toggle('hideme', getDefaultStatus() !== 0);
+}
+
+/** The "No option" row always sits after the Options, never among them. */
+function keepNullRowLast(){
+  const nullRow = document.getElementById('statusNullRow');
+  if (nullRow) statusWrap.appendChild(nullRow);
 }
 
 function setStatuses(items){
-  statusWrap.innerHTML = '';
+  // Only real Options go: the "No option" row lives in the wrap too and keeps its chosen colour.
+  statusWrap.querySelectorAll('.status-row').forEach(row => row.remove());
   // A fresh list of options has no default option until the organiser picks one
   defaultRowEl = null;
   const safe = Array.isArray(items) ? items : [];
@@ -1315,10 +1336,11 @@ function setStatuses(items){
       : palette[idx]; // Default: position-based color
     statusWrap.appendChild(makeStatusRow(label, weight, color));
   });
+  keepNullRowLast();
   refreshStatusReorderUI();
   applyDefaultColors();
   applyRankingMode();
-  paintDefaultToggles();
+  paintStatusDefaults();
   validateStatusesUI();
 }
 
@@ -1327,10 +1349,12 @@ function addStatus(label=''){
   if (current >= MAX_STATUSES) return;
   // New status gets weight 0 by default
   statusWrap.appendChild(makeStatusRow(label, 0));
+  keepNullRowLast();
   refreshStatusReorderUI();
   applyDefaultColors();
   applyRankingMode();
   updatePositionWeights();
+  paintStatusDefaults();  // the new row's Default option box
   validateStatusesUI();
 }
 
@@ -1348,13 +1372,24 @@ function updatePositionWeights(){
 addStatusBtn.addEventListener('click', () => addStatus(''));
 
 /**
- * Un-answered Slots: the five fixed greys, with the default ticked from the start
- * (migrations/012). Part of the Options section, so it hides with it on booking calendars.
+ * Un-answered Slots: the five fixed greys, starting on the default (migrations/012). The square
+ * opens a small palette holding exactly those five, because a native colour input always opens the
+ * full OS picker, which cannot be limited. Part of the Options section, so it hides with it on
+ * booking calendars.
  */
 function initNullColorPicker(){
-  if(!nullSwatchesEl) return;
+  if(!nullColorPickEl || !nullColorPopEl) return;
+
   const paint = () => {
-    nullSwatchesEl.querySelectorAll('.null-swatch').forEach(btn => {
+    // Same look as an Option row: the swatch colour, and the label filled with it
+    if (nullColorChipEl) nullColorChipEl.style.background = nullColorChoice;
+    const label = document.getElementById('statusNullLabel');
+    if (label) {
+      label.style.backgroundColor = nullColorChoice;
+      label.style.color = getContrastTextColor(nullColorChoice);
+      label.style.borderColor = nullColorChoice;
+    }
+    nullColorPopEl.querySelectorAll('.null-color-choice').forEach(btn => {
       const on = btn.dataset.color === nullColorChoice;
       btn.classList.toggle('active', on);
       btn.setAttribute('aria-checked', on ? 'true' : 'false');
@@ -1370,19 +1405,42 @@ function initNullColorPicker(){
     });
   };
 
+  const close = () => {
+    nullColorPopEl.hidden = true;
+    nullColorPickEl.setAttribute('aria-expanded', 'false');
+    paint();
+  };
+
   for(const color of NULL_COLOR_CHOICES){
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'null-swatch';
+    btn.className = 'null-color-choice';
     btn.dataset.color = color;
     btn.style.background = color;
     btn.setAttribute('role', 'radio');
     btn.setAttribute('aria-checked', 'false');
     btn.setAttribute('aria-label', `No option colour: ${color}${color === NULL_COLOR_DEFAULT ? ' (default)' : ''}`);
     btn.title = color;
-    btn.addEventListener('click', () => { nullColorChoice = color; paint(); });
-    nullSwatchesEl.appendChild(btn);
+    btn.addEventListener('click', () => { nullColorChoice = color; close(); });
+    nullColorPopEl.appendChild(btn);
   }
+
+  nullColorPickEl.addEventListener('click', () => {
+    if(nullColorPopEl.hidden){
+      nullColorPopEl.hidden = false;
+      nullColorPickEl.setAttribute('aria-expanded', 'true');
+    } else {
+      close();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if(nullColorPopEl.hidden) return;
+    if(nullColorPickEl.contains(e.target) || nullColorPopEl.contains(e.target)) return;
+    close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && !nullColorPopEl.hidden) close();
+  });
 
   paint();
 }
@@ -1522,9 +1580,9 @@ function validateAdmin(){
 let privacyMode = 'open';
 
 const PRIVACY_HINTS = {
-  open: "Visible - All users can see each other's responses.",
-  hidden: "Private (Users) Users cannot see each other's choices, but the organiser can.",
-  blind: "Private (All) All responses and names are private - even the organiser cannot see users' responses. People only see their own name, organiser name (yours), and how many have joined."
+  open: "All users can see each other's responses.",
+  hidden: "Users cannot see each other's choices, but the organiser (you) can.",
+  blind: "All responses and names are private - even the organiser (you) cannot see users' responses. People only see their own name, organiser name (yours), and how many have joined."
 };
 
 const privacyToggleEl = document.getElementById('privacyToggle');
@@ -1534,15 +1592,13 @@ if (privacyToggleEl) {
   privacyToggleEl.addEventListener('click', (e) => {
     const btn = e.target.closest('.priv-btn');
     if (!btn || btn.dataset.mode === privacyMode) return;
-    
-    // Update active state
-    document.querySelectorAll('#privacyToggle .priv-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    
-    privacyMode = btn.dataset.mode;
-    updatePrivacyHint();
+    setPrivacyMode(btn.dataset.mode);
   });
 }
+
+// Ticking the opt-out only swaps the hint; it never changes the privacy mode.
+const hideNamesEl = document.getElementById('hideNames');
+if (hideNamesEl) hideNamesEl.addEventListener('change', updateHideNamesRow);
 
 function updatePrivacyHint() {
   if (!privacyHintEl) return;
@@ -1551,15 +1607,23 @@ function updatePrivacyHint() {
   updateHideNamesRow();
 }
 
-/** "Hide names too" is offered with Hidden only (Blind always hides names). */
+/**
+ * Names are private on Hidden unless the organiser opts out, so the row is offered with Hidden
+ * only (Blind always hides names) and its hint follows the tick.
+ */
 function updateHideNamesRow() {
   const show = hideNamesSupported && privacyMode === 'hidden';
   document.getElementById('hideNamesRow').classList.toggle('hideme', !show);
-  document.getElementById('hideNamesHint').classList.toggle('hideme', !show);
+  const hintEl = document.getElementById('hideNamesHint');
+  hintEl.classList.toggle('hideme', !show);
+  hintEl.textContent = document.getElementById('hideNames').checked
+    ? 'Everyone can see who has joined, but not their choices.'
+    : 'People only see their own name, organiser name (yours), and how many have joined.';
 }
 
+/** True only when the People list must stay private, which is the Hidden default. */
 function hideNamesValue() {
-  return hideNamesSupported && privacyMode === 'hidden' && document.getElementById('hideNames').checked;
+  return hideNamesSupported && privacyMode === 'hidden' && !document.getElementById('hideNames').checked;
 }
 
 function setPrivacyMode(mode) {
@@ -1567,6 +1631,8 @@ function setPrivacyMode(mode) {
   document.querySelectorAll('#privacyToggle .priv-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.mode === mode);
   });
+  // Returning to Hidden restores the default: names are private again.
+  if (mode === 'hidden') document.getElementById('hideNames').checked = false;
   updatePrivacyHint();
 }
 
@@ -1585,7 +1651,7 @@ function getPrivacyValue() {
 let dateFilterMode = 'all';
 
 const DATE_FILTER_HINTS = {
-  all: "Show all dates in the range to participants.",
+  all: "Show all dates in the range.",
   only: "Only show dates you select on the calendar. Click date headers after creating to pick them.",
   except: "Show all dates except the ones you select. Click date headers after creating to exclude them."
 };
@@ -1623,7 +1689,7 @@ function getDateFilterMode() {
 const BOOKING_LIMIT_MAX = 20;
 const BOOKING_PRIVACY_HINTS = {
   open: 'Everyone sees who booked each slot.',
-  hidden: 'Only you see names. Others just see Booked.'
+  hidden: "Only the organiser (you) sees the name of who booked a slot. Others just see 'Booked' but not the name who booked the slot."
 };
 const bookingLabelEl = document.getElementById('bookingLabel');
 const bookingColorEl = document.getElementById('bookingColor');
@@ -1694,7 +1760,7 @@ const capacityControl = makeLimitControl({
   toggleId: 'capacityToggle', stepperId: 'capacityStepper', valueId: 'capacityValue', hintId: 'capacityHint',
   initial: null,
   hint: (v) => v === null ? 'Everyone can pick every slot.'
-    : v === 1 ? 'Booking: each slot can be taken by one person.'
+    : v === 1 ? 'Booking: each slot can only be taken by one person.'
     : `Each slot can be taken by up to ${v} people.`,
   onChange: () => applyBookingMode()
 });
@@ -1905,15 +1971,14 @@ async function createCalendar(){
     };
     if (hubContext.token) body.group_token = hubContext.token;
     if (hideNamesValue()) body.hide_names = 1;
+    // Default option (migrations/013): the option every Slot begins with, so no Slot is
+    // un-answered. Booking calendars ignore it (their Slots are free until somebody books). The
+    // two are mutually exclusive by construction: a ticked box hides the "No option" row.
+    const defStatus = isBookingMode() ? 0 : getDefaultStatus();
+    if (defStatus >= 1) body.default_status = defStatus;
     // Un-answered Slots colour (migrations/012). The default grey is stored as nothing, so only a
-    // different grey is sent; booking calendars ignore it (their Slots use Free / Partly / Full).
-    if (!isBookingMode() && nullColorChoice !== NULL_COLOR_DEFAULT) body.null_color = nullColorChoice;
-    // Default option (migrations/013): the option every Slot begins with, so there is no
-    // un-answered state. Booking calendars ignore it (their Slots are free until somebody books).
-    if (!isBookingMode()) {
-      const defStatus = getDefaultStatus();
-      if (defStatus >= 1) body.default_status = defStatus;
-    }
+    // different grey is sent, and only while some Slot can still be un-answered.
+    if (!isBookingMode() && defStatus === 0 && nullColorChoice !== NULL_COLOR_DEFAULT) body.null_color = nullColorChoice;
     const accessEmoji = accessField ? accessField.value : null;
     if (accessEmoji !== null) body.access_emoji = accessEmoji;
     const booking = isBookingMode();
@@ -1974,7 +2039,7 @@ async function createCalendar(){
  *   per       - Booking: bookings per person (0 = no limit, 1-20; default 1), counted per day
  *   total     - Booking: 1 = count per across the whole calendar instead of per day
  *   privacy   - "open", "hidden" or "blind" (booking calendars fall back from blind to hidden)
- *   names     - "hidden": Hidden privacy with Hide names too ticked
+ *   names     - "hidden" (the Hidden default) keeps the People list private, "visible" opts out of it
  */
 function parseTemplateParams() {
   const params = new URLSearchParams(window.location.search);
@@ -2123,10 +2188,12 @@ function parseTemplateParams() {
     applied = true;
   }
 
-  // names=hidden: Hidden privacy with "Hide names too" ticked (ignored until migrations/009)
-  if (params.get('names') === 'hidden' && hideNamesSupported) {
+  // names=hidden (the Hidden default) keeps the People list private, names=visible opts out of it
+  // (both ignored until migrations/009)
+  const namesParam = params.get('names');
+  if ((namesParam === 'hidden' || namesParam === 'visible') && hideNamesSupported) {
     setPrivacyMode('hidden');
-    document.getElementById('hideNames').checked = true;
+    document.getElementById('hideNames').checked = namesParam === 'visible';
     applied = true;
   }
 

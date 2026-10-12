@@ -523,61 +523,6 @@ if ($action === 'set_organiser_marks' && $_SERVER['REQUEST_METHOD'] === 'POST') 
     respond(200, ['status' => 'success', 'organiser_marks' => $on === 1]);
 }
 
-// Colour of a Slot nobody has answered yet (calendar organiser, migrations/012)
-if ($action === 'set_null_color' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    requireCsrf();
-    if (!nullColorColumnReady($pdo)) respond(503, ['status' => 'error', 'message' => 'This setting is not available yet']);
-    $capCol = bookingColumnsReady($pdo) ? ', slot_capacity' : '';
-    $stmtC = $pdo->prepare("SELECT id{$capCol} FROM calendars WHERE token = :t");
-    $stmtC->execute([':t' => requireToken()]);
-    $cal = $stmtC->fetch();
-    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
-    $calId = (int)$cal['id'];
-    $session = requireSession($pdo, $calId);
-    if ($session['role'] !== 'admin') {
-        respond(403, ['status' => 'error', 'message' => 'Only the organiser can change settings']);
-    }
-    // Booking calendars colour their Slots with Free / Partly / Full instead
-    if (isset($cal['slot_capacity']) && $cal['slot_capacity'] !== null) {
-        respond(400, ['status' => 'error', 'message' => 'Booking calendars use their own Slot colours']);
-    }
-    $color = nullColorValue($_POST['color'] ?? null);
-    if ($color === false) respond(400, ['status' => 'error', 'message' => 'Invalid colour']);
-    $pdo->prepare("UPDATE calendars SET null_color = :c WHERE id = :id")
-        ->execute([':c' => $color, ':id' => $calId]);
-    respond(200, ['status' => 'success', 'null_color' => $color]);
-}
-
-if ($action === 'set_slot_default' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    requireCsrf();
-    if (!slotDefaultColumnReady($pdo)) respond(503, ['status' => 'error', 'message' => 'This setting is not available yet']);
-    $capCol = bookingColumnsReady($pdo) ? ', slot_capacity' : '';
-    $stmtC = $pdo->prepare("SELECT id, statuses_json{$capCol} FROM calendars WHERE token = :t");
-    $stmtC->execute([':t' => requireToken()]);
-    $cal = $stmtC->fetch();
-    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
-    $calId = (int)$cal['id'];
-    $session = requireSession($pdo, $calId);
-    if ($session['role'] !== 'admin') {
-        respond(403, ['status' => 'error', 'message' => 'Only the organiser can change settings']);
-    }
-    // Booking calendars leave Slots free until somebody books them
-    if (isset($cal['slot_capacity']) && $cal['slot_capacity'] !== null) {
-        respond(400, ['status' => 'error', 'message' => 'Booking calendars have no default option']);
-    }
-    // Clamp to this calendar's own options
-    $maxStatus = 3;
-    if (isset($cal['statuses_json']) && is_string($cal['statuses_json']) && $cal['statuses_json'] !== '') {
-        $decoded = json_decode($cal['statuses_json'], true);
-        if (is_array($decoded) && count($decoded) >= 1 && count($decoded) <= 5) $maxStatus = count($decoded);
-    }
-    $default = slotDefaultValue($_POST['status'] ?? null, $maxStatus);
-    if ($default === false) respond(400, ['status' => 'error', 'message' => 'Invalid default option']);
-    $pdo->prepare("UPDATE calendars SET default_status = :d WHERE id = :id")
-        ->execute([':d' => $default, ':id' => $calId]);
-    respond(200, ['status' => 'success', 'default_status' => $default]);
-}
-
 // -------------------------
 // Actions
 // -------------------------

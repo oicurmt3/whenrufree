@@ -321,7 +321,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Currently, calendar settings (title, dates, slots, status options) cannot be changed 
+        <p>Currently, calendar settings (title, dates, slots, status options, default option and un-answered colour) cannot be changed 
         after creation. Create a new calendar if you need different settings.</p>
       </div>
     </div>
@@ -347,11 +347,11 @@
         <p>When creating a calendar, you can choose from three privacy modes:</p>
         <ul>
           <li><b><span class="material-symbols-outlined icon-inline">visibility</span> Open</b> - All users can see each other's choices. This is the default and works best when everyone should see who's available when.</li>
-          <li><b><span class="material-symbols-outlined icon-inline">visibility_off</span> Hidden</b> - Users cannot see each other's choices, but the organiser can still see all individual responses. Useful for voting or when you don't want participants to influence each other. Tick <b>Hide names too</b> to also keep the People list private.</li>
+          <li><b><span class="material-symbols-outlined icon-inline">visibility_off</span> Hidden</b> - Users cannot see each other's choices, but the organiser can still see all individual responses. Useful for voting or when you don't want participants to influence each other. Names are private too, unless you tick <b>Show everyone who has joined (but not their choices)</b>.</li>
           <li><b><span class="material-symbols-outlined icon-inline">lock</span> Blind</b> - All choices are completely private. Even the organiser cannot see individual responses - only aggregate counts (e.g., "3 Yes, 2 Maybe"). Names are private too. Perfect for anonymous voting or sensitive surveys.</li>
         </ul>
         <p>In all modes, aggregate counts are always visible so everyone can see the overall results.</p>
-        <p>When names are private (Blind, or Hidden with Hide names too), the People list only shows each person their own name, the organiser and how many people have joined. The organiser always sees everyone.</p>
+        <p>When names are private (Blind, or Hidden unless the organiser shows who has joined), the People list only shows each person their own name, the organiser and how many people have joined. The organiser always sees everyone.</p>
       </div>
     </div>
     
@@ -445,6 +445,20 @@
           <li><b>Grey</b> = No response yet</li>
         </ul>
         <p>Organisers can customise these options when creating the calendar.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+        What is the default option and the "No option" colour?
+        <span class="material-symbols-outlined faq-icon">expand_more</span>
+      </div>
+      <div class="faq-answer">
+        <p>The checkbox at the end of each option row (on the create page) marks that option as the <b>default</b>. Every slot then
+        starts on it for each participant until they change it, and the <b>No option</b> row disappears because no slot is ever
+        un-answered.</p>
+        <p>If no checkbox is ticked, slots start <b>un-answered</b> and use the grey you pick on the <b>No option</b> row at the bottom
+        of the options list. Neither the default option nor the un-answered colour can be changed after the calendar is created.</p>
       </div>
     </div>
 

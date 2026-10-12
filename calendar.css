@@ -1272,53 +1272,6 @@ main{
 .settings-check input{width:22px;height:22px;margin:0;flex:0 0 auto;accent-color:var(--primary);cursor:pointer;}
 #settingsModal p.settings-hint{margin:0;font-size:.85rem;color:var(--text-muted);line-height:1.4;}
 
-/* Un-answered Slots colour (migrations/012): five fixed greys, the default one ticked. Sized and
-   shaped like the create page's colour pickers (.color-pick) so both pickers match. */
-.settings-null{margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid #e0e0e0;}
-.settings-null[hidden]{display:none;}
-.settings-null-label{display:block;font-weight:600;margin-bottom:10px;}
-.null-swatches{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;}
-.null-swatch{
-  position:relative;
-  width:36px;height:36px;padding:0;border:1px solid #aaa;border-radius:4px;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  font-family:inherit;flex-shrink:0;
-}
-/* Keeps the 44x44 touch target even though the swatch is 36px */
-.null-swatch::after{content:'';position:absolute;inset:-4px;}
-.null-swatch .material-symbols-outlined{font-size:20px;line-height:1;}
-.null-swatch.active{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);}
-.null-swatch:focus-visible{outline:3px solid var(--primary);outline-offset:2px;}
-
-/* Default option (migrations/013): the option every Slot begins with, so no Slot is ever
-   un-answered. One row per option; only one can be on, and tapping the one that is on turns it
-   off so Slots start un-answered again. The button is blank until chosen, then reads "Default". */
-.settings-default-label{display:block;font-weight:600;margin-bottom:10px;}
-.default-toggles{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
-.default-toggle-row{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  min-height:44px;padding:6px 10px;
-  background:#fff;border:1px solid #aaa;border-radius:6px;cursor:pointer;
-  font-family:inherit;font-size:0.95rem;font-weight:600;color:inherit;text-align:left;
-}
-.default-toggle-row:hover{border-color:#666;}
-.default-toggle-row.active{border-color:var(--primary);}
-.default-toggle-row:focus-visible{outline:3px solid var(--primary);outline-offset:2px;}
-.default-toggle-row[disabled]{opacity:.55;cursor:not-allowed;}
-.default-toggle-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.default-toggle-tag{
-  width:36px;height:36px;flex-shrink:0;
-  display:inline-flex;align-items:center;justify-content:center;
-  background:#fff;border:1px solid #aaa;border-radius:6px;color:#666;
-}
-.default-toggle-tag .material-symbols-outlined{font-size:20px;line-height:1;}
-.default-toggle-row.active .default-toggle-tag{
-  border-color:var(--primary);
-  background:color-mix(in srgb, var(--primary) 12%, #fff);
-  color:var(--primary);
-}
-.default-state{margin:0;font-size:0.85rem;color:#666;}
-
 /* The legend marks the default option, so it is clear where un-answered Slots start */
 .legend-item.is-default{font-weight:600;}
 .legend-default{
