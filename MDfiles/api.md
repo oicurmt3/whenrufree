@@ -37,7 +37,7 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `set_access_emoji` | POST | Account | organiser | Set or remove the calendar's emoji (`emoji` 0-34 or null) |
 | `set_group_access_emoji` | POST | Account | Hub organiser | Set or remove the Hub's emoji |
 | `manage_calendar_user` | POST | Account | organiser | One person, one decision (`user_id`): `blocked` 1/0, `delete` 1, `report_reason` / `report_details`; applied report, then block, then delete |
-| `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}`, `hide_names`, `names_private`, `organiser_marks`, `organiser_marks_available` |
+| `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}`, `hide_names`, `names_private`, `null_color`, `default_status`, `organiser_marks`, `organiser_marks_available` |
 | `group_meta` | GET | Account | - | Hub listing (`g` param, not `c`) with `organiser_name`, `is_organiser`, `claimable` |
 | `create_group` | POST | Account | - | Create Hub (optional `organiser_name`) |
 | `claim_hub` | POST | Account | - | Claim an old Hub once with its organiser PIN (`g`, `pin`) |
@@ -45,7 +45,7 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `remove_calendar_from_group` | POST | Account | organiser or Hub organiser | Detach calendar from Hub |
 | `users` | GET | Account | - | List names (`mine`, `claimable`, `blocked` for the organiser) + `total`, `names_hidden` |
 | `availability` | GET | Account | - | Read availability (from/to params); blocked people left out |
-| `create_calendar` | POST | Account | - | Create calendar; the account is organiser (optional `admin_name`, `group_token`, `hide_names`) |
+| `create_calendar` | POST | Account | - | Create calendar; the account is organiser (optional `admin_name`, `group_token`, `hide_names`, `null_color`, `default_status`) |
 | `join_calendar` | POST | Account | - | Join with the profile name or a per-calendar `display_name` |
 | `rename_user` | POST | Account | joined (self) / organiser | Rename (`display_name`, or `use_profile` for yourself) |
 | `claim_name` | POST | Account | - | Claim an old name once with its PIN (`user_id`, `pin`) |
@@ -103,8 +103,10 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 - Roles: "admin" (organiser) or "member" (participant)
 - Names: letters, numbers, spaces, `'` and `-`, up to 32 characters, unique per calendar; one name per account per calendar
 - Usernames: 3-20 lowercase letters, numbers or `_`, unique, private
-- Privacy: 0=open, 1=hidden, 2=blind; names are private on blind, and on hidden with `hide_names` 1
+- Privacy: 0=open, 1=hidden, 2=blind; names are private on blind, and on hidden unless `hide_names` is 0 (default 1)
 - Joining: anyone signed in with the link can join; the link is the only access control
+- Un-answered colour: `null_color` = one of five greys for slots nobody has answered (migration 012); availability calendars only
+- Default option: `default_status` = 1..N option every slot starts on, or null for un-answered (migration 013); availability calendars only
 - Organiser marks: `show_organiser_marks` 1 (default) or 0; the organiser can change it any time; only affects Open, non-booking calendars
 - Frozen calendar: `chosen_date` + `chosen_slot` both non-null blocks `save` endpoint
 - Booking calendar: `slot_capacity` 1-20 (people per slot), `max_per_user` 1-20 or null, `per_user_total` (limit per day or in total), `bookings_closed`; one status (1 = booked); no Blind privacy. Set only at creation (`create_calendar`)

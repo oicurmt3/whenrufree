@@ -37,6 +37,8 @@ The calendar page is split into six classic scripts that share global scope (no 
 | `updatePrivacyIndicator()` | calendar-core.js:204 | Creates/updates the lock/eye icon next to the calendar title. |
 | `normaliseStatusOptions(raw)` | calendar-core.js:348 | Validates and normalises 1-5 status options with labels, colours, and weights. |
 | `applyStatusOptions(rawOptions)` | calendar-core.js:394 | Sets STATUS_OPTIONS, applies CSS variables, recalculates text colours, re-renders legend. |
+| `defaultSlotStatus()` / `effectiveSlotStatus(status)` | calendar-core.js:355 / 363 | The **Default option** (migrations/013): an un-answered Slot (status 0) displays `state.defaultStatus` when set. Defaults never count in Best Match -- only answers the person actually sent are ranked. |
+| `applyNullColor(color)` | calendar-core.js:384 | Paints un-answered Slots in the organiser's **No option** grey (migrations/012): sets `--status-null` and a matching label colour from `NULL_COLOR_CHOICES` (`null` = the default `#bfbfbf`). Keep the palette in sync with `includes/data.php` and `index.js`. |
 | `renderLegend()` | calendar-core.js:411 | Builds the status colour legend in `#legendWrap`. |
 
 ### Auth and Permissions
@@ -81,7 +83,7 @@ The calendar page is split into six classic scripts that share global scope (no 
 
 | Function | File:Line | Description |
 |----------|------|-------------|
-| `loadCalendarMeta()` | calendar-users.js:8 | Fetches calendar config, applies slots/statuses/dates/privacy/chosen state, stores `state.account` and calls `applyMe()`. |
+| `loadCalendarMeta()` | calendar-users.js:8 | Fetches calendar config, applies slots/statuses/dates/privacy/chosen state plus `null_color` (via `applyNullColor()`) and `default_status` (migrations/012 / 013), stores `state.account` and calls `applyMe()`. |
 | `loadUsers()` | calendar-users.js:144 | Fetches the name list (`mine`, `claimable` flags), sorts admin first, caches adminUserId. Updates the view bar name, or closes the read-only view when that person can no longer be viewed. |
 | `ensureRangeLoaded(from, to)` | calendar-grid.js:31 | Fetches availability for a date range if not already loaded. |
 | `ensureDateRangeLoaded()` | calendar-grid.js:782 | Loads the full calendar date range. |
@@ -298,11 +300,24 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 | `getTodayClamped()` | 848 | Returns today's date clamped to MIN_DATE/MAX_DATE. |
 | `addDays(dateStr, days)` | 856 | Adds days to a date string, clamped to range. |
 
+### Options UI
+
+| Function | Line | Description |
+|----------|------|-------------|
+| `makeStatusRow(initialLabel, initialWeight, initialColor)` | 1161 | One option row: colour picker, label, weight (Weights mode), default checkbox and move up / delete. |
+| `addStatus(label)` | 1347 | Adds an option row (max 5) and keeps the **No option** row last. |
+| `setStatuses(items)` | 1320 | Replaces every option row (templates and presets). |
+| `getDefaultStatus()` | 1289 | 1-based index of the option whose default checkbox is ticked, or 0 (no default). |
+| `paintStatusDefaults()` | 1299 | Keeps one default: ticking a box clears the others; hides `#statusNullRow` while a default is set (no slot starts un-answered). |
+| `keepNullRowLast()` | 1315 | Re-appends `#statusNullRow` after the last option row on add / reorder. |
+| `initNullColorPicker()` | 1380 | **No option** colour picker (`#nullColorPick` / `#nullColorPop`): five fixed greys, paints the chip and the `#statusNullLabel` background. |
+| `validateStatusesUI()` | 1456 | Label, weight and colour checks for every option row. |
+
 ### Slots UI
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `makeSlotRow(initial)` | 871 | Creates a slot input row with delete button and error span. |
+| `makeSlotRow(initial)` | 886 | Creates a slot input row with delete button and error span. |
 | `readSlotsFromUI()` | 933 | Reads all slot input values into an array. |
 | `setSlots(slots)` | 937 | Replaces slot rows with given labels. |
 | `addSlot(label)` | 943 | Adds a slot row (max 6). |
@@ -315,7 +330,7 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 | `adminNameValue()` | 1390 | Trimmed optional organiser name (blank = profile name). |
 | `validateAdmin()` | 1394 | Organiser name check; passes when blank. |
 | `validateAll()` | 1688 | Validates all form fields and enables/disables create button. |
-| `createCalendar()` | 1747 | Validates form, sends `create_calendar` (with `admin_name` only when typed), hands account errors to `Account.handleApiError()`, shows the save panel, then goes to the calendar. |
+| `createCalendar()` | 1940 | Validates form, sends `create_calendar` (with `admin_name` only when typed, plus `default_status` or `null_color`), hands account errors to `Account.handleApiError()`, shows the save panel, then goes to the calendar. |
 
 | `guardFormUntilSignedIn(me)` | 2108 | Signed out: capture-phase `click` and `focusin` listeners on `.card` stop any form control and open the closable sign-in panel (`Account.showSignIn(me, {dismissible: true})`). Links and the badge still work; scrolling doesn't trigger it. |
 
@@ -325,7 +340,7 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `parseTemplateParams()` | 1979 | Reads URL params (title, category, slots, statuses, weights, mode, range, weekends, datefilter, `privacy` (open / hidden / blind), `names=hidden`, and booking `cap` / `per` / `total`) and prefills the form. `privacy` is applied before `cap`, so a booking template drops Blind to Hidden; `names` needs migrations/009. With `cap`, the first status label becomes the booking label. |
+| `parseTemplateParams()` | 2044 | Reads URL params (title, category, slots, statuses, weights, mode, range, weekends, datefilter, `privacy` (open / hidden / blind), `names=hidden` / `names=visible`, and booking `cap` / `per` / `total`) and prefills the form. `privacy` is applied before `cap`, so a booking template drops Blind to Hidden; `names` needs migrations/009. With `cap`, the first status label becomes the booking label. |
 | `showTemplateBanner()` | 2161 | Shows blue "Template loaded!" notification banner. |
 | `initHubContext()` | 125 | Reads `?g=` token, fetches `group_meta`, shows the Hub banner and sets `hubContext` for `create_calendar`, so the new calendar joins the Hub. |
 | `getHubTokenFromUrl()` | 44 | Returns Hub token from `?g=` query param. |
@@ -343,10 +358,10 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `initHideNamesField(features)` | 119 | Enables the **Hide names too** row once `get_site_config` reports `features.hide_names` (migration 009). |
-| `updateHideNamesRow()` / `hideNamesValue()` | 1555 / 1561 | **Hide names too** checkbox (`#hideNamesRow`, hint `#hideNamesHint`), shown only for Hidden privacy; sends `hide_names: 1`. Template param `names=hidden`. |
+| `initHideNamesField(features)` | 119 | Enables the **Show everyone who has joined (but not their choices)** row once `get_site_config` reports `features.hide_names` (migration 009). |
+| `updateHideNamesRow()` / `hideNamesValue()` | 1614 / 1625 | **Show everyone who has joined** checkbox (`#hideNamesRow`, hint `#hideNamesHint`), shown only for Hidden privacy. Unticked (the default) keeps names private, so `hideNamesValue()` returns `hide_names: 1`. Template param `names=hidden` / `names=visible`. |
 
-`createCalendar()` sends `hide_names`. There is no join setting to send: the link is the invite, so the save panel, details text and poster carry no join line.
+`setPrivacyMode('hidden')` re-ticks the box to the default (unticked), so names are private again. `createCalendar()` sends `hide_names`. There is no join setting to send: the link is the invite, so the save panel, details text and poster carry no join line.
 | `calendarSaveKit.emojiLine(meta)` / `buildCopyText(meta)` | 182 | Emoji line added to the copied link, share, email, poster and `.txt`. |
 
 ### Booking mode (create page)
@@ -361,7 +376,7 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 | `applyBookingMode()` | 1632 | Shows Bookings per person (`#perUserField`, Slots section, which also holds the booking label + colour in `#bookingPanel`), hides the Options section (`#optionsSection`) and Blind (switches to Hidden if needed), revalidates. |
 | `validateBookingLabel()` | 1661 | Booking label check (same rules as status labels). |
 
-`getValidStatuses()` returns the single booking status (weight 1) in booking mode; `createCalendar()` adds `slot_capacity` / `max_per_user` and passes `booking` to the save panel, where `calendarSaveKit` uses "book a slot" wording in the share text, email, poster tagline and `.txt`.
+`getValidStatuses()` returns the single booking status (weight 1) in booking mode; `createCalendar()` adds `slot_capacity` / `max_per_user` and passes `booking` to the save panel, where `calendarSaveKit` uses "book a slot" wording in the share text, email, poster tagline and `.txt`. Booking calendars never send `default_status` or `null_color`: their slots are free until somebody books them.
 
 ---
 

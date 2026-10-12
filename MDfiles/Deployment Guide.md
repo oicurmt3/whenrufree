@@ -44,15 +44,15 @@ ALTER TABLE calendars
 
 8. **Drop old PINs** - `migrations/008_drop_pins.sql` is a draft: run it about 90 days after accounts go live, once Admin > Accounts shows few unclaimed names and Hubs. It deletes all remaining PIN hashes (they can no longer be claimed) and drops the old session and passkey tables.
 
-9. **Hide names and Block** - run `migrations/009_invite_only.sql` (adds `calendars.hide_names`, `users.blocked`). Safe to re-run. Until it runs, **Hide names too** is hidden on the create page and nobody can be blocked. Migration 009 also added the Invite only feature (`calendars.invite_only`, `groups.invite_only`, `access_requests`); `migrations/014_drop_invite_only.sql` removes those again.
+9. **Hide names and Block** - run `migrations/009_invite_only.sql` (adds `calendars.hide_names`, `users.blocked`). Safe to re-run. Until it runs, the **Show everyone who has joined (but not their choices)** row is hidden on the create page (Hidden calendars keep names private) and nobody can be blocked. Migration 009 also added the Invite only feature (`calendars.invite_only`, `groups.invite_only`, `access_requests`); `migrations/014_drop_invite_only.sql` removes those again.
 
 10. **Organiser marks** - run `migrations/010_organiser_marks.sql` (adds `calendars.show_organiser_marks`, default 1). Safe to re-run. Until it runs, the organiser's coloured slot edge always shows on Open calendars and Calendar settings doesn't offer the switch.
 
 11. **Reports** - run `migrations/011_report_users.sql` **before** uploading the reports code (creates `reports`: a snapshot of who was reported, by whom, why, with no foreign keys so it survives the calendar and the account). Safe to re-run. Until it runs, blocking, deleting and reporting all still work but the **Report** dropdown is hidden and the admin **Reports** tab says to run the migration.
 
-12. **No option colour** - run `migrations/012_null_color.sql` (adds `calendars.null_color`). Safe to re-run. Until it runs, Slots use the default light grey and the **No option colour** setting is not offered.
+12. **No option colour** - run `migrations/012_null_color.sql` (adds `calendars.null_color`). Safe to re-run. Until it runs, Slots use the default light grey and the **No option** row's colour picker stores nothing.
 
-13. **Default option** - run `migrations/013_slot_default.sql` (adds `calendars.default_status`). Safe to re-run. Until it runs, Slots start un-answered and the **Default option** setting is not offered.
+13. **Default option** - run `migrations/013_slot_default.sql` (adds `calendars.default_status`). Safe to re-run. Until it runs, Slots start un-answered and the option-row **Default option** checkboxes store nothing.
 
 14. **Remove Invite only** - run `migrations/014_drop_invite_only.sql` **after** uploading the code that no longer uses it (drops `access_requests` and the `invite_only` columns on `calendars` and `groups`). Safe to re-run. `calendars.hide_names` and `users.blocked` from migration 009 stay.
 

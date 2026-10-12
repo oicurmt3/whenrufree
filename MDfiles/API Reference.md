@@ -101,7 +101,7 @@ An organiser can give a calendar or Hub one of 35 emoji (stored as its position 
 
 ### GET get_site_config
 
-Public site config for the create pages (no sign-in needed). **Response:** `{ status, config, features: { access_emoji: bool, booking: bool, booking_total: bool, booking_styles: bool, accounts: bool, hide_names: bool } }` - `features.access_emoji` is `true` once migration 003 has run (the create pages show the emoji switch only then); `features.booking` is `true` once migration 004 has run (the create page shows **People per slot** only then); `features.booking_total` is `true` once migration 005 has also run (the create page shows the **Per day / In total** toggle only then); `features.booking_styles` is `true` once migration 006 has also run (the create page shows the Partly booked / Full colour and name settings only then); `features.accounts` is `true` once migration 007 has run; `features.hide_names` is `true` once migration 009 has run (the create page shows **Hide names too** only then).
+Public site config for the create pages (no sign-in needed). **Response:** `{ status, config, features: { access_emoji: bool, booking: bool, booking_total: bool, booking_styles: bool, accounts: bool, hide_names: bool } }` - `features.access_emoji` is `true` once migration 003 has run (the create pages show the emoji switch only then); `features.booking` is `true` once migration 004 has run (the create page shows **People per slot** only then); `features.booking_total` is `true` once migration 005 has also run (the create page shows the **Per day / In total** toggle only then); `features.booking_styles` is `true` once migration 006 has also run (the create page shows the Partly booked / Full colour and name settings only then); `features.accounts` is `true` once migration 007 has run; `features.hide_names` is `true` once migration 009 has run (the create page shows the **Show everyone who has joined (but not their choices)** row only then).
 
 ### POST access_check
 
@@ -136,7 +136,7 @@ Implemented in `includes/members.php`; the `blocked` and `hide_names` columns ne
 - **Joining:** anyone signed in with the link can open and join a calendar or Hub. The link is the only access control.
 - **Gate:** runs after the access emoji gate, for calendar-scoped actions only. A person the organiser has blocked on that calendar gets HTTP 403 `{ code: "BLOCKED", message }` everywhere on it. Exempt actions: `csrf_token`, `diag`, `access_check` and every `admin_*` action.
 - **Blocking:** `users.blocked` blocks one person on one calendar. Their availability is left out of `availability` and its `summary` (not on booking calendars, where their bookings still hold their places), and other members don't see them in `users`. Set or cleared from the Manage person menu, which keeps their answers.
-- **Private names:** `calendars.hide_names` (Hidden calendars only) makes members see only themselves, the organisers and a total. Blind calendars always do this. Reported as `names_hidden` by `users`.
+- **Private names:** `calendars.hide_names` (Hidden calendars only) makes members see only themselves, the organisers and a total; it is the Hidden default and the organiser opts out by ticking **Show everyone who has joined (but not their choices)**. Blind calendars always hide names. Reported as `names_hidden` by `users`.
 
 ### POST manage_calendar_user
 
@@ -267,8 +267,12 @@ Returns full calendar configuration and metadata.
 | partial_color / full_color | string/null | Booking calendars: `#rrggbb` cell colours for partly booked / full slots, `null` = default (orange / red) |
 | partial_label / full_label | string/null | Booking calendars: names for partly booked / full slots, `null` = default ("Partly booked" / "Full") |
 | bookings_closed | bool | Booking calendars: `true` when the organiser has closed bookings |
-| hide_names | bool | Hidden calendars: the organiser ticked **Hide names too** |
+| hide_names | bool | Hidden calendars: names are private (the organiser did not tick **Show everyone who has joined (but not their choices)**) |
 | names_private | bool | `true` on Blind, or Hidden with `hide_names` (members see only themselves, organisers and a total) |
+| null_color | string/null | Availability calendars: `#rrggbb` fill for slots nobody has answered (one of five greys), `null` = the default light grey. Always `null` before migration 012 |
+| null_color_available | bool | `true` once `migrations/012_null_color.sql` has run and the calendar is not a booking calendar |
+| default_status | int/null | Availability calendars: 1-based status option every slot starts on (the **Default option**), `null` = slots start un-answered. Always `null` before migration 013 |
+| default_status_available | bool | `true` once `migrations/013_slot_default.sql` has run and the calendar is not a booking calendar |
 | organiser_marks | bool | `true` (default) when the organiser's answers show as a coloured slot edge on Open calendars; always `true` before migration 010 |
 | organiser_marks_available | bool | `true` once `migrations/010_organiser_marks.sql` has run (the organiser can then change `organiser_marks`) |
 
@@ -379,14 +383,16 @@ Creates a new calendar. The signed-in account becomes its organiser.
 | admin_name | string | No | Organiser name on this calendar (max 32 chars). Blank = the account's profile name |
 | group_token | string | No | Hub token - assigns new calendar to that Hub (valid token only; no Hub organiser needed; rate limited; needs the Hub's emoji if it has one) |
 | access_emoji | int | No | 0-34: the calendar's own access emoji |
-| hide_names | int | No | Hidden calendars (`is_private` 1) only: 1 = members see only themselves, the organisers and a total. Blind always hides names. Ignored for other modes |
+| hide_names | int | No | Hidden calendars (`is_private` 1) only: 1 = names are private (members see only themselves, the organisers and a total). Omit it for the Hidden default of showing who has joined. Blind always hides names. Ignored for other modes |
+| null_color | string | No | Availability calendars only: `#rrggbb` from the five greys (`#000000`, `#404040`, `#808080`, `#bfbfbf`, `#ffffff`) for slots nobody has answered. 400 if not one of them; ignored until migration 012 has run |
+| default_status | int | No | Availability calendars only: 1-5 (the **Default option** every slot starts on, clamped to the option count). 400 if out of range; ignored until migration 013 has run, and never stored for booking calendars |
 | slot_capacity | int | No | 1-20: makes a booking calendar (people per slot). Omit, `null` or 0 for a normal availability poll |
 | max_per_user | int | No | Booking only: 1-20 bookings per person (organiser exempt); omit, `null` or 0 for no limit |
 | per_user_total | int | No | Booking only: `1` = count `max_per_user` across the whole calendar, otherwise per day. Ignored without `max_per_user`; 400 if migration 005 has not run |
 | partial_color / full_color | string | No | Booking only: `#rrggbb` cell colours for partly booked / full slots (400 if not `#rrggbb`). Ignored until migration 006 has run |
 | partial_label / full_label | string | No | Booking only: names for partly booked / full slots, same rules as option labels (400 if invalid). Ignored until migration 006 has run |
 
-Booking calendars must send exactly one status (its weight is forced to 1) and cannot use Blind privacy (`is_private` 2 returns 400). Before migration 004 a `slot_capacity` returns 400 "Booking is not available yet". Booking settings cannot be changed after creation.
+Booking calendars must send exactly one status (its weight is forced to 1) and cannot use Blind privacy (`is_private` 2 returns 400). Before migration 004 a `slot_capacity` returns 400 "Booking is not available yet". Booking settings, the default option and the un-answered colour cannot be changed after creation.
 
 **Response:**
 ```json

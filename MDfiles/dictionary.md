@@ -146,8 +146,10 @@ Core configuration for each scheduling calendar.
 | full_color | CHAR(7) | NULL | Booking calendars: `#rrggbb` cell colour for full slots, NULL = default red. Migration 006 |
 | per_user_total | TINYINT(1) | 0 | Booking calendars: 1 = `max_per_user` counts across the whole calendar, 0 = per day. Ignored when `max_per_user` is NULL. Migration 005 |
 | bookings_closed | TINYINT(1) | 0 | Booking calendars: 1 = organiser closed bookings. Migration 004 |
-| hide_names | TINYINT(1) | 0 | Hidden calendars: 1 = members see only themselves, the organisers and a total (Blind always does this). Migration 009 |
+| hide_names | TINYINT(1) | 0 | Hidden calendars: 1 = members see only themselves, the organisers and a total (Blind always does this). The Hidden default; the organiser opts out by ticking **Show everyone who has joined (but not their choices)**. Migration 009 |
 | show_organiser_marks | TINYINT(1) | 1 | Open calendars: 1 = the organiser's answers show as a coloured left edge on everyone's slots, 0 = hidden. The organiser changes it in Calendar settings (`set_organiser_marks`). Migration 010 |
+| null_color | CHAR(7) | NULL | Availability calendars: `#rrggbb` fill for slots nobody has answered, one of five greys (`#000000`, `#404040`, `#808080`, `#bfbfbf`, `#ffffff`), NULL = the default light grey (`#bfbfbf`). NULL on booking calendars. Migration 012 |
+| default_status | TINYINT UNSIGNED | NULL | Availability calendars: 1..N status option every slot starts on (the create page's **Default option** checkbox), NULL = slots start un-answered. NULL on booking calendars. Migration 013 |
 
 **Indexes:**
 - PRIMARY KEY (`id`)
@@ -165,7 +167,8 @@ Core configuration for each scheduling calendar.
 - A calendar with `access_emoji` NULL inside a Hub with an emoji uses the Hub's emoji
 - Booking calendars (`slot_capacity` set) have exactly one status (1 = booked, weight 1), never Blind privacy (`is_private` 0 or 1), and store bookings as `availability` rows. `save` locks the calendar row and refuses bookings beyond `slot_capacity` per slot or `max_per_user` per person per day (or in total when `per_user_total` = 1; the organiser booking for themselves is exempt from `max_per_user`). The booking columns are set only at creation
 - While `bookings_closed` = 1, participants cannot save or reset; the organiser still can
-- `hide_names` is set only in `create_calendar` (Hidden calendars only)
+- `hide_names` is set only in `create_calendar` (Hidden calendars only); it is the Hidden default, so the create page sends it unless the organiser ticks **Show everyone who has joined (but not their choices)**
+- `null_color` and `default_status` are set only in `create_calendar` and only for availability calendars (not booking ones), and are never changed afterwards. A `default_status` other than NULL means no slot is ever un-answered, so `null_color` is only consulted when `default_status` is NULL
 - `show_organiser_marks` only changes what the page draws; on Open calendars the organiser's answers are still in `availability` responses (Best Match names, People view)
 
 ---

@@ -4,6 +4,21 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
+## 2026-10-12 - Option controls on the create page, Hidden names opt-out
+
+### Changed
+- **Default option and un-answered colour now sit in the options list:** every status option row ends in a checkbox. Tick one to make it the **default option**, so each person's slots start on it and no slot is ever un-answered; leave them all unticked and slots start in the **No option** colour. Ticking a box hides the **No option** row, because nothing is left un-answered. The old **Default option / No default option** switch, the standalone un-answered colour field and the "default option" hint line are gone
+- **The "No option" row:** a static row at the bottom of the options list, laid out like an option row but with no move or delete. Its colour picker offers the same five greys (black to white) and paints the row's fixed "No option" label. Not offered on booking calendars - their slots are free until somebody books them
+- **Hidden names are a positive opt-out:** on Hidden calendars names are private by default and the checkbox now reads **Show everyone who has joined (but not their choices)**. Switching back to Hidden re-ticks it to the private default. Template URLs accept `names=visible` as well as `names=hidden`
+- **Removed the un-answered colour and default option from Calendar settings:** both are fixed at creation, so the modal no longer offers them and the `set_null_color` / `set_slot_default` endpoints (and their rate-limit entries) are deleted
+- **Hint wording:** privacy hints, the date filter hint ("Show all dates in the range.") and the Hub access emoji off-state ("Optional emoji for Hub access")
+
+### API
+- `create_calendar` accepts `null_color` (`#rrggbb`, one of five greys) and `default_status` (1..N option), both for availability calendars only; `calendar_meta` returns `null_color`, `null_color_available`, `default_status` and `default_status_available`
+- `hide_names` is now the Hidden default: the create page sends `hide_names: 1` unless the organiser ticks **Show everyone who has joined (but not their choices)**
+
+---
+
 ## 2026-10-10 - Invite only removed
 
 ### Removed

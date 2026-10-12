@@ -48,12 +48,12 @@ If you used When RU Free with a PIN before accounts, you can claim your old name
    - **Category** (optional): Pick up to 3 icons that represent your event type
    - **Slots**: The time options participants will choose between (e.g. "Morning", "Lunch", "Evening"). You get 1-6 slots. Use the quick-add chips or type your own.
    - **People per slot**: Leave on **No limit** for a normal availability poll. Pick **1**, **2** or **More** (up to 20) to make a booking calendar - see Booking Calendars below.
-   - **Statuses**: The response options (default: Yes / Maybe / No). You can customise labels, colours, and scoring weights. Up to 5 statuses.
+   - **Statuses**: The response options (default: Yes / Maybe / No). You can customise labels, colours, and scoring weights. Up to 5 statuses. Tick the checkbox at the end of a row to make that option the **default option** (every slot starts on it and the **No option** row disappears); leave them all unticked and slots start un-answered in the grey you pick on the **No option** row.
    - **Date range**: The start and end dates. Maximum 360 days.
    - **Exclude weekends**: Tick this to hide Saturdays and Sundays.
    - **Date filter mode**: Choose whether participants see all dates, only dates you select, or all dates except ones you exclude.
    - **Access emoji** (optional): Turn the switch on and pick one of 35 emoji. Anyone opening the link must pick the same emoji once. Creating inside a Hub that already has an emoji? The calendar uses the Hub's emoji unless you pick its own.
-   - **Privacy mode**: Open (everyone sees all choices), Hidden (only you see individual choices), or Blind (nobody sees individual choices, and names are private). With Hidden you can also tick **Hide names too**, so participants see only themselves, you and how many have joined.
+   - **Privacy mode**: Open (everyone sees all choices), Hidden (only you see individual choices), or Blind (nobody sees individual choices, and names are private). With Hidden you can also tick **Show everyone who has joined (but not their choices)**, otherwise participants see only themselves, you and how many have joined.
 3. **Organiser name** (optional): leave blank to use your profile name, or type a name just for this calendar. You manage the calendar from this account.
 4. Tap **Create Calendar**.
 5. Save the link from the save panel (copy, download, Share or Email), then continue to your new calendar. It is also listed on your profile page, so you can always find it again. Organiser tools appear whenever you open it signed in to this account, on any device.
@@ -124,7 +124,7 @@ index.html?template=1&title=...&category=...&slots=...&statuses=...&range=1week
 
 Add `&cap=1` (people per slot, 1-20) to make a booking calendar, and optionally `&per=2` (bookings per person, counted per day; `0` = no limit, default 1) and `&total=1` (count `per` across the whole calendar instead). With `cap`, the first `statuses` label becomes the booking label.
 
-Add `&privacy=open|hidden|blind` to preset the privacy mode (booking calendars fall back from Blind to Hidden), and `&names=hidden` for Hidden with **Hide names too**. The access emoji is never put in a link: pick it on the create page. There is no join setting: the link is the invite and anyone signed in with it can join.
+Add `&privacy=open|hidden|blind` to preset the privacy mode (booking calendars fall back from Blind to Hidden), and `&names=hidden` (private names, the Hidden default) or `&names=visible` (Hidden with **Show everyone who has joined**). The access emoji is never put in a link: pick it on the create page. There is no join setting: the link is the invite and anyone signed in with it can join.
 
 The Templates page has ready-made booking examples (interviews, parent-teacher nights, workshops, tours, volunteer rosters, court hire, hot desks, gym, school-run seats, pet care, holiday house, shared car, meeting room) in its Bookings section.
 
@@ -226,7 +226,7 @@ A passkey signs you in with your fingerprint, face, Windows Hello or device scre
 Your calendar may be in one of three privacy modes:
 
 - **Open**: You can see everyone's choices (after joining)
-- **Hidden**: Only the organiser can see individual choices. You see aggregated counts only. If the organiser ticked **Hide names too**, the People list shows only you, the organiser and how many have joined.
+- **Hidden**: Only the organiser can see individual choices. You see aggregated counts only. Names are private by default; if the organiser ticked **Show everyone who has joined (but not their choices)**, the People list shows everyone who has joined, and otherwise it shows only you, the organiser and how many have joined.
 - **Blind**: Nobody can see individual choices, not even the organiser. True anonymity. Names are private too.
 
 The privacy mode is shown by an icon next to the calendar title (eye, hidden eye, or lock).

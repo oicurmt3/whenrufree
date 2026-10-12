@@ -17,8 +17,9 @@ An organiser signs in, creates a calendar with custom time slots, date ranges, a
 - Optional access emoji: the organiser picks 1 of 35 emoji for a calendar or Hub as an invite confirmation; each account picks it once (calendars in a Hub use the Hub's emoji unless they have their own)
 - Anyone signed in with the link can open and join a calendar or Hub; the link is the only access control, so share it only with people you trust
 - Organisers can block anyone on a calendar; their access is paused and their answers are left out until unblocked
-- Three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices). Names are private on Blind, and on Hidden with "Hide names too"
+- Three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices). Names are private on Blind, and on Hidden unless the organiser ticks "Show everyone who has joined (but not their choices)"
 - Customisable time slots (1-6), status options (1-5 with colours and weights), and date ranges (up to 360 days)
+- Tick an option as the default (every slot starts there), or leave all options unticked and pick one of five greys for slots nobody has answered
 - Date filtering: organiser can show/hide specific dates for participants
 - Auto-ranked "Best Match" analysis with expandable rosters
 - See anyone's calendar read only from the People list, following the same privacy rules as the Best Match names
