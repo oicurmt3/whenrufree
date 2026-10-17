@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>When RU Free? - Infographic</title>
+<style>
+  @font-face{
+    font-family:'Material Symbols Outlined';
+    font-style:normal;
+    font-weight:400;
+    src:url('fonts/material-symbols-outlined.woff2') format('woff2');
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --primary:#3f51b5;
+    --primary-dark:#303f9f;
+    --ink:#1f2430;
+    --text:#3a4050;
+    --muted:#6b7280;
+    --line:#e2e5ea;
+    --bg:#f4f5f7;
+    --card:#ffffff;
+    --green:#2e7d32;
+    --green-bg:#e8f5e9;
+    --blue:#1565c0;
+    --blue-bg:#e3f2fd;
+    --amber:#8a5a00;
+    --amber-bg:#fff6e0;
+    --red:#b00020;
+    --red-bg:#fdecef;
+  }
+  html,body{background:var(--bg);}
+  body{
+    width:1240px;
+    font-family:"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  .ico{
+    font-family:'Material Symbols Outlined';
+    font-weight:normal;
+    font-style:normal;
+    line-height:1;
+    display:inline-block;
+    vertical-align:middle;
+  }
+  .sheet{width:1240px;}
+
+  /* ---------- header ---------- */
+  .hero{
+    position:relative;
+    padding:44px 56px 40px;
+    background:
+      radial-gradient(900px 320px at 88% -30%, #6a7bd6 0%, rgba(106,123,214,0) 70%),
+      linear-gradient(135deg,#3f51b5 0%, #303f9f 62%, #26327d 100%);
+    color:#fff;
+    overflow:hidden;
+  }
+  .hero:after{
+    content:"";
+    position:absolute;right:-90px;bottom:-140px;
+    width:420px;height:420px;border-radius:50%;
+    background:rgba(255,255,255,.06);
+  }
+  .hero:before{
+    content:"";
+    position:absolute;right:90px;top:-120px;
+    width:260px;height:260px;border-radius:50%;
+    background:rgba(255,255,255,.05);
+  }
+  .brand{display:flex;align-items:center;gap:18px;}
+  .brand .mark{
+    width:66px;height:66px;border-radius:18px;
+    background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.28);
+    display:flex;align-items:center;justify-content:center;
+    font-size:38px;
+  }
+  .brand h1{font-size:46px;line-height:1;letter-spacing:-.5px;font-weight:700;}
+  .brand h1 span{font-weight:300;opacity:.92;}
+  .tagline{
+    margin-top:20px;
+    font-size:20px;line-height:1.45;
+    max-width:720px;color:rgba(255,255,255,.92);
+    font-weight:400;
+  }
+  .pills{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap;}
+  .pill{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:9px 16px;border-radius:999px;
+    background:rgba(255,255,255,.13);
+    border:1px solid rgba(255,255,255,.26);
+    font-size:14px;font-weight:600;letter-spacing:.2px;
+  }
+  .pill .ico{font-size:19px;}
+  .hero .url{
+    position:absolute;right:56px;bottom:40px;
+    font-size:15px;letter-spacing:.6px;color:rgba(255,255,255,.78);
+  }
+
+  /* ---------- layout ---------- */
+  .body-pad{padding:38px 56px 6px;}
+  .eyebrow{
+    display:flex;align-items:center;gap:10px;
+    font-size:12px;font-weight:800;letter-spacing:1.6px;
+    text-transform:uppercase;color:var(--primary);
+  }
+  .eyebrow .ico{font-size:20px;}
+  .h2{font-size:27px;color:var(--ink);font-weight:700;letter-spacing:-.2px;margin-top:8px;}
+  .sub{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.5;}
+
+  section{margin-top:40px;}
+
+  /* ---------- steps ---------- */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;}
+  .step{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:22px 20px 20px;position:relative;
+    box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  .step .num{
+    width:34px;height:34px;border-radius:10px;
+    background:var(--blue-bg);color:var(--primary);
+    font-weight:800;font-size:16px;
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:14px;
+  }
+  .step .glyph{position:absolute;right:18px;top:18px;font-size:26px;color:#c9cfdd;}
+  .step h3{font-size:17px;color:var(--ink);margin-bottom:8px;font-weight:700;}
+  .step p{font-size:14px;line-height:1.55;color:var(--muted);}
+  .step .meta{
+    margin-top:12px;font-size:12px;font-weight:700;letter-spacing:.4px;
+    color:var(--blue);text-transform:uppercase;
+  }
+
+  /* ---------- roles ---------- */
+  .roles{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px;}
+  .role{
+    border-radius:16px;padding:24px 24px 22px;
+    background:var(--card);border:1px solid var(--line);
+    box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  .role.organiser{background:linear-gradient(180deg,#f7f8ff 0%,#ffffff 60%);border-color:#dfe3f5;}
+  .role.admin{background:linear-gradient(180deg,#f7f9fb 0%,#ffffff 60%);}
+  .role-head{display:flex;align-items:center;gap:12px;}
+  .role-head .badge{
+    width:42px;height:42px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;
+  }
+  .role.organiser .badge{background:var(--primary);}
+  .role.admin .badge{background:#37474f;}
+  .role-head h3{font-size:19px;color:var(--ink);font-weight:700;}
+  .role-head .scope{
+    font-size:11px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);
+  }
+  .role ul{list-style:none;margin-top:16px;display:grid;gap:9px;}
+  .role li{
+    font-size:14px;line-height:1.5;color:var(--text);
+    padding-left:24px;position:relative;
+  }
+  .role li .ico{
+    position:absolute;left:0;top:1px;font-size:17px;color:var(--green);
+  }
+  .divider-note{
+    margin-top:16px;border-radius:14px;padding:14px 18px;
+    background:var(--amber-bg);border:1px solid #f0d9a6;
+    font-size:14px;line-height:1.5;color:#6b4a00;
+    display:flex;gap:12px;align-items:flex-start;
+  }
+  .divider-note .ico{font-size:21px;color:var(--amber);margin-top:1px;}
+  .divider-note b{color:#5a3d00;}
+
+  /* ---------- privacy modes ---------- */
+  .modes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px;}
+  .mode{
+    border-radius:16px;padding:20px;border:1px solid var(--line);background:var(--card);
+    box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  .mode .top{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .mode .top .ico{font-size:24px;}
+  .mode h3{font-size:17px;font-weight:700;color:var(--ink);}
+  .mode p{font-size:13.5px;line-height:1.55;color:var(--muted);}
+  .mode.open{border-top:4px solid #4caf50;}
+  .mode.open .top .ico{color:#2e7d32;}
+  .mode.hidden{border-top:4px solid #f9a825;}
+  .mode.hidden .top .ico{color:#8a5a00;}
+  .mode.blind{border-top:4px solid #5c6bc0;}
+  .mode.blind .top .ico{color:#3f51b5;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+  .chip{
+    font-size:11px;font-weight:700;letter-spacing:.3px;
+    padding:5px 9px;border-radius:7px;background:#f1f3f7;color:#4b5563;
+  }
+
+  /* ---------- features ---------- */
+  .features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px;}
+  .feat{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:18px 18px 17px;display:flex;gap:14px;
+    box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  .feat .bubble{
+    flex:0 0 38px;height:38px;border-radius:11px;
+    background:#eef0fb;color:var(--primary);
+    display:flex;align-items:center;justify-content:center;font-size:21px;
+  }
+  .feat h4{font-size:15px;color:var(--ink);font-weight:700;margin-bottom:5px;}
+  .feat p{font-size:13px;line-height:1.5;color:var(--muted);}
+
+  /* ---------- numbers strip ---------- */
+  .stats{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
+    margin-top:20px;
+  }
+  .stat{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:18px 18px 16px;text-align:left;
+  }
+  .stat .v{font-size:30px;font-weight:800;color:var(--primary-dark);letter-spacing:-.5px;line-height:1;}
+  .stat .k{margin-top:7px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+
+  /* ---------- privacy footer ---------- */
+  .privacy{
+    margin-top:42px;
+    background:#20252f;color:#d7dbe4;
+    padding:34px 56px 38px;
+  }
+  .privacy .head{display:flex;align-items:center;gap:12px;}
+  .privacy .head .ico{font-size:28px;color:#8fd694;}
+  .privacy h2{font-size:24px;color:#fff;font-weight:700;letter-spacing:-.2px;}
+  .privacy .head p{margin-top:2px;font-size:14px;color:#98a0b0;}
+  .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px;}
+  .pcard{
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:14px;padding:18px;
+  }
+  .pcard h4{font-size:12px;letter-spacing:1.3px;text-transform:uppercase;color:#9aa4b8;font-weight:800;margin-bottom:10px;}
+  .pcard ul{list-style:none;display:grid;gap:7px;}
+  .pcard li{font-size:13.5px;line-height:1.45;padding-left:18px;position:relative;color:#c3c9d6;}
+  .pcard li:before{
+    content:"";position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;
+    background:#6f7bd4;
+  }
+  .pcard.good li:before{background:#6fbf73;}
+  .pcard.good h4{color:#8fd694;}
+
+  .foot{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:18px 56px 26px;background:var(--bg);
+    font-size:12.5px;color:var(--muted);
+  }
+  .foot b{color:#4a5164;}
+  .foot .tech{display:flex;gap:8px;flex-wrap:wrap;}
+  .foot .tech span{
+    padding:5px 10px;border-radius:7px;background:#fff;border:1px solid var(--line);
+    font-size:11.5px;font-weight:700;color:#5b6270;letter-spacing:.2px;
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="brand">
+      <div class="mark"><span class="ico">calendar_month</span></div>
+      <h1>When <span>RU</span> Free?</h1>
+    </div>
+    <p class="tagline">
+      Group availability scheduling that finds the time everyone can make -
+      without collecting anyone's email, real name or photo.
+    </p>
+    <div class="pills">
+      <span class="pill"><span class="ico">block</span> No ads</span>
+      <span class="pill"><span class="ico">visibility_off</span> No tracking</span>
+      <span class="pill"><span class="ico">alternate_email</span> No email stored</span>
+      <span class="pill"><span class="ico">key</span> Google, Facebook or passkey</span>
+    </div>
+    <div class="url">whenrufree.net</div>
+  </header>
+
+  <div class="body-pad">
+
+    <!-- HOW IT WORKS -->
+    <section>
+      <div class="eyebrow"><span class="ico">route</span> How it works</div>
+      <h2 class="h2">Four taps from a link to a decided date</h2>
+      <p class="sub">One organiser sets it up, everyone answers, and the score does the arguing.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <span class="ico glyph">login</span>
+          <h3>Sign in</h3>
+          <p>Google (openid only), Facebook (user ID only) or a passkey. The provider ID is stored as a keyed hash.</p>
+          <div class="meta">30-day session</div>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <span class="ico glyph">tune</span>
+          <h3>Create a calendar</h3>
+          <p>1-6 time slots, 1-5 status options with weights and colours, a date range up to 360 days.</p>
+          <div class="meta">Auto-saves as you go</div>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <span class="ico glyph">link</span>
+          <h3>Share the link</h3>
+          <p>The unique URL is the invite. Anyone signed in with it can open the calendar and join.</p>
+          <div class="meta">Optional access emoji</div>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <span class="ico glyph">leaderboard</span>
+          <h3>Read Best Match</h3>
+          <p>Every date and slot is ranked by weighted score, with expandable rosters behind each result.</p>
+          <div class="meta">Ranked automatically</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TWO ROLES -->
+    <section>
+      <div class="eyebrow"><span class="ico">badge</span> Two roles, two words</div>
+      <h2 class="h2">Organiser is not admin</h2>
+      <p class="sub">One word for the person running a calendar or Hub, one for the person running the site.</p>
+
+      <div class="roles">
+        <div class="role organiser">
+          <div class="role-head">
+            <div class="badge"><span class="ico">admin_panel_settings</span></div>
+            <div>
+              <h3>Organiser</h3>
+              <div class="scope">calendar or Hub</div>
+            </div>
+          </div>
+          <ul>
+            <li><span class="ico">check</span> Creates the calendar or Hub and owns its link</li>
+            <li><span class="ico">check</span> Sets slots, options, privacy mode and the access emoji</li>
+            <li><span class="ico">check</span> Sees individual choices on Hidden calendars</li>
+            <li><span class="ico">check</span> Blocks people, decides reports, closes bookings</li>
+            <li><span class="ico">check</span> Keeps the calendar alive while it is active</li>
+          </ul>
+        </div>
+
+        <div class="role admin">
+          <div class="role-head">
+            <div class="badge"><span class="ico">shield_person</span></div>
+            <div>
+              <h3>WhenRUFree admin</h3>
+              <div class="scope">the whole site</div>
+            </div>
+          </div>
+          <ul>
+            <li><span class="ico">check</span> Signs in at admin.html, never through a calendar link</li>
+            <li><span class="ico">check</span> Manages calendars, Hubs and accounts site-wide</li>
+            <li><span class="ico">check</span> Handles reports escalated by an organiser</li>
+            <li><span class="ico">check</span> Sets permanent retention and site config</li>
+            <li><span class="ico">check</span> Unlocks a locked old name or Hub</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="divider-note">
+        <span class="ico">info</span>
+        <div><b>Never mixed up:</b> the interface calls calendar and Hub creators <b>organiser</b> everywhere.
+        "Admin" only ever means the WhenRUFree admin, the person who runs the webapp itself.</div>
+      </div>
+    </section>
+
+    <!-- PRIVACY MODES -->
+    <section>
+      <div class="eyebrow"><span class="ico">lock</span> Choose who sees what</div>
+      <h2 class="h2">Three privacy modes, set by the organiser</h2>
+      <p class="sub">The mode decides what members see. Individual answers are never broadcast by accident.</p>
+
+      <div class="modes">
+        <div class="mode open">
+          <div class="top"><span class="ico">visibility</span><h3>Open</h3></div>
+          <p>Everyone sees every person's answers for every slot.</p>
+          <div class="chips"><span class="chip">Names shown</span><span class="chip">Choices shown</span></div>
+        </div>
+        <div class="mode hidden">
+          <div class="top"><span class="ico">visibility_lock</span><h3>Hidden</h3></div>
+          <p>Only the organiser sees individual choices. Names stay private unless the organiser opts in.</p>
+          <div class="chips"><span class="chip">Totals only</span><span class="chip">Names opt-in</span></div>
+        </div>
+        <div class="mode blind">
+          <div class="top"><span class="ico">visibility_off</span><h3>Blind</h3></div>
+          <p>Nobody sees individual choices, including the organiser. Names are private.</p>
+          <div class="chips"><span class="chip">Totals only</span><span class="chip">Names private</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section>
+      <div class="eyebrow"><span class="ico">widgets</span> What is in the box</div>
+      <h2 class="h2">Small app, complete toolset</h2>
+
+      <div class="features">
+        <div class="feat">
+          <div class="bubble"><span class="ico">leaderboard</span></div>
+          <div>
+            <h4>Best Match ranking</h4>
+            <p>Weighted status scores across dates and slots, with a roster you can expand.</p>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="bubble"><span class="ico">hub</span></div>
+          <div>
+            <h4>Calendar Hubs</h4>
+            <p>One private link lists several calendars. Opening one from a Hub counts as Hub activity.</p>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="bubble"><span class="ico">emoji_emotions</span></div>
+          <div>
+            <h4>Access emoji</h4>
+            <p>Optional invite confirmation, picked once per account and remembered afterwards.</p>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="bubble"><span class="ico">event_available</span></div>
+          <div>
+            <h4>Book a slot</h4>
+            <p>Choose and freeze a date, with capacity limits and an organiser booking close.</p>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="bubble"><span class="ico">flag</span></div>
+          <div>
+            <h4>Block and report</h4>
+            <p>Organisers pause access; reports go to the organiser, or to the WhenRUFree admin if they are about the organiser.</p>
+          </div>
+        </div>
+        <div class="feat">
+          <div class="bubble"><span class="ico">qr_code_2</span></div>
+          <div>
+            <h4>Open by code</h4>
+            <p>Short 8-character calendar and Hub links, or paste a URL into the go page.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="v">1-6</div><div class="k">Time slots</div></div>
+        <div class="stat"><div class="v">1-5</div><div class="k">Status options</div></div>
+        <div class="stat"><div class="v">360</div><div class="k">Days per range</div></div>
+        <div class="stat"><div class="v">0</div><div class="k">Trackers, ads, emails</div></div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- PRIVACY -->
+  <section class="privacy">
+    <div class="head">
+      <span class="ico">shield</span>
+      <div>
+        <h2>Privacy-first by design</h2>
+        <p>If the app does not need it, the app does not store it.</p>
+      </div>
+    </div>
+
+    <div class="pgrid">
+      <div class="pcard">
+        <h4>Kept</h4>
+        <ul>
+          <li>A private username you choose</li>
+          <li>A profile name other people see on calendars</li>
+          <li>Provider IDs as HMAC-SHA-256 keyed hashes</li>
+          <li>Calendar answers, bookings and the calendar link token</li>
+        </ul>
+      </div>
+      <div class="pcard good">
+        <h4>Never collected</h4>
+        <ul>
+          <li>Email address</li>
+          <li>Real name or photo from Google or Facebook</li>
+          <li>Advertising or analytics identifiers</li>
+          <li>Third-party tracking of any kind</li>
+        </ul>
+      </div>
+      <div class="pcard">
+        <h4>Under your control</h4>
+        <ul>
+          <li>HttpOnly session cookie, 30 days, renewed on use</li>
+          <li>Delete your account: preview first, then confirm with your username</li>
+          <li>Leave a calendar and take your name and answers with you</li>
+          <li>Inactive calendars clean up automatically</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div><b>When RU Free?</b> &nbsp;|&nbsp; whenrufree.net &nbsp;|&nbsp; Signed in to open, join or create anything.</div>
+    <div class="tech">
+      <span>PHP 8</span><span>MariaDB</span><span>Vanilla JS</span><span>No build step</span>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
