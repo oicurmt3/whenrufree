@@ -279,6 +279,106 @@ function accountCreate(PDO $pdo): int {
     return (int)$pdo->lastInsertId();
 }
 
+// -------------------------
+// Test users (accounts created from the admin panel)
+// -------------------------
+
+/**
+ * True when migration 015 has added the created_by_admin flag. Checked separately from
+ * accountsTablesReady() so that a server without the column keeps working: adding the column
+ * to that probe would take the whole sign-in system offline until the migration is applied.
+ */
+function adminTestUsersReady(PDO $pdo): bool {
+    static $cache = [];
+    $key = spl_object_id($pdo);
+    if (!isset($cache[$key])) {
+        try {
+            $pdo->query('SELECT created_by_admin FROM accounts LIMIT 0');
+            $cache[$key] = true;
+        } catch (PDOException $e) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
+}
+
+function adminTestUsersRequire(PDO $pdo): void {
+    if (!adminTestUsersReady($pdo)) {
+        respond(503, [
+            'status' => 'error',
+            'code' => 'TEST_USERS_UNAVAILABLE',
+            'message' => 'Test users are not set up on this server yet. Run migrations/015_admin_test_users.sql.',
+        ]);
+    }
+}
+
+/** True when this account was created from the admin panel. Impersonation is allowed for these only. */
+function accountIsAdminCreated(PDO $pdo, int $accountId): bool {
+    if ($accountId <= 0 || !adminTestUsersReady($pdo)) return false;
+    $stmt = $pdo->prepare("SELECT created_by_admin FROM accounts WHERE id = :id LIMIT 1");
+    $stmt->execute([':id' => $accountId]);
+    return (int)($stmt->fetchColumn() ?: 0) === 1;
+}
+
+/**
+ * Create a test user. Unlike accountCreate() the caller supplies both the username and the
+ * name for calendars, because a NULL display_name would make accountCurrent() report
+ * needs_setup and every calendar action would answer 403 ACCOUNT_SETUP.
+ */
+function accountCreateTestUser(PDO $pdo, string $username, string $displayName): int {
+    $pdo->prepare(
+        "INSERT INTO accounts (username, display_name, created_by_admin, created_at, last_seen_at)
+         VALUES (:u, :dn, 1, :now, :now2)"
+    )->execute([':u' => $username, ':dn' => $displayName, ':now' => accountNow(), ':now2' => accountNow()]);
+    return (int)$pdo->lastInsertId();
+}
+
+/** A free username based on $candidate: the candidate itself, or it with a number appended. */
+function accountFreeTestUsername(PDO $pdo, string $candidate): ?string {
+    $candidate = mb_substr($candidate, 0, 20);
+    if ($candidate === '') return null;
+    $stmt = $pdo->prepare("SELECT 1 FROM accounts WHERE username = :u LIMIT 1");
+    for ($n = 0; $n < 100; $n++) {
+        $try = $n === 0 ? $candidate : mb_substr($candidate, 0, 20 - mb_strlen((string)$n)) . $n;
+        $stmt->execute([':u' => $try]);
+        if (!$stmt->fetchColumn()) return $try;
+    }
+    return null;
+}
+
+/** Test users for the admin panel, newest first. */
+function accountListTestUsers(PDO $pdo, int $limit = 200): array {
+    $limit = max(1, min(500, $limit));
+    $stmt = $pdo->query(
+        "SELECT a.id, a.username, a.display_name, a.created_at, a.last_seen_at,
+                (SELECT COUNT(*) FROM users u WHERE u.account_id = a.id) AS calendar_count,
+                (SELECT COUNT(*) FROM `groups` g WHERE g.organiser_account_id = a.id) AS hub_count
+         FROM accounts a
+         WHERE a.created_by_admin = 1
+         ORDER BY a.id DESC
+         LIMIT {$limit}"
+    );
+    $out = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $out[] = [
+            'id' => (int)$r['id'],
+            'username' => $r['username'] !== null ? (string)$r['username'] : null,
+            'display_name' => $r['display_name'] !== null ? (string)$r['display_name'] : null,
+            'created_at' => (string)$r['created_at'],
+            'last_seen_at' => (string)$r['last_seen_at'],
+            'calendar_count' => (int)$r['calendar_count'],
+            'hub_count' => (int)$r['hub_count'],
+        ];
+    }
+    return $out;
+}
+
+/** Ids of every test user, for the bulk delete. */
+function accountTestUserIds(PDO $pdo): array {
+    $stmt = $pdo->query("SELECT id FROM accounts WHERE created_by_admin = 1");
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
 /**
  * Sign in with a verified provider ID: the existing account, or a new one.
  * @return array{account_id:int, created:bool}
@@ -563,6 +663,7 @@ function accountDelete(PDO $pdo, int $accountId): void {
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $cid) {
             $delCal->execute([':cid' => (int)$cid]);
             $delAccess->execute([':cid' => (int)$cid]);
+            reportsDeleteForCalendar($pdo, (int)$cid);
         }
         $stmt = $pdo->prepare("SELECT id FROM `groups` WHERE organiser_account_id = :aid");
         $stmt->execute([':aid' => $accountId]);

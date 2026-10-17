@@ -27,6 +27,8 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `account_memberships` | GET | Account | - | Calendars and Hubs for the profile page |
 | `account_delete_preview` | GET | Account | - | What deleting the account would remove |
 | `account_delete` | POST | Account | - | Delete account and everything it owns (`confirm` = username) |
+| `account_leave_calendar` | POST | Account | joined | Remove your own name and choices from `c`; the calendar stays |
+| `account_delete_calendar` | POST | Account | organiser | Delete `c` for everyone (organiser-audience reports go too; reports about you stay) |
 | `account_passkey_signup_begin` / `_finish` | POST | CSRF | - | Create an account with a passkey |
 | `account_passkey_add_begin` / `_finish` | POST | Account | - | Add a passkey to the account |
 | `account_passkey_login_begin` / `_finish` | POST | CSRF | - | Sign in with a passkey (usernameless) |
@@ -36,8 +38,11 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `access_settings` | GET | Account | organiser / Hub organiser | Current emoji (`c` or `g`) |
 | `set_access_emoji` | POST | Account | organiser | Set or remove the calendar's emoji (`emoji` 0-34 or null) |
 | `set_group_access_emoji` | POST | Account | Hub organiser | Set or remove the Hub's emoji |
-| `manage_calendar_user` | POST | Account | organiser | One person, one decision (`user_id`): `blocked` 1/0, `delete` 1, `report_reason` / `report_details`; applied report, then block, then delete |
-| `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}`, `hide_names`, `names_private`, `null_color`, `default_status`, `organiser_marks`, `organiser_marks_available` |
+| `manage_calendar_user` | POST | Account | organiser | One person, one decision (`user_id`): `blocked` 1/0, `delete` 1, `report_reason` / `report_details`; applied report, then block, then delete. Always reports to the super admin |
+| `report_user` | POST | Account | joined | Report someone (`user_id`, `reason`, optional `details`) to the organiser, or to the super admin when the report is about the organiser |
+| `calendar_reports` | GET | Account | organiser | Open member reports for this calendar, with who reported |
+| `decide_calendar_report` | POST | Account | organiser | `report_id` + `decision` dismiss / block / remove / escalate |
+| `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}`, `hide_names`, `names_private`, `null_color`, `default_status`, `organiser_marks`, `reports_available`, `open_reports` |
 | `group_meta` | GET | Account | - | Hub listing (`g` param, not `c`) with `organiser_name`, `is_organiser`, `claimable` |
 | `create_group` | POST | Account | - | Create Hub (optional `organiser_name`) |
 | `claim_hub` | POST | Account | - | Claim an old Hub once with its organiser PIN (`g`, `pin`) |
@@ -75,7 +80,12 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `admin_set_access_emoji` | POST | Admin | super | Remove a calendar's or Hub's emoji (`kind`, `id`) |
 | `admin_accounts` | GET | Admin | super | Account totals and list (optional `q` username prefix) |
 | `admin_delete_account` | POST | Admin | super | Delete an account (`account_id`) |
-| `admin_reports` | GET | Admin | super | Reports sent by organisers (reporter, reason, details, calendar) |
+| `admin_test_users` | GET | Admin | super | Test users created from the panel (migration 015) |
+| `admin_create_test_user` | POST | Admin | super | Create test users (`username`, `display_name`, optional `count` 1-10) |
+| `admin_delete_test_users` | POST | Admin | super | Delete every test user |
+| `admin_impersonate` | POST | Admin | super | Open a test user in this browser (`account_id`) |
+| `admin_impersonate_end` | POST | CSRF | - | Return to the admin's account, or sign the test user out |
+| `admin_reports` | GET | Admin | super | All reports (reporter, reason, details, calendar, audience); open first |
 | `admin_report_decide` | POST | Admin | super | Close a report, or delete the reported account, with `report_id` and `decision` dismiss / delete |
 
 "Account" in the Auth column also means CSRF on POSTs.
@@ -88,11 +98,12 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | 400 | Validation error (`USERNAME_INVALID`, `USERNAME_RESERVED`, `NAME_INVALID`, `CONFIRM_MISMATCH`) |
 | 401 | Not signed in (`ACCOUNT_REQUIRED`), wrong old PIN when claiming, or wrong access emoji (`ACCESS_WRONG`, with `attempts_left`) |
 | 403 | Account setup unfinished (`ACCOUNT_SETUP`), not joined (`NOT_JOINED`), account admin sign-in off or not allowed (`ADMIN_ACCOUNT_OFF`, `NOT_ADMIN`), CSRF failure or insufficient role, calendar frozen, bookings closed (`BOOKINGS_CLOSED`), access emoji needed (`ACCESS_REQUIRED`, `HUB_ACCESS_REQUIRED`), or blocked (`BLOCKED`) |
-| 404 | Calendar/user/action not found, or passkey not linked to any account (`NO_PASSKEY`) |
-| 409 | `ALREADY_JOINED`, `NAME_TAKEN`, `USERNAME_TAKEN`, `ALREADY_CLAIMED`, `LAST_METHOD`, `PASSKEY_EXISTS`, `PASSKEY_LIMIT` |
+| 404 | Calendar/user/action not found, person not on this calendar, or passkey not linked to any account (`NO_PASSKEY`) |
+| 409 | `ALREADY_JOINED`, `NAME_TAKEN`, `USERNAME_TAKEN`, `ALREADY_CLAIMED`, `LAST_METHOD`, `PASSKEY_EXISTS`, `PASSKEY_LIMIT`, `ALREADY_REPORTED` |
+| 410 | A report's person has already left the calendar (dismiss it instead of blocking or removing) |
 | 429 | Rate limited, old name / Hub locked after wrong PINs (`ACCOUNT_LOCKED`), too many wrong emoji picks (`ACCESS_LOCKED`), or too many unknown codes |
 | 500 | Server misconfiguration (e.g. missing `accounts.pepper`) |
-| 503 | Rate limiter unavailable on a sensitive POST, accounts tables missing (migration 007 not run), or `show_organiser_marks` missing (migration 010 not run) |
+| 503 | Rate limiter unavailable on a sensitive POST, accounts tables missing (migration 007 not run), reports tables or audience columns missing (migrations 011/016 not run), test users missing (migration 015 not run), or `show_organiser_marks` missing (migration 010 not run) |
 
 ## Data Conventions
 
@@ -105,6 +116,7 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 - Usernames: 3-20 lowercase letters, numbers or `_`, unique, private
 - Privacy: 0=open, 1=hidden, 2=blind; names are private on blind, and on hidden unless `hide_names` is 0 (default 1)
 - Joining: anyone signed in with the link can join; the link is the only access control
+- Reports: `audience` is `organiser` (member reporting a member) or `super` (anything involving the organiser); one open report per reporter and person, then a cooldown (default 30 days)
 - Un-answered colour: `null_color` = one of five greys for slots nobody has answered (migration 012); availability calendars only
 - Default option: `default_status` = 1..N option every slot starts on, or null for un-answered (migration 013); availability calendars only
 - Organiser marks: `show_organiser_marks` 1 (default) or 0; the organiser can change it any time; only affects Open, non-booking calendars

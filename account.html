@@ -8,7 +8,7 @@
   <meta name="description" content="Your When RU Free profile: your name, sign-in methods, calendars and Hubs.">
   <title>Your profile - When RU Free</title>
   <link rel="stylesheet" href="page.css">
-  <link rel="stylesheet" href="account.css?v=20261010a">
+  <link rel="stylesheet" href="account.css?v=20261017c">
 </head>
 <body class="acct-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -54,14 +54,14 @@
           <h2 id="profileTitle">Profile</h2>
           <form id="profileForm" novalidate>
             <div class="acct-field">
-              <label for="profileName">Your name on calendars</label>
+              <label for="profileName">Your default name on calendars</label>
               <input id="profileName" name="display_name" autocomplete="nickname" maxlength="32" required>
               <span class="acct-hint">Changing it also changes your name on every calendar where you haven't picked a different one.</span>
             </div>
             <p class="acct-readonly">
               <span class="acct-readonly-label">Private username</span>
               <b id="profileUsernameValue">&mdash;</b>
-              <span class="acct-hint">Fixed at sign-up. Only you and the super admin can see it; it is never shown on calendars.</span>
+              <span class="acct-hint">Only you can see it; it is never shown on calendars.</span>
             </p>
             <p id="profileError" class="acct-error" role="alert"></p>
             <p id="profileNote" class="acct-hint" role="status"></p>
@@ -72,6 +72,7 @@
         <section class="acct-section" aria-labelledby="calTitle">
           <h2 id="calTitle">Your calendars</h2>
           <ul id="calendarList" class="acct-list"></ul>
+          <p id="calendarStatus" class="acct-status" role="status" aria-live="polite"></p>
         </section>
 
         <section class="acct-section" aria-labelledby="hubTitle">
@@ -127,7 +128,7 @@
   </div>
 
   <script src="passkey.js?v=20260927a"></script>
-  <script src="account-core.js?v=20261010m"></script>
-  <script src="account.js?v=20261010l"></script>
+  <script src="account-core.js?v=20261012a"></script>
+  <script src="account.js?v=20261017c"></script>
 </body>
 </html>

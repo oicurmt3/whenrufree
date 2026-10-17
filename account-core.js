@@ -272,10 +272,44 @@
    */
   async function requireSignedIn() {
     const info = await me();
+    if (info.signed_in) showImpersonationBar(info);
     if (info.signed_in && !info.needs_setup) return info;
     if (info.signed_in) goToSetup();
     else showSignIn(info);
     return new Promise(() => {});
+  }
+
+  /**
+   * Bar across the top of every page while a test user is open in this browser. A test user has
+   * no sign-in method of its own, so this only ever appears after the admin opened one from the
+   * Accounts tab, and the button hands the browser back to the admin's own account.
+   * @param {object} info - account_me payload
+   * @returns {HTMLElement|null}
+   */
+  function showImpersonationBar(info) {
+    if (!info || !info.is_test_user) return null;
+    const existing = document.getElementById('acctImpersonate');
+    if (existing) return existing;
+
+    const bar = el('div', { id: 'acctImpersonate', className: 'acct-impersonate', role: 'status' });
+    bar.appendChild(icon('science'));
+    bar.appendChild(el('span', { className: 'acct-impersonate-text' },
+      'Test user: ' + (info.display_name || info.username || 'unknown')));
+
+    const back = el('button', { type: 'button', className: 'acct-impersonate-btn' }, 'Return to my account');
+    back.addEventListener('click', async () => {
+      back.disabled = true;
+      const r = await postJson('admin_impersonate_end');
+      // Reload either way: the cookie changed, so every label on the page is now stale.
+      if (r.ok) location.reload();
+      else { back.disabled = false; toast((r.data && r.data.message) || 'Could not return to your account'); }
+    });
+    bar.appendChild(back);
+
+    // First child of body with sticky positioning, so it pushes the page down instead of
+    // covering anything and stays visible while scrolling.
+    document.body.insertBefore(bar, document.body.firstChild);
+    return bar;
   }
 
   /**
@@ -420,9 +454,14 @@
     toast,
     renderBadge,
     renderSignInBadge,
+    showImpersonationBar,
     logout,
     currentReturnPath,
   };
 
   document.addEventListener('DOMContentLoaded', takeSigninResult);
+
+  // Covers pages that do not call require() (the home page preview, static pages), so an open
+  // test user is never invisible. me() is cached, so this adds no extra request elsewhere.
+  document.addEventListener('DOMContentLoaded', () => { me().then(showImpersonationBar); });
 })();

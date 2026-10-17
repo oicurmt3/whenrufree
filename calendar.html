@@ -34,9 +34,9 @@
     }
   </style>
   <!-- App styles -->
-  <link rel="stylesheet" href="calendar.css?v=20261010u">
+  <link rel="stylesheet" href="calendar.css?v=20261017a">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
-  <link rel="stylesheet" href="account.css?v=20261010a">
+  <link rel="stylesheet" href="account.css?v=20261012a">
 </head>
 <body>
 <header>
@@ -63,6 +63,11 @@
     <!-- Submit/Save button - hidden initially to prevent flash -->
     <button id="submitBtn" class="btn btn-submit icon-btn is-saved init-hidden" type="button" disabled title="Saved" aria-label="Saved">
       <span id="submitBtnIcon" class="material-symbols-outlined" aria-hidden="true">lock</span>
+    </button>
+    <!-- Reports waiting for the organiser (admin only) -->
+    <button id="reportsBtn" class="btn btn-ghost icon-btn has-badge" type="button" title="Reports" aria-label="Reports on this calendar" aria-haspopup="dialog" style="display:none;">
+      <span class="material-symbols-outlined" aria-hidden="true">flag</span>
+      <span id="reportsBtnBadge" class="icon-badge"></span>
     </button>
     <!-- Reset My Availability (all authenticated users) -->
     <button id="resetMineBtn" class="btn btn-danger icon-btn" type="button" title="Reset my availability" aria-label="Reset my availability" style="display:none;">
@@ -327,6 +332,42 @@
   </div>
 </div>
 
+<!-- Report someone on this calendar (everyone; goes to the organiser, or the super admin if it is about the organiser) -->
+<div class="modal-overlay" id="reportUserModal">
+  <div class="modal">
+    <h2 id="reportUserTitle">Report this person</h2>
+    <p id="reportUserText"></p>
+
+    <div class="manage-row">
+      <label class="manage-label" for="reportReason">Reason</label>
+      <select id="reportReason"></select>
+    </div>
+    <textarea id="reportDetails" rows="3" maxlength="200" aria-label="Report details (optional)" placeholder="Anything they should know (optional)"></textarea>
+    <p class="block-note" id="reportWhoSees"></p>
+
+    <div class="error" id="reportError"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="reportCancel" type="button">Cancel</button>
+      <button class="btn btn-confirm" id="reportSend" type="button" disabled>Send report</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reports waiting for this calendar's organiser (organiser only) -->
+<div class="modal-overlay" id="reportsModal">
+  <div class="modal modal-wide">
+    <h2><span class="material-symbols-outlined settings-title-icon" aria-hidden="true">flag</span> Reports</h2>
+    <p class="block-note">People on this calendar reported someone to you. Reported people do not know who reported them. Dismissing is silent: nothing is sent to the reporter.</p>
+    <div id="reportsList" class="reports-list"></div>
+    <p id="reportsEmpty" class="block-note" hidden>No reports are waiting.</p>
+    <div class="error" id="reportsError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="reportsClose" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Review the choices before they are applied -->
 <div class="modal-overlay modal-top" id="confirmChoicesModal">
   <div class="modal">
@@ -344,13 +385,13 @@
 
 <!-- App script -->
 <script src="passkey.js?v=20260927a"></script>
-<script src="account-core.js?v=20261010m"></script>
+<script src="account-core.js?v=20261012a"></script>
 <script src="emoji.js?v=20261008b"></script>
-<script src="calendar-core.js?v=20261010t"></script>
-<script src="calendar-users.js?v=20261010v"></script>
+<script src="calendar-core.js?v=20261017a"></script>
+<script src="calendar-users.js?v=20261017a"></script>
 <script src="calendar-grid.js?v=20261010q"></script>
 <script src="calendar-rank.js?v=20260927b"></script>
 <script src="calendar-booking.js?v=20260927b"></script>
-<script src="calendar-main.js?v=20261010j"></script>
+<script src="calendar-main.js?v=20261017a"></script>
 </body>
 </html>

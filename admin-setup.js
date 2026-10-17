@@ -28,6 +28,15 @@ const datePresetsWrap  = document.getElementById('datePresetsWrap');
 const addDatePresetBtn = document.getElementById('addDatePresetBtn');
 const retentionDaysInput = document.getElementById('retentionDaysInput');
 const hubRetentionDaysInput = document.getElementById('hubRetentionDaysInput');
+const examplesWrap     = document.getElementById('examplesWrap');
+const addExampleBtn    = document.getElementById('addExampleBtn');
+
+/**
+ * Template cards available on ideas.html, as {key, label} pairs. Read from the page itself
+ * (loadTemplateCards) so the admin list can never drift from the cards that exist.
+ * @type {Array<{key:string, label:string}>}
+ */
+let templateCardOptions = [];
 
 /**
  * Show a status message in all save bars (top, bottom, and per-section).
@@ -59,6 +68,7 @@ function setSetupStatus(msg, type, mainOnly) {
  */
 async function loadSiteConfig() {
     setSetupStatus('Loading...', '', true);
+    await loadTemplateCards();
     try {
         const data = await apiRequest('get_site_config', 'GET');
         if (data && data.config && typeof data.config === 'object' && Object.keys(data.config).length > 0) {
@@ -76,6 +86,39 @@ async function loadSiteConfig() {
     } catch (e) {
         setSetupStatus('Failed to load config: ' + e.message, 'error');
     }
+}
+
+/**
+ * Read the template cards from ideas.html so the admin can pick one by name instead of
+ * typing a key. Cards carry a data-tpl key; the heading text becomes the label.
+ * Failure is not fatal: the rows fall back to a free-text key box.
+ */
+async function loadTemplateCards() {
+    if (templateCardOptions.length > 0) return;
+    const found = [];
+    try {
+        const resp = await fetch('ideas.html', { method: 'GET', credentials: 'same-origin' });
+        if (resp.ok) {
+            const doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
+            doc.querySelectorAll('.template-card').forEach(card => {
+                const key = (card.dataset.tpl || '').trim();
+                if (!key || found.some(o => o.key === key)) return;
+                // Take the heading text without the leading icon span, which would otherwise
+                // contribute its ligature name ("sports_soccer Weekday Sports Tryouts")
+                const heading = card.querySelector('h3');
+                let label = key;
+                if (heading) {
+                    const clone = heading.cloneNode(true);
+                    clone.querySelectorAll('.material-symbols-outlined').forEach(sp => sp.remove());
+                    label = clone.textContent.trim() || key;
+                }
+                found.push({ key, label });
+            });
+        }
+    } catch (e) {
+        console.warn('Could not read the template card list from ideas.html:', e);
+    }
+    templateCardOptions = found;
 }
 
 /**
@@ -104,6 +147,13 @@ function getDefaultConfig() {
                 {key:'1week', label:'1 week',  days:6},
                 {key:'2weeks',label:'2 weeks', days:13},
                 {key:'1month',label:'1 month', days:30}
+            ]
+        },
+        examples: {
+            items: [
+                {card:'team-name-vote',     url:'calendar.html?c=Ua1dsF5q', label:'See an example', icon:'visibility', emoji:'\u{1F680}'},
+                {card:'ranked-choice',      url:'calendar.html?c=Ua1dsF5q', label:'See an example', icon:'visibility', emoji:'\u{1F680}'},
+                {card:'workplace-catchup',  url:'calendar.html?c=Ua1dsF5q', label:'See an example', icon:'visibility', emoji:'\u{1F680}'}
             ]
         },
         retention: {
@@ -255,6 +305,142 @@ if (addSlotDefBtn) {
         slotDefaultsWrap.appendChild(makeChipRow('', 'e.g. Morning'));
         slotDefaultsWrap.lastElementChild.querySelector('input').focus();
         updateMoveButtons(slotDefaultsWrap);
+    });
+}
+
+// -------------------------
+// TEMPLATE EXAMPLES EDITOR
+// -------------------------
+
+/**
+ * Make a template example row: card picker, link, and the optional button text / icon / emoji.
+ * @param {{card:string, url:string, label:string, icon:string, emoji:string}} item
+ * @returns {HTMLElement}
+ */
+function makeExampleRow(item) {
+    const row = document.createElement('div');
+    row.className = 'setup-row setup-example-row';
+
+    // Card picker: a dropdown once ideas.html has been read, otherwise a plain key box
+    let cardField;
+    if (templateCardOptions.length > 0) {
+        cardField = document.createElement('select');
+        cardField.className = 'setup-select setup-example-card';
+        cardField.setAttribute('aria-label', 'Template card');
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '- Pick a card -';
+        cardField.appendChild(blank);
+        // Repair a key that only differs by punctuation: earlier saves stripped the hyphens
+        // ("team-name-vote" became "teamnamevote"). Selecting the real card means re-saving
+        // writes the correct key back.
+        let selected = item.card || '';
+        if (selected && !templateCardOptions.some(o => o.key === selected)) {
+            const want = String(selected).toLowerCase().replace(/[^a-z0-9]/g, '');
+            const match = templateCardOptions.find(o => o.key.toLowerCase().replace(/[^a-z0-9]/g, '') === want);
+            if (match) {
+                selected = match.key;
+            } else {
+                // Genuinely gone from the page: keep it visible so the row cannot silently retarget
+                const stale = document.createElement('option');
+                stale.value = item.card;
+                stale.textContent = item.card + ' (not found on the page)';
+                cardField.appendChild(stale);
+            }
+        }
+        templateCardOptions.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.key;
+            opt.textContent = o.label;
+            cardField.appendChild(opt);
+        });
+        cardField.value = selected;
+    } else {
+        cardField = document.createElement('input');
+        cardField.type = 'text';
+        cardField.className = 'setup-input setup-example-card';
+        cardField.placeholder = 'Card key, e.g. team-name-vote';
+        cardField.maxLength = 40;
+        cardField.value = item.card || '';
+        cardField.setAttribute('aria-label', 'Template card key');
+    }
+
+    const urlIn = document.createElement('input');
+    urlIn.type = 'text';
+    urlIn.className = 'setup-input setup-example-url';
+    urlIn.placeholder = 'calendar.html?c=TOKEN';
+    urlIn.maxLength = 300;
+    urlIn.value = item.url || '';
+    urlIn.setAttribute('aria-label', 'Example link');
+
+    const labelIn = document.createElement('input');
+    labelIn.type = 'text';
+    labelIn.className = 'setup-input setup-example-label';
+    labelIn.placeholder = 'See an example';
+    labelIn.maxLength = 30;
+    labelIn.value = item.label || '';
+    labelIn.setAttribute('aria-label', 'Example button text');
+
+    const iconIn = document.createElement('input');
+    iconIn.type = 'text';
+    iconIn.className = 'setup-input setup-example-icon';
+    iconIn.placeholder = 'visibility';
+    iconIn.maxLength = 40;
+    iconIn.value = item.icon || '';
+    iconIn.setAttribute('aria-label', 'Example button icon');
+    iconIn.title = 'Material Symbols name, e.g. visibility';
+
+    const emojiIn = document.createElement('input');
+    emojiIn.type = 'text';
+    emojiIn.className = 'setup-input setup-example-emoji';
+    emojiIn.placeholder = '\u{1F680}';
+    emojiIn.maxLength = 8;
+    emojiIn.value = item.emoji || '';
+    emojiIn.setAttribute('aria-label', 'Access emoji hint');
+    emojiIn.title = 'Emoji for this demo, shown in the button tooltip';
+
+    const actions = makeActionButtons(row);
+
+    row.appendChild(cardField);
+    row.appendChild(urlIn);
+    row.appendChild(labelIn);
+    row.appendChild(iconIn);
+    row.appendChild(emojiIn);
+    row.appendChild(actions);
+    return row;
+}
+
+/**
+ * Read all template example rows. Rows without a card or link are dropped, so the saved
+ * list only holds usable buttons.
+ * @returns {Array<{card:string, url:string, label?:string, icon?:string, emoji?:string}>}
+ */
+function readExamples() {
+    const out = [];
+    if (!examplesWrap) return out;
+    examplesWrap.querySelectorAll('.setup-example-row').forEach(row => {
+        const card = setupSanitise(row.querySelector('.setup-example-card')?.value, 40);
+        const url  = String(row.querySelector('.setup-example-url')?.value || '').trim().slice(0, 300);
+        if (!card || !url) return;
+        const item = {card, url};
+        const label = setupSanitise(row.querySelector('.setup-example-label')?.value, 30);
+        const icon  = setupSanitise(row.querySelector('.setup-example-icon')?.value, 40);
+        const emoji = String(row.querySelector('.setup-example-emoji')?.value || '').trim().slice(0, 8);
+        if (label) item.label = label;
+        if (icon)  item.icon  = icon;
+        if (emoji) item.emoji = emoji;
+        out.push(item);
+    });
+    return out;
+}
+
+if (addExampleBtn) {
+    addExampleBtn.addEventListener('click', () => {
+        if (!examplesWrap) return;
+        examplesWrap.appendChild(makeExampleRow({card:'', url:'', label:'', icon:'', emoji:''}));
+        const first = examplesWrap.lastElementChild.querySelector('.setup-example-card');
+        if (first) first.focus();
+        updateMoveButtons(examplesWrap);
     });
 }
 
@@ -497,6 +683,13 @@ function renderSetupEditor(cfg) {
     (cfg.dates?.presets || []).forEach(p => datePresetsWrap.appendChild(makeDatePresetRow(p)));
     updateMoveButtons(datePresetsWrap);
 
+    // Template examples
+    if (examplesWrap) {
+        examplesWrap.innerHTML = '';
+        (cfg.examples?.items || []).forEach(it => examplesWrap.appendChild(makeExampleRow(it)));
+        updateMoveButtons(examplesWrap);
+    }
+
     // Retention / auto-delete
     if (retentionDaysInput) {
         const days = parseInt(cfg.retention?.inactive_days, 10);
@@ -531,6 +724,9 @@ function readEditorConfig() {
         dates: {
             max_range_days: Math.max(1, Math.min(365, parseInt(maxRangeDaysInput?.value, 10) || 360)),
             presets: readDatePresets()
+        },
+        examples: {
+            items: readExamples()
         },
         retention: {
             inactive_days: Math.max(1, Math.min(3650, parseInt(retentionDaysInput?.value, 10) || 40)),

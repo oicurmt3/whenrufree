@@ -83,6 +83,9 @@ async function loadCalendarMeta(){
     state.reportsAvailable = meta.calendar.reports_available === true;
     state.reportReasons = meta.calendar.report_reasons && typeof meta.calendar.report_reasons === 'object'
       ? meta.calendar.report_reasons : null;
+    // Reports waiting for this calendar's organiser (0 for everyone else)
+    state.openReports = Number(meta.calendar.open_reports) || 0;
+    updateReportsButton();
     updatePrivacyIndicator();
 
     // Rank sort order: 'score' (default) or 'date' (chronological)
@@ -339,6 +342,23 @@ function populateUserSelectModal(){
       item.appendChild(manageBtn);
     }
 
+    // Everyone else: report a person they can see. Reports about the organiser go to the super
+    // admin, so this is offered on the organiser's row too (including on Blind calendars, where
+    // the organisers are the only other people a member can see).
+    if(canReportUser(u, isOrganiser)){
+      const reportBtn = document.createElement('button');
+      reportBtn.className = 'user-select-report';
+      reportBtn.type = 'button';
+      reportBtn.title = 'Report ' + u.display_name;
+      reportBtn.setAttribute('aria-label', reportBtn.title);
+      reportBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">flag</span>';
+      reportBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openReportModal(u);
+      });
+      item.appendChild(reportBtn);
+    }
+
     if(u.mine || (canClaim && u.claimable) || canView){
       item.classList.add('is-clickable');
       item.addEventListener('click', () => onUserSelectItemClick(u.id));
@@ -555,6 +575,252 @@ function closeUserSelectModal(){
   els.userSelectModal.classList.remove('active');
 }
 
+// -------------------------
+// Report a person (everyone): member-to-member goes to the organiser, anything involving the
+// organiser goes to the super admin
+// -------------------------
+
+/** Whether this row offers Report: anyone you can see, except yourself and an unclaimed old name. */
+function canReportUser(u, isOrganiser){
+  if(state.reportsAvailable !== true) return false;
+  if(!u || u.mine || u.claimable) return false;
+  if(isOrganiser) return false; // the organiser uses Manage on that row instead
+  return true;
+}
+
+/** Reasons come from the server (includes/reports.php) so both sides agree. */
+function fillReportReasons(){
+  const sel = els.reportReason;
+  if(!sel) return;
+  sel.textContent = '';
+  const choose = document.createElement('option');
+  choose.value = '';
+  choose.textContent = 'Choose a reason';
+  sel.appendChild(choose);
+  const reasons = state.reportReasons;
+  for(const [key, label] of (reasons && typeof reasons === 'object' ? Object.entries(reasons) : [])){
+    const o = document.createElement('option');
+    o.value = key;
+    o.textContent = String(label);
+    sel.appendChild(o);
+  }
+}
+
+function openReportModal(u){
+  if(!els.reportUserModal || !u) return;
+  state.reportTarget = u;
+  const aboutOrganiser = u.role === 'admin';
+  els.reportUserTitle.textContent = `Report ${u.display_name}`;
+  els.reportUserText.textContent = aboutOrganiser
+    ? `Tell the super admin about the organiser of this calendar. The organiser does not see this report.`
+    : `Tell the organiser about ${u.display_name}. The organiser decides what happens; ${u.display_name} will not be told who reported them.`;
+  els.reportWhoSees.textContent = aboutOrganiser
+    ? 'This report goes straight to the super admin, because an organiser cannot decide a complaint about themselves.'
+    : 'This report goes to the organiser of this calendar.';
+  fillReportReasons();
+  els.reportReason.value = '';
+  els.reportDetails.value = '';
+  els.reportError.textContent = '';
+  els.reportSend.disabled = true;
+  els.reportUserModal.classList.add('active');
+  els.reportReason.focus();
+}
+
+function closeReportModal(){
+  if(els.reportUserModal) els.reportUserModal.classList.remove('active');
+  state.reportTarget = null;
+}
+
+async function submitReport(){
+  const u = state.reportTarget;
+  if(!u) return;
+  const reason = els.reportReason.value;
+  if(!reason){
+    els.reportError.textContent = 'Choose a reason for the report.';
+    return;
+  }
+  els.reportError.textContent = '';
+  els.reportSend.disabled = true;
+  try{
+    const body = { user_id: u.id, reason };
+    const details = els.reportDetails.value.trim();
+    if(details) body.details = details;
+    const res = await apiPost('report_user', body);
+    if(res.status !== 'success'){
+      els.reportError.textContent = res.message || 'Could not send that report.';
+      els.reportSend.disabled = false;
+      return;
+    }
+    closeReportModal();
+    showToast(res.message || 'Report sent');
+  }catch(e){
+    console.error('Error reporting person:', e);
+    els.reportError.textContent = 'Could not send that report.';
+  }finally{
+    els.reportSend.disabled = false;
+  }
+}
+
+// -------------------------
+// Reports inbox (organiser only)
+// -------------------------
+
+/** Toolbar button and its count: organisers only, and only once the reports table exists. */
+function updateReportsButton(){
+  if(!els.reportsBtn) return;
+  const isOrganiser = isCurrentUserOrganiser();
+  const show = isOrganiser && state.reportsAvailable === true;
+  els.reportsBtn.style.display = show ? 'inline-flex' : 'none';
+  const n = Number(state.openReports) || 0;
+  els.reportsBtnBadge.textContent = n > 99 ? '99+' : String(n);
+  els.reportsBtnBadge.hidden = n === 0;
+  els.reportsBtn.title = n ? `Reports (${n} waiting)` : 'Reports';
+  els.reportsBtn.setAttribute('aria-label', els.reportsBtn.title);
+}
+
+function openReportsModal(){
+  if(!els.reportsModal) return;
+  els.reportsError.textContent = '';
+  els.reportsModal.classList.add('active');
+  loadCalendarReports();
+}
+
+function closeReportsModal(){
+  if(els.reportsModal) els.reportsModal.classList.remove('active');
+}
+
+async function loadCalendarReports(){
+  els.reportsList.textContent = '';
+  els.reportsEmpty.hidden = true;
+  els.reportsError.textContent = '';
+  try{
+    const data = await apiGet('calendar_reports');
+    if(data.status !== 'success'){
+      els.reportsError.textContent = data.message || 'Could not load the reports.';
+      return;
+    }
+    if(!data.available){
+      els.reportsError.textContent = 'Reports are not available yet. Run migrations/011 and 016.';
+      return;
+    }
+    state.calendarReports = Array.isArray(data.reports) ? data.reports : [];
+    state.openReports = Number(data.open) || 0;
+    updateReportsButton();
+    renderCalendarReports();
+  }catch(e){
+    console.error('Error loading reports:', e);
+    els.reportsError.textContent = 'Could not load the reports.';
+  }
+}
+
+function reportReasonLabel(key){
+  return (state.reportReasons && state.reportReasons[key]) || String(key || 'Other');
+}
+
+/** "2026-10-17 11:05:00" -> "17 Oct 2026, 11:05". */
+function reportWhen(value){
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(value || ''));
+  if(!m) return '';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${Number(m[3])} ${months[Number(m[2]) - 1]} ${m[1]}, ${m[4]}:${m[5]}`;
+}
+
+/** One entry per report, with the four things the organiser can do about it. */
+function renderCalendarReports(){
+  els.reportsList.textContent = '';
+  const list = state.calendarReports;
+  els.reportsEmpty.hidden = list.length > 0;
+  for(const r of list){
+    const item = document.createElement('div');
+    item.className = 'report-item';
+
+    const head = document.createElement('div');
+    head.className = 'report-item-head';
+    const who = document.createElement('span');
+    const reporter = document.createElement('b');
+    reporter.textContent = r.reporter_name || 'Someone';
+    const target = document.createElement('b');
+    target.textContent = r.display_name || 'someone';
+    who.append(reporter, ' reported ', target);
+    head.appendChild(who);
+    const when = document.createElement('span');
+    when.className = 'report-item-when';
+    when.textContent = reportWhen(r.created_at);
+    head.appendChild(when);
+    item.appendChild(head);
+
+    const reason = document.createElement('p');
+    reason.className = 'report-item-reason';
+    reason.textContent = reportReasonLabel(r.reason);
+    item.appendChild(reason);
+
+    if(r.details){
+      const details = document.createElement('p');
+      details.className = 'report-item-details';
+      details.textContent = `"${r.details}"`;
+      item.appendChild(details);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'report-item-actions';
+    const add = (decision, label, cls) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = cls ? `btn btn-ghost btn-sm ${cls}` : 'btn btn-ghost btn-sm';
+      b.dataset.decision = decision;
+      b.dataset.reportId = String(r.id);
+      b.textContent = label;
+      actions.appendChild(b);
+    };
+    add('dismiss', 'Dismiss', 'report-dismiss');
+    add('block', 'Block', '');
+    add('remove', 'Remove', 'report-remove');
+    add('escalate', 'Send to super admin', '');
+    item.appendChild(actions);
+
+    els.reportsList.appendChild(item);
+  }
+}
+
+async function decideCalendarReport(reportId, decision, btn){
+  const r = state.calendarReports.find(x => x.id === reportId);
+  if(!r) return;
+  const name = r.display_name || 'this person';
+  let question = '';
+  if(decision === 'dismiss') question = `Dismiss this report about ${name}?\n\nNothing happens to ${name} and ${r.reporter_name || 'the reporter'} is not told.`;
+  else if(decision === 'block') question = `Block ${name}?\n\nThey can no longer open this calendar and their answers are hidden from views and Best Match. You can unblock them later.`;
+  else if(decision === 'remove') question = `Remove ${name} from this calendar?\n\nTheir name and every answer they gave are deleted. This cannot be undone.`;
+  else question = `Send this report about ${name} to the super admin?\n\nThe super admin decides it from now on.`;
+  if(!confirm(question)) return;
+
+  btn.disabled = true;
+  els.reportsError.textContent = '';
+  try{
+    const res = await apiPost('decide_calendar_report', { report_id: reportId, decision });
+    if(res.status !== 'success'){
+      els.reportsError.textContent = res.message || 'Could not save that.';
+      btn.disabled = false;
+      return;
+    }
+    state.openReports = Number(res.open) || 0;
+    updateReportsButton();
+    await loadCalendarReports();
+    if(decision === 'block' || decision === 'remove'){
+      await refreshPeopleAndViews();
+      showToast(decision === 'block' ? `${name} blocked` : `${name} removed`);
+    } else if(decision === 'escalate'){
+      showToast('Sent to the super admin');
+    } else {
+      showToast('Report dismissed');
+    }
+  }catch(e){
+    console.error('Error deciding report:', e);
+    els.reportsError.textContent = 'Could not save that.';
+    btn.disabled = false;
+  }
+}
+
+
 /*** People modal: tap your name to see your own Slots, an old name to claim it, or someone else to see theirs */
 function onUserSelectItemClick(userId){
   const uid = Number(userId);
@@ -652,6 +918,9 @@ function updateUserUI(){
   
   // Reset All: visible only for admin
   els.resetAllBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+
+  // Reports inbox: organiser only, once the reports table exists
+  updateReportsButton();
 
   // Update sort toggle clickable state based on current user role
   updateSortToggleUI();

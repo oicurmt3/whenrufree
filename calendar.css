@@ -1233,6 +1233,100 @@ main{
 .user-select-manage:hover{background:#e8eaf6;color:#283593;}
 .user-select-manage .material-symbols-outlined{font-size:22px;}
 
+/* Report someone (everyone): opens the member report modal */
+.user-select-report{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:44px;
+  height:44px;
+  border:none;
+  background:transparent;
+  color:#555;
+  border-radius:50%;
+  cursor:pointer;
+  flex-shrink:0;
+  padding:0;
+  transition:background .15s, color .15s;
+}
+.user-select-report:hover{background:#fdecea;color:#b3261e;}
+.user-select-report .material-symbols-outlined{font-size:22px;}
+
+/* Count on a toolbar icon button (reports waiting for the organiser) */
+.has-badge{position:relative;}
+.icon-badge{
+  position:absolute;
+  top:2px;
+  right:2px;
+  min-width:18px;
+  height:18px;
+  padding:0 4px;
+  border-radius:9px;
+  background:#b3261e;
+  color:#fff;
+  font-size:.7rem;
+  font-weight:700;
+  line-height:18px;
+  text-align:center;
+  pointer-events:none;
+}
+.icon-badge[hidden]{display:none;}
+
+/* Organiser reports inbox */
+.modal.modal-wide{max-width:560px;max-height:88vh;overflow-y:auto;}
+
+.reports-list{display:flex;flex-direction:column;gap:10px;margin:12px 0;}
+
+.report-item{
+  border:1px solid #d7dbe0;
+  border-radius:10px;
+  padding:10px 12px;
+  background:#fafbfc;
+}
+
+.report-item-head{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  gap:6px;
+  font-size:.95rem;
+  color:#333;
+}
+
+.report-item-head b{color:#111;}
+
+.report-item-when{
+  margin-left:auto;
+  font-size:.78rem;
+  color:#666;
+  white-space:nowrap;
+}
+
+.report-item-reason{
+  margin:6px 0 0;
+  font-weight:600;
+  font-size:.9rem;
+  color:#444;
+}
+
+.report-item-details{
+  margin:4px 0 0;
+  font-size:.88rem;
+  color:#555;
+  line-height:1.4;
+}
+
+.report-item-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+
+.report-item-actions .btn{min-height:44px;}
+.report-remove{color:#b3261e;}
+.report-remove:hover{background:#fdecea;}
+
 /* Change your own name (your row) */
 .user-select-edit{
   display:flex;

@@ -189,6 +189,13 @@ The calendar page is split into six classic scripts that share global scope (no 
 | `closeUserView()` | calendar-users.js:187 | Back to your own calendar: clears `state.viewUserId`, hides the bar, redraws. Wired to the bar's X and Escape (when no modal is open) in calendar-main.js. |
 | `openUserSelectModal()` | calendar-users.js:353 | Shows the People modal after `populateUserSelectModal()`. |
 | `closeUserSelectModal()` | calendar-users.js:556 | Hides the People modal. |
+| `canReportUser(u, isOrganiser)` | calendar-users.js:584 | Whether a row gets the flag button: reporting is available (migration 016), the row is not you, not an unclaimed old name, and you are not the organiser (they use Manage instead). Organisers are reportable by members, because that report goes to the super admin. |
+| `openReportModal(u)` / `closeReportModal()` | calendar-users.js:609 / 629 | Report modal (`#reportUserModal`): fills the reasons from `state.reportReasons`, and sets the wording from the target's role - "The organiser decides what happens" for a member, "The super admin does not show this to the organiser" for the organiser. |
+| `submitReport()` | calendar-users.js:634 | POST `report_user` with `user_id`, `reason` and optional `details`; toasts the audience the server chose, or shows the 409 `ALREADY_REPORTED` message. |
+| `updateReportsButton()` | calendar-users.js:669 | Shows `#reportsBtn` for the organiser once reporting exists, and sets its count badge from `state.openReports` (99+ cap). Called from `loadCalendarMeta()` and `updateUserUI()`. |
+| `openReportsModal()` / `closeReportsModal()` | calendar-users.js:681 / 688 | Organiser inbox (`#reportsModal`); opening loads the list. |
+| `loadCalendarReports()` / `renderCalendarReports()` | calendar-users.js:692 / 729 | GET `calendar_reports`, then one `.report-item` per report: "REPORTER reported TARGET", when, reason, optional details, and the four actions. |
+| `decideCalendarReport(reportId, decision, btn)` | calendar-users.js:785 | Confirms in plain words, POSTs `decide_calendar_report` (`dismiss` / `block` / `remove` / `escalate`), updates the badge, reloads the list and, for block / remove, `refreshPeopleAndViews()`. |
 | `refreshPeopleAndViews()` | calendar-users.js:359 | Reloads users and availability, then redraws the People list, grid and rankings (after block / unblock / delete / report). |
 | `openManageModal(u)` .. `applyManageChoices()` | calendar-users.js:377 .. 519 | Manage person (organiser): Block/Unblock two-way toggle starting on the person's current status, Delete checkbox, Report dropdown (`state.reportReasons`, from `meta.calendar.report_reasons`) and optional details. `updateManageState()` enables **Confirm choices** once a delete, report or block change is pending; `manageChoiceLines()` builds the review lines, dropping the block line when a delete is chosen and only showing it when access really changes. `applyManageChoices()` POSTs `manage_calendar_user`, toasts the outcome and calls `refreshPeopleAndViews()`. |
 | `onUserSelectItemClick(userId)` | calendar-users.js:561 | Your own name closes the list and `closeUserView()` (back to your own Slots; only the `person_edit` button renames); a claimable old name opens `openClaimModal()`; anyone `canViewUser()` allows calls `toggleUserView()`. |
@@ -459,6 +466,7 @@ Loaded on every page after `passkey.js`. Exposes `window.Account`. Builds everyt
 | `renderSignInButtons(methods)` | 192 | **Continue with Google** (`googleButton`) / **Continue with Facebook** (when on in `config.php`), **Sign in with a passkey** and **New here? Create an account with a passkey**. All share Google's layout: icon 12px from the left, label centred. |
 | `showSignIn(info, opts)` | 223 | Full-screen sign-in panel that cannot be dismissed. With `opts.dismissible` (home page while signed out) it gets a lighter backdrop and closes with the X button, Escape or a tap outside. |
 | `require()` | 273 | Resolves with `account_me` once signed in and set up; otherwise shows the sign-in panel or goes to `account.html` to finish setup, and never resolves. |
+| `showImpersonationBar(info)` | 289 | When `account_me` says `is_test_user`, adds a sticky `#acctImpersonate` bar as the first body child: "Test user: NAME" and **Return to my account** (POST `admin_impersonate_end`, then reload). Present on every page, not just the admin panel. |
 | `showBlocked()` | 285 | Blocked panel (`#acctBlocked`, cannot be dismissed): the organiser has blocked this account from the calendar. Links to Home, Your profile and FAQs. |
 | `handleApiError(data)` | 313 | For `ACCOUNT_REQUIRED` / `ACCOUNT_SETUP` responses from any call: shows sign-in or goes to setup; for `BLOCKED` shows `showBlocked()`. Returns true when handled. |
 | `takeSigninResult()` | 331 | Reads and strips `?signin=` after a Google / Facebook redirect (messages in `SIGNIN_MESSAGES`). |
@@ -468,23 +476,28 @@ Loaded on every page after `passkey.js`. Exposes `window.Account`. Builds everyt
 | `renderSignInBadge(parent, onClick)` | 385 | Signed-out **Sign in** button in the badge spot (`acct-badge acct-badge-signin`, `login` icon). Calls `fitBadgeToHead()`. |
 | `logout()` | 396 | POST `account_logout`. |
 
-## account.js (~340 lines)
+## account.js (~440 lines)
 
 Profile page (`account.html`).
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `saveProfile(form, errorEl, body)` | 83 | POST `account_update`; reports `renamed` / `conflicts`. |
-| `initSetup()` | 99 | First-time setup form: username + profile name, then back to the page the person came from. |
-| `initProfile()` | 117 | Profile form (name and private username). |
-| `tag(text, extraClass)` | 72 | Small label on list rows (e.g. "Organiser", "Blocked"). |
-| `loadMemberships()` | 142 | GET `account_memberships`: calendars (role, name, Hub, "Blocked" tag) and Hubs (organiser or opened). |
-| `renderMethods(methods)` / `loadMethods()` | 181 / 203 | **Ways to sign in** list with Remove (disabled when only one is left), then redraws the Add buttons. |
-| `removeMethod(m, btn)` | 209 | POST `account_remove_method`. |
-| `addPasskey()` | 224 | `account_passkey_add_begin` -> create -> `account_passkey_add_finish`; "already has a passkey" when the device refuses a duplicate. |
-| `renderAddButtons(linked)` | 242 | **Add sign-in with Google** / **Add sign-in with Facebook** (`oauth_start` with `mode=link`), each hidden when already in `linked`; **Add a passkey on this device** always. |
-| `initSignOutAndDelete()` | 266 | Sign out; delete account (GET `account_delete_preview`, type the username, POST `account_delete`). |
-| `init()` | 319 | Handles `?signin=`, then setup or profile. |
+| `listItem(iconName, main, sub, extra, actions)` | 41 | One row: icon, `.acct-item-text` holding an `.acct-item-body` (name + sub), optional row `actions` inside the text (so buttons sit beside the name and only wrap on narrow screens), and an optional trailing node. |
+| `emptyItem(listEl, message, linkHref, linkText)` | 63 | Empty-state row, optionally followed by a link (used by "No Hubs yet. Create a Hub."). |
+| `tag(text, extraClass)` | 78 | Small label on list rows (e.g. "Organiser", "Blocked"). |
+| `saveProfile(form, errorEl, body)` | 89 | POST `account_update`; reports `renamed` / `conflicts`. |
+| `initSetup()` | 105 | First-time setup form: username + profile name, then back to the page the person came from. |
+| `initProfile()` | 122 | Profile form (name and private username). |
+| `calendarActions(c)` | 152 | Row buttons: **Delete calendar** (`.acct-btn-danger`) for organisers, **Leave calendar** (`.acct-btn-ghost`) for everyone else. |
+| `leaveCalendar(c, title, btn)` | 178 | Confirms, POSTs `account_leave_calendar`, reloads the list and reports into `#calendarStatus`. The calendar stays for everyone else; opening the link again joins with a blank calendar. |
+| `deleteCalendar(c, title, btn)` | 196 | Confirms, POSTs `account_delete_calendar`, reloads the list. Deletes the calendar for everyone; cannot be undone. |
+| `loadMemberships()` | 215 | GET `account_memberships`: calendars (role, name, Hub, "Blocked" tag, row actions) and Hubs (organiser or opened). |
+| `renderMethods(methods)` / `loadMethods()` | 254 / 276 | **Ways to sign in** list with Remove (disabled when only one is left), then redraws the Add buttons. |
+| `removeMethod(m, btn)` | 282 | POST `account_remove_method`. |
+| `addPasskey()` | 297 | `account_passkey_add_begin` -> create -> `account_passkey_add_finish`; "already has a passkey" when the device refuses a duplicate. |
+| `renderAddButtons(linked)` | 315 | **Add sign-in with Google** / **Add sign-in with Facebook** (`oauth_start` with `mode=link`), each hidden when already in `linked`; **Add a passkey on this device** always. |
+| `initSignOutAndDelete()` | 339 | Sign out; delete account (GET `account_delete_preview`, type the username, POST `account_delete`). |
+| `init()` | 392 | Handles `?signin=`, then setup or profile. |
 
 ---
 
@@ -522,7 +535,7 @@ Shared access emoji helper loaded by `index.html`, `calendar.html`, `hub.html` a
 
 ---
 
-## admin-*.js (5 files, ~2,700 lines)
+## admin-*.js (5 files, ~3,000 lines)
 
 Admin panel logic, split like the calendar page into classic scripts sharing global scope. `admin.html` loads them after `emoji.js`, in this order:
 
@@ -531,7 +544,7 @@ Admin panel logic, split like the calendar page into classic scripts sharing glo
 | `admin-core.js` | Tokens, `apiRequest(action, method, body, params)`, `formatDate()`, `truncateToken()`, `escapeHtml()`, password login (`handleLogin()`), account login (`handleAccountLogin(silent)`, POST `admin_login_account`), `startAdminSession()`, logout (stops the automatic account login for the tab), `checkExistingSession()` (runs on `DOMContentLoaded`; tries the account login silently when there is no admin token), `emojiBadge()`, `clearAccessEmoji()`, Escape-key handler, `switchTab()` (loads Accounts the first time its tab opens) |
 | `admin-calendars.js` | Calendars tab: `loadCalendars()`, filters, sort, `renderTable()`, selection, `handleTogglePermanent()`, `executeDelete()`, bulk delete, pagination, Users expander (`toggleUsersExpand()`, `executeDeleteUser()`) |
 | `admin-hubs.js` | Hubs tab: `loadHubs()`, filters, sort, `renderHubTable()`, selection, delete, bulk delete, pagination, calendars expander |
-| `admin-accounts.js` | Accounts tab: `loadAccounts()` (GET `admin_accounts`, optional `q` username prefix, debounced search), `renderAccountStats()` (Google / Facebook / passkey on or off, totals, unclaimed old names and Hubs), `renderAccountTable()`, `deleteAdminAccount()` (type the username, or DELETE for an account without one; POST `admin_delete_account`), `calendarsNeedReload()` |
-| `admin-setup.js` | Setup tab: `loadSiteConfig()`, slot / option / preset / date editors, `saveConfig()` |
+| `admin-accounts.js` | Accounts tab: `loadAccounts()` (GET `admin_accounts`, optional `q` username prefix, debounced search), `renderAccountStats()` (Google / Facebook / passkey on or off, totals, unclaimed old names and Hubs), `renderAccountTable()`, `deleteAdminAccount()` (type the username, or DELETE for an account without one; POST `admin_delete_account`), `calendarsNeedReload()`, and test users: `loadTestUsers()`, `renderTestUserTable()`, `addTestUser()`, `deleteTestUser()`, `wipeTestUsers()`, `openTestUser()` (POST `admin_impersonate`, then reloads as that account), `returnFromTestUser()` (POST `admin_impersonate_end`), `refreshImpersonateBar()` (the banner shown on every tab while a test user is open) |
+| `admin-setup.js` | Setup tab: `loadSiteConfig()`, slot / option / preset / date editors, template examples (`loadTemplateCards()` reads the cards from `ideas.html`, `makeExampleRow()` / `readExamples()` edit them), `saveConfig()` |
 
 Other details: Access emoji: `emojiBadge(emoji, inherited)` shows the emoji (or the Hub's, faded) next to calendars and Hubs; `clearAccessEmoji(kind, item, btn, rerender)` confirms and posts `admin_set_access_emoji` (key_off button). Old names: `renderUserPills()` marks names without an account with a dashed border and " - not claimed", and blocked people with " - Blocked". Claim lockouts: `renderUserPills()` adds an amber Unlock pill for users with `locked_seconds > 0` (`unlockUser()` -> `admin_unlock_user`); `renderHubTable()` adds a lock_open action on locked Hubs (`unlockHub()` -> `admin_unlock_group`); `formatWait(seconds)` matches the API's "5 minutes" / "2 hours" / "2 days" wording.

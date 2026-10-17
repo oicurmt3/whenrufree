@@ -13,6 +13,7 @@ One row per person. Created by `migrations/007_accounts.sql`. No email, real nam
 | display_name | VARCHAR(40) | NULL | Profile name used on calendars by default (app limit 32). NULL until setup is finished |
 | created_at | DATETIME | - | Created |
 | last_seen_at | DATETIME | - | Last use (updated at most once a day with the session renewal) |
+| created_by_admin | TINYINT(1) | 0 | 1 = a test user added from the admin panel: it has no sign-in method of its own and can only be opened by a super admin. `migrations/015_admin_test_users.sql` |
 
 **Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_accounts_username` (`username`), INDEX `idx_accounts_last_seen` (`last_seen_at`)
 
@@ -20,6 +21,7 @@ One row per person. Created by `migrations/007_accounts.sql`. No email, real nam
 - An account without `username` or `display_name` "needs setup" and can only use `account_*` actions
 - Deleting an account removes the calendars and Hubs it organises, its names and availability elsewhere, and every `account_*` row (FK cascades)
 - cleanup.php deletes accounts unused for `accounts.inactive_days` (default 730) that have no names and no Hubs, and passkey sign-ups abandoned before a passkey was saved
+- A test user (`created_by_admin = 1`) is refused by the OAuth and passkey sign-in paths and by the admin sign-in check, so the only way in is `admin_impersonate` from the super admin panel
 
 ---
 
@@ -394,7 +396,7 @@ Wrong emoji picks per IP address and calendar/Hub. Created by `migrations/003_ac
 
 ## Table: reports
 
-Reports an organiser sends about a person from the **Manage person** menu. Created by `migrations/011_report_users.sql`.
+Reports about a person on a calendar. Created by `migrations/011_report_users.sql`; the audience routing, reporter name and outcome come from `migrations/016_report_audience.sql`.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -402,21 +404,32 @@ Reports an organiser sends about a person from the **Manage person** menu. Creat
 | calendar_id | BIGINT UNSIGNED | - | calendars.id the person was on (no FK: the report outlives the calendar) |
 | user_id | BIGINT UNSIGNED | NULL | users.id at the time of the report (snapshot, no FK) |
 | account_id | BIGINT UNSIGNED | NULL | The reported account, when the name had one (no FK) |
-| reporter_account_id | BIGINT UNSIGNED | - | The organiser's accounts.id |
+| reporter_account_id | BIGINT UNSIGNED | - | The reporter's accounts.id (an organiser or a member) |
+| reporter_user_id | BIGINT UNSIGNED | NULL | The reporter's users.id on that calendar, used for one open report per pair (`migrations/016`) |
+| reporter_name | VARCHAR(40) | NULL | The reporter's name on that calendar, shown to the organiser (`migrations/016`) |
 | display_name | VARCHAR(40) | NULL | The name the person was using, as it was then |
-| reason | VARCHAR(32) | - | Reason key from `reportReasons()` (e.g. `inappropriate_name`, `spam`) |
-| details | VARCHAR(200) | NULL | Optional free text from the organiser |
-| status | VARCHAR(10) | 'open' | `open` until the super admin decides, then `closed` |
+| calendar_title | VARCHAR(100) | NULL | Snapshot of the calendar title, so a super-admin report still reads sensibly after the calendar is deleted (`migrations/016`) |
+| target_role | VARCHAR(10) | 'user' | `admin` or `user`: the reported person's role when it happened (`migrations/016`) |
+| audience | VARCHAR(10) | 'super' | `organiser` = that calendar's organiser decides; `super` = the super admin decides (`migrations/016`) |
+| reason | VARCHAR(32) | - | Reason key from `reportReasons()` (e.g. `inappropriate_name`, `behaviour`, `spam`) |
+| details | VARCHAR(200) | NULL | Optional free text from the reporter |
+| status | VARCHAR(10) | 'open' | `open` until decided, then `closed` |
+| outcome | VARCHAR(12) | NULL | What closed it: `dismissed`, `blocked`, `removed`, or `escalated` while still open (`migrations/016`) |
 | created_at | DATETIME | - | When the report was sent |
-| decided_at | DATETIME | NULL | When the super admin decided |
+| decided_at | DATETIME | NULL | When it was decided |
 
-**Indexes:** PRIMARY KEY (`id`), INDEX `idx_reports_status` (`status`, `created_at`), INDEX `idx_reports_calendar` (`calendar_id`), INDEX `idx_reports_account` (`account_id`)
+**Indexes:** PRIMARY KEY (`id`), INDEX `idx_reports_status` (`status`, `created_at`), INDEX `idx_reports_calendar` (`calendar_id`), INDEX `idx_reports_account` (`account_id`), INDEX `idx_reports_cal_audience` (`calendar_id`, `audience`, `status`)
 
 **Business rules:**
 - No foreign keys on purpose: a report is a snapshot and survives the calendar, the name and the account it names
-- Usernames are never stored here (they stay private to the super admin)
-- Written by `manage_calendar_user` *before* any block or delete, so a report sent with a delete still records the name and account
-- Super admin resolves them in the admin **Reports** tab (`admin_reports`, `admin_report_decide`); cleanup.php step 11 prunes closed reports older than `accounts.reports_keep_days` (default 180)
+- Usernames are never stored here (they stay private to the super admin); the admin panel joins them live
+- Anything involving the organiser, on either side, gets `audience = 'super'` from `reportAudienceFor()`: a member reporting the organiser, or the organiser reporting anyone. Member-to-member reports get `audience = 'organiser'`
+- Written by `report_user` (any member) and by `manage_calendar_user` *before* any block or delete, so a report sent with a delete still records the name and account
+- One open report per reporter and person; after a decision the same pair cannot report again within `accounts.report_cooldown_days` (default 30)
+- A calendar's organiser decides its `organiser` reports in the calendar **Reports** inbox (`calendar_reports`, `decide_calendar_report`): dismiss (silent), block, remove, or escalate to the super admin
+- Super admin resolves `super` reports in the admin **Reports** tab (`admin_reports`, `admin_report_decide`)
+- `organiser` reports are deleted with their calendar; `super` reports are kept, so deleting a calendar cannot erase a complaint about its organiser
+- cleanup.php step 11 removes `organiser` reports whose calendar is gone and prunes closed reports older than `accounts.reports_keep_days` (default 180)
 
 ---
 

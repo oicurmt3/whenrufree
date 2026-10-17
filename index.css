@@ -278,6 +278,26 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
   align-items: center;
 }
 
+/* State line under the Options: what every Slot starts as, so the case where no Default option is
+   ticked is never silent. Same wording and size as the settings modal's note, with the same check
+   box the Option rows use. It sits outside the "No option" row so it never breaks that row's
+   single line, and it stays put when the row hides. */
+.status-null-hint{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 440px;
+  margin: -4px 0 12px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #666;
+}
+.status-null-hint .material-symbols-outlined{
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 1;
+}
+
 /* The picker is a small square that opens the five greys, so the full OS colour picker (which
    cannot be limited) is never shown. It keeps the native input's look: border, a 2px gap, then the
    colour. */
@@ -386,6 +406,13 @@ h1{margin:0 0 8px;font-size:1.4rem;background-color:#3f51b5; padding: 15px; bord
 .inline-error{ color:var(--danger); font-weight:600; font-size:0.85rem; margin-left:4px; display:none; }
 .flex-between{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
 .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+
+/* Dates section: keep the range hint, the preset chips and the date fields close together. Both
+   wrappers are .row (flex), so these margins add up instead of collapsing, and the preset field
+   overrides .field's own margin to stop the hint sitting so far above the chips. */
+.dates-intro{ margin: 0 0 4px; }
+.dates-presets{ margin: 4px 0 0; }
+.row.date-row-mobile{ margin-top: 12px; }
 .range-summary {
  background: #f8f9fa;
  padding: 10px 12px;

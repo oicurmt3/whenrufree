@@ -235,7 +235,9 @@ function reportsTablesReady(PDO $pdo): bool {
     $key = spl_object_id($pdo);
     if (!isset($cache[$key])) {
         try {
-            $pdo->query('SELECT id FROM reports LIMIT 0');
+            // The audience columns come from migrations/016; without them the report routing
+            // this code relies on is not there yet, so everything falls back to "not offered".
+            $pdo->query('SELECT id, audience, reporter_name FROM reports LIMIT 0');
             $cache[$key] = true;
         } catch (PDOException $e) {
             $cache[$key] = false;

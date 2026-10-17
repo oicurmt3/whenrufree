@@ -44,18 +44,21 @@ function reportRow(r) {
     const username = r.account_username
         ? escapeHtml(r.account_username)
         : (r.account_id ? `#${r.account_id}` : '<span class="no-title">(no account)</span>');
-    const calendar = r.calendar_title
-        ? `<a href="calendar.html?c=${encodeURIComponent(r.calendar_token || '')}" target="_blank" rel="noopener">${escapeHtml(r.calendar_title)}</a>`
-        : `<span class="no-title">deleted (#${r.calendar_id})</span>`;
+    // calendar_title is the live title, or the snapshot for a report that outlived its calendar
+    const calendar = r.calendar_token
+        ? `<a href="calendar.html?c=${encodeURIComponent(r.calendar_token || '')}" target="_blank" rel="noopener">${escapeHtml(r.calendar_title || 'Untitled calendar')}</a>`
+        : `<span class="no-title">${r.calendar_title ? escapeHtml(r.calendar_title) + ' (deleted)' : `deleted (#${r.calendar_id})`}</span>`;
+    // Reports about an organiser reach the super admin directly; escalated ones came through an organiser
+    const origin = r.outcome === 'escalated' ? ' <span class="acct-tag acct-tag-muted">escalated</span>' : '';
     const closed = r.status !== 'open';
     return `
         <tr class="${closed ? 'report-closed' : ''}">
             <td class="rp-id">${r.id}</td>
-            <td class="rp-name">${label}${details}</td>
+            <td class="rp-name">${label}${origin}${details}</td>
             <td class="rp-username">${username}</td>
             <td class="rp-reason">${escapeHtml(reasonLabel(r.reason))}</td>
             <td class="rp-calendar">${calendar}</td>
-            <td class="rp-reporter">${r.reporter_username ? escapeHtml(r.reporter_username) : '&mdash;'}</td>
+            <td class="rp-reporter">${r.reporter_username ? escapeHtml(r.reporter_username) : (r.reporter_name ? escapeHtml(r.reporter_name) : '&mdash;')}</td>
             <td class="rp-when">${formatDate(r.created_at)}</td>
             <td class="rp-actions">
                 <div class="action-buttons">
@@ -91,7 +94,7 @@ async function loadReports() {
         const data = await apiRequest('admin_reports', 'GET');
         reportsLoaded = true;
         if (!data.available) {
-            reportErrorState.textContent = 'Reports are not available yet. Run migrations/011_report_users.sql.';
+            reportErrorState.textContent = 'Reports are not available yet. Run migrations/011_report_users.sql and migrations/016_report_audience.sql.';
             updateReportsBadge(0);
             showReportState('error');
             return;

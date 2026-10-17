@@ -140,7 +140,50 @@ Implemented in `includes/members.php`; the `blocked` and `hide_names` columns ne
 
 ### POST manage_calendar_user
 
-CSRF + `c`, calendar organiser only. One call for the whole Manage person menu. Body: `user_id`, plus any of `blocked` (1 block, 0 unblock), `delete` (1) and a report (`report_reason`, optional `report_details`). Organisers cannot be changed here, and the organiser cannot act on their own row. Choices are applied in a fixed order - the report first (while the name and account still exist), then the block, then the delete - so a report sent alongside a delete is never lost. Block is reversible and keeps the answers; delete cascades to availability. At least one of `blocked` or `delete` is required (400 otherwise). **Response:** `{ status, blocked, deleted, reported, report_id }`
+CSRF + `c`, calendar organiser only. One call for the whole Manage person menu. Body: `user_id`, plus any of `blocked` (1 block, 0 unblock), `delete` (1) and a report (`report_reason`, optional `report_details`). Organisers cannot be changed here, and the organiser cannot act on their own row. Choices are applied in a fixed order - the report first (while the name and account still exist), then the block, then the delete - so a report sent alongside a delete is never lost. Block is reversible and keeps the answers; delete cascades to availability. At least one of `blocked` or `delete` is required (400 otherwise). An organiser's report always has `audience = 'super'`. **Response:** `{ status, blocked, deleted, reported, report_id }`
+
+---
+
+## Reports
+
+Implemented in `includes/reports.php`. Needs `migrations/011_report_users.sql` and `migrations/016_report_audience.sql`; until the second one has run, `reports_available` is false and none of this is offered.
+
+Every report has an **audience**, decided server-side by `reportAudienceFor()` and never by the client:
+
+- `organiser` - a member reporting another member. That calendar's organiser decides it.
+- `super` - anything involving the organiser: a member reporting them, or the organiser reporting anyone. The super admin decides it, because an organiser cannot adjudicate a complaint about themselves.
+
+Reasons come from `reportReasons()`: `inappropriate_name`, `behaviour`, `spam`, `harassment`, `impersonation`, `other`.
+
+### POST report_user
+
+CSRF + `c`. Any account with a name on the calendar (a blocked account is refused by the block gate). Body: `user_id`, `reason`, optional `details` (trimmed to 200 chars).
+
+- The person must be on this calendar; you cannot report yourself (400).
+- One open report per reporter and person; after a decision the same pair cannot report again for `accounts.report_cooldown_days` (default 30). Otherwise: 409 `ALREADY_REPORTED`.
+- Per-IP limit: 20 reports an hour.
+- Reporting only records the report: it never blocks, hides or deletes anyone.
+
+**Response:** `{ status, report_id, audience, message }` - `message` says whether it went to the organiser or the super admin. Errors: 400 invalid reason, 404 not on this calendar, 429 too many reports, 503 before migration 016.
+
+### GET calendar_reports
+
+`c`, calendar organiser only (403 otherwise). Open `organiser`-audience reports for this calendar, oldest first. No username or account is ever returned: the organiser sees the names on their own calendar.
+
+**Response:** `{ status, available, open, reasons, reports }` - `available` is false (with `open` 0 and no `reports`) until migration 016 has run. Each report: `{ id, user_id, display_name, reporter_user_id, reporter_name, target_role, reason, details, created_at }`.
+
+### POST decide_calendar_report
+
+CSRF + `c`, calendar organiser only. Body: `report_id`, `decision`:
+
+| Decision | Effect |
+|----------|--------|
+| `dismiss` | Closes the report as `dismissed`. Silent: nothing is sent to the reporter and the person is not changed |
+| `block` | Sets `users.blocked = 1` for the reported person, then closes the report as `blocked` |
+| `remove` | Deletes the person's availability and their name on this calendar, then closes the report as `removed` |
+| `escalate` | Moves the report to the super admin queue (`audience` becomes `super`, `outcome` stays `escalated`) and leaves it open |
+
+The report must belong to this calendar and have `audience = 'organiser'` (404 otherwise), and must still be open (409). Block and remove need the person to still be on the calendar (410 if they left) and refuse the organiser (403). **Response:** `{ status, open }` - `open` is the number still waiting.
 
 ---
 
@@ -185,6 +228,14 @@ CSRF. Body: `type`, `id`. The last method can never be removed (409 `LAST_METHOD
 ### POST account_delete
 
 CSRF. Body: `confirm` (the username). Deletes the calendars and Hubs it organises (calendars in a deleted Hub stay, detached), its names and availability on every other calendar, and all its sign-in data, then signs out. Mismatch: 400 `CONFIRM_MISMATCH`. **Response:** `{ status }`
+
+### POST account_leave_calendar
+
+CSRF + `c`. Any account with a name on that calendar. Removes that person's name and every answer they gave; the calendar stays for everyone else. The organiser cannot leave their own calendar (403): they delete it instead. **Response:** `{ status }`. Errors: 404 when the account is not on the calendar.
+
+### POST account_delete_calendar
+
+CSRF + `c`. The calendar's organiser only (403 otherwise). Deletes the calendar for everyone: names, answers, sessions and access grants, and organiser-audience reports. Super-admin reports about that organiser are kept. **Response:** `{ status }`.
 
 ### Passkeys (POST + CSRF)
 
@@ -275,6 +326,9 @@ Returns full calendar configuration and metadata.
 | default_status_available | bool | `true` once `migrations/013_slot_default.sql` has run and the calendar is not a booking calendar |
 | organiser_marks | bool | `true` (default) when the organiser's answers show as a coloured slot edge on Open calendars; always `true` before migration 010 |
 | organiser_marks_available | bool | `true` once `migrations/010_organiser_marks.sql` has run (the organiser can then change `organiser_marks`) |
+| reports_available | bool | `true` once migrations 011 and 016 have run: the People list offers Report |
+| report_reasons | object/null | Reason key => label map, or `null` when reporting is not available |
+| open_reports | int | Reports waiting for this calendar's organiser (always 0 for members) |
 
 Opening a calendar with `from_hub=1&g=HUB_TOKEN` (matching its Hub) counts as Hub activity.
 
@@ -604,11 +658,33 @@ Accounts tab. Optional query `q` (username prefix, `[a-z0-9_]{1,20}`).
 
 CSRF + admin session. Body: `account_id`. Same as the person deleting their own account. **Response:** `{status}`
 
+### GET admin_test_users
+
+Accounts tab, test users section. Needs `migrations/015_admin_test_users.sql`.
+
+**Response:** `{ status, available, users: [{ id, username, display_name, created_at, last_seen_at, calendar_count, hub_count }] }` - every `created_by_admin` account, newest first. `available` is false (with no `users`) until the migration has run.
+
+### POST admin_create_test_user
+
+CSRF + admin session. Body: `username` (3-20, `[a-z0-9_]`; reserved names are allowed here), `display_name`, optional `count` (1-10). Creates one or more test users; a username that is taken gets a number appended, so the batch is always usable. Test users have no sign-in method of their own (`created_by_admin = 1`), and the OAuth, passkey and admin-account sign-in paths all refuse them. Per-IP limit: 60 an hour. **Response:** `{ status, created: [{ id, username, display_name }], users }`
+
+### POST admin_delete_test_users
+
+CSRF + admin session. Deletes every test user (same as `admin_delete_account` for each). **Response:** `{ status, deleted }`
+
+### POST admin_impersonate
+
+CSRF + admin session. Body: `account_id`, which must be a test user (403 otherwise, logged as `ADMIN_IMPERSONATE_DENIED`). Swaps the account cookie to the test user and remembers the admin's own account in the PHP session, so `admin_impersonate_end` can return. Only one test user can be open at a time; opening another replaces it. **Response:** `{ status, account_id }`
+
+### POST admin_impersonate_end
+
+CSRF; deliberately no admin token needed, so a new tab can still return. Restores the admin's own account from the session marker, or signs the test user out when the admin signed in with a password only. **Response:** `{ status, restored }`
+
 ### GET admin_reports
 
 Reports tab. Needs `migrations/011_report_users.sql`.
 
-**Response:** `{ status, available, open, reasons, reports }` - `available` false (with `open` 0 and no `reports`) until migration 011 has run; `open` is the number still awaiting a decision and `reasons` is the key => label map the organiser saw. Up to 200 reports, open ones first then newest first. Each report: `{ id, calendar_id, calendar_title, calendar_token, user_id, account_id, display_name, account_username, account_display_name, reporter_username, reason, details, status, created_at, decided_at }` - `display_name` is the name as it was when reported, `account_username` is the reported account's private username (null for an unclaimed old name) and `reporter_username` identifies the organiser.
+**Response:** `{ status, available, open, reasons, reports }` - `available` false (with `open` 0 and no `reports`) until migrations 011 and 016 have run; `open` is the number still awaiting a decision and `reasons` is the key => label map. Up to 200 reports, open ones first then newest first. Each report: `{ id, calendar_id, calendar_title, calendar_token, user_id, account_id, display_name, account_username, account_display_name, reporter_username, reporter_name, reason, details, status, audience, target_role, outcome, created_at, decided_at }` - `display_name` is the name as it was when reported, `calendar_title` falls back to the snapshot for a report that outlived its calendar, `account_username` is the reported account's private username (null for an unclaimed old name), and `reporter_name` is the reporter's name on that calendar (`reporter_username` is only present when they had an account).
 
 ### POST admin_report_decide
 
@@ -645,6 +721,11 @@ All security-relevant actions are logged to `grape_private/logs/security_YYYY-MM
 | ADMIN_RESET_ALL | Organiser resets all users |
 | ORGANISER_DELETE_USER | Organiser deletes a participant |
 | USER_BLOCKED | Organiser blocks or unblocks a person on a calendar (`blocked`) |
+| USER_REPORTED | A member or organiser reports someone (`report_id`, `reason`, `audience`) |
+| REPORT_DISMISSED | Calendar organiser silently dismisses a member's report |
+| REPORT_ESCALATED | Calendar organiser hands a report to the super admin |
+| CALENDAR_LEFT | A member leaves a calendar from their profile page |
+| CALENDAR_DELETED | Organiser deletes a calendar from their profile page |
 | CHOOSE_SLOT | Organiser locks in a date+slot |
 | UNCHOOSE_SLOT | Organiser reopens the calendar |
 | BOOKINGS_CLOSED | Organiser closes bookings on a booking calendar |
@@ -670,4 +751,11 @@ All security-relevant actions are logged to `grape_private/logs/security_YYYY-MM
 | ADMIN_LOGIN_FAILED | Invalid admin password |
 | ADMIN_LOGIN_LOCKED | Admin login lockout triggered (per IP) |
 | ADMIN_LOGIN_SUCCESS | Successful admin login (`method`: `password` or `account`, with `account_id`) |
-| ADMIN_ACCOUNT_DENIED | Signed-in account not in `admin.account_ids` tried to open the admin panel (`account_id`) |
+| ADMIN_ACCOUNT_DENIED | Signed-in account not in `admin.account_ids`, or a test user, tried to open the admin panel (`account_id`, `reason`) |
+| ADMIN_CREATE_TEST_USER | Super admin creates one or more test users (`created`, `ids`) |
+| ADMIN_DELETE_TEST_USERS | Super admin deletes every test user (`deleted`) |
+| ADMIN_IMPERSONATE | Super admin opens a test user in this browser (`account_id`) |
+| ADMIN_IMPERSONATE_DENIED | Tried to open an account that is not a test user (`account_id`) |
+| ADMIN_IMPERSONATE_END | Returned to the admin's own account, or signed the test user out (`account_id`; 0 when there was no account to return to) |
+| ADMIN_REPORT_DISMISSED | Super admin dismisses a report |
+| ADMIN_REPORT_DELETE_ACCOUNT | Super admin deletes the account a report names |

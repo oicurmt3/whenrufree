@@ -720,6 +720,23 @@ const els = {
   choiceError: qs('#choiceError'),
   choiceBack: qs('#choiceBack'),
   choiceApply: qs('#choiceApply'),
+  // Report someone (everyone) and the organiser's report inbox
+  reportUserModal: qs('#reportUserModal'),
+  reportUserTitle: qs('#reportUserTitle'),
+  reportUserText: qs('#reportUserText'),
+  reportReason: qs('#reportReason'),
+  reportDetails: qs('#reportDetails'),
+  reportWhoSees: qs('#reportWhoSees'),
+  reportError: qs('#reportError'),
+  reportCancel: qs('#reportCancel'),
+  reportSend: qs('#reportSend'),
+  reportsBtn: qs('#reportsBtn'),
+  reportsBtnBadge: qs('#reportsBtnBadge'),
+  reportsModal: qs('#reportsModal'),
+  reportsList: qs('#reportsList'),
+  reportsEmpty: qs('#reportsEmpty'),
+  reportsError: qs('#reportsError'),
+  reportsClose: qs('#reportsClose'),
   // Other elements
   bannerAddBtn: qs('#bannerAddBtn'),
   nameBanner: qs('#nameBanner'),
@@ -793,8 +810,11 @@ const state = {
   organiserMarksAvailable:false, // Server has calendars.show_organiser_marks (migration 010)
   nullColor:null, // Colour of un-answered Slots (migration 012); null = the default light grey
   defaultStatus:0, // Option all Slots begin with (migration 013); 0 = none, so Slots start un-answered
-  reportsAvailable:false, // Server has the reports table (migration 011): offer the Report dropdown
+  reportsAvailable:false, // Server has the reports table (migrations/011 + 016): offer reporting
   reportReasons:null, // reason key => label, from the server so both sides agree
+  openReports:0, // Reports waiting for this calendar's organiser (organiser only)
+  reportTarget:null, // The person in the report modal
+  calendarReports:[], // Open reports shown in the organiser's inbox
   manage:null, // Choices in the manage modal for one person (block / delete / report)
   users:[],
   usersTotal:0, // Everyone who has joined (users may be trimmed when names are private)

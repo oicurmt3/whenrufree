@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Admin - When RU Free?</title>
-  <link rel="stylesheet" href="admin.css?v=20261010b">
+  <link rel="stylesheet" href="admin.css?v=20261012a">
 </head>
 <body>
 
@@ -49,6 +49,15 @@
         <h1><span class="material-symbols-outlined">admin_panel_settings</span> When RU Free Admin</h1>
         <button id="logoutBtn" class="btn btn-ghost btn-small">
           <span class="material-symbols-outlined">logout</span> Logout
+        </button>
+      </div>
+
+      <!-- Shown on every tab while a test user is open in this browser -->
+      <div id="impersonateBar" class="impersonate-bar hide" role="status">
+        <span class="material-symbols-outlined">science</span>
+        <span class="impersonate-bar-text">Test user is open in this browser: <strong id="impersonateName">&mdash;</strong></span>
+        <button id="impersonateBackBtn" class="btn btn-primary btn-small">
+          <span class="material-symbols-outlined">undo</span> Return to my account
         </button>
       </div>
 
@@ -261,6 +270,77 @@
         </div>
         <p class="account-note">Shows the 100 most recently active accounts. No emails or provider profiles are stored.</p>
 
+        <!-- ============================================
+             TEST USERS (admin-created, for testing only)
+             ============================================ -->
+        <div class="setup-section" id="testUsersSection">
+          <div class="setup-section-head">
+            <h2><span class="material-symbols-outlined">science</span> Test users</h2>
+            <button id="testUserRefreshBtn" class="btn btn-ghost btn-small">
+              <span class="material-symbols-outlined">refresh</span> Refresh
+            </button>
+          </div>
+          <p class="setup-hint">
+            Accounts that exist only for testing. They have no way to sign in on their own &mdash; press
+            <strong>Open as</strong> and that test user stays signed in on this browser until you press
+            <strong>Return to my account</strong>. Use them to join calendars, book slots and test privacy
+            modes as a second person.
+          </p>
+          <p class="setup-hint-sm">
+            Cookies are shared by every tab in one browser, so open a <strong>private window</strong> for each
+            extra test user. Opening one replaces whichever test user was open.
+          </p>
+
+          <div class="test-user-form">
+            <div class="setup-field-row">
+              <label for="testUsernameInput">Username</label>
+              <input type="text" id="testUsernameInput" class="setup-input" maxlength="20" placeholder="e.g. test1" autocomplete="off">
+              <span class="setup-field-hint">3-20: a-z, 0-9, _</span>
+            </div>
+            <div class="setup-field-row">
+              <label for="testNameInput">Name on calendars</label>
+              <input type="text" id="testNameInput" class="setup-input" maxlength="32" placeholder="e.g. Test User 1" autocomplete="off">
+            </div>
+            <div class="setup-field-row">
+              <label for="testCountInput">How many</label>
+              <input type="number" id="testCountInput" class="setup-num-input" min="1" max="10" value="1">
+              <span class="setup-field-hint">1 - 10, numbered</span>
+            </div>
+            <div class="setup-save-bar">
+              <button id="addTestUserBtn" class="btn btn-primary btn-small">
+                <span class="material-symbols-outlined">person_add</span> Add test user
+              </button>
+              <button id="wipeTestUsersBtn" class="btn btn-ghost btn-small">
+                <span class="material-symbols-outlined">delete_sweep</span> Delete all test users
+              </button>
+              <span id="testUserStatus" class="setup-status"></span>
+            </div>
+          </div>
+
+          <p id="testUserUnavailable" class="account-note hide">
+            Test users are not set up on this server yet. Run <code>migrations/015_admin_test_users.sql</code> first.
+          </p>
+
+          <div class="table-container">
+            <table id="testUserTable" class="admin-table">
+              <thead>
+                <tr>
+                  <th class="col-id">ID</th>
+                  <th class="col-title">Username</th>
+                  <th class="col-organiser">Name on calendars</th>
+                  <th class="col-created">Created</th>
+                  <th class="col-activity">Last seen</th>
+                  <th class="col-users">Calendars</th>
+                  <th class="col-cal-count">Hubs</th>
+                  <th class="col-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="testUserTableBody"></tbody>
+            </table>
+          </div>
+          <p id="testUserEmpty" class="account-note hide">No test users yet.</p>
+        </div>
+
         <div id="accountLoadingState" class="state-msg hide">
           <span class="material-symbols-outlined spin">progress_activity</span> Loading accounts...
         </div>
@@ -322,7 +402,7 @@
       <div id="tabSetup" class="tab-panel hide" role="tabpanel">
 
         <div class="setup-header">
-          <p class="setup-intro">Customise the defaults and options shown on the calendar creation page (<strong>index.html</strong>). Changes are saved to the database (<code>site_config</code> table) and take effect immediately for new visitors.</p>
+          <p class="setup-intro">Customise the defaults and options shown on the calendar creation page (<strong>index.html</strong>) and the example buttons on the <strong>Templates page</strong> (<strong>ideas.html</strong>). Changes are saved to the database (<code>site_config</code> table) and take effect immediately for new visitors.</p>
           <div id="setupSaveBar" class="setup-save-bar">
             <span id="setupStatus" class="setup-status"></span>
             <button id="saveConfigBtn" class="btn btn-primary">
@@ -417,6 +497,33 @@
             <span>Label</span><span>Days offset</span><span></span>
           </div>
           <div id="datePresetsWrap" class="setup-list"></div>
+          <div class="setup-section-save">
+            <button class="btn btn-primary btn-small js-save-config">
+              <span class="material-symbols-outlined">save</span> Save
+            </button>
+            <span class="js-setup-status setup-status"></span>
+          </div>
+        </div>
+
+        <!-- SECTION: Template examples -->
+        <div class="setup-section">
+          <div class="setup-section-head">
+            <h2><span class="material-symbols-outlined">link</span> Template examples</h2>
+            <button id="addExampleBtn" class="btn btn-ghost btn-small">
+              <span class="material-symbols-outlined">add</span> Add Example
+            </button>
+          </div>
+          <p class="setup-hint">
+            Adds an <strong>Example</strong> button to a card on the <a href="ideas.html" target="_blank" rel="noopener">Templates page</a>.
+            The card list is read from <code>ideas.html</code>, so it always matches the page.
+            Turn on <em>Permanent</em> for the demo calendar on the <strong>Calendars</strong> tab, or the daily cleanup job will delete it.
+          </p>
+
+          <h3 class="setup-subhead">Example buttons <span class="setup-subhint">(one per template card)</span></h3>
+          <div class="setup-col-heads setup-example-heads">
+            <span>Template card</span><span>Link</span><span>Button text</span><span>Icon</span><span>Emoji</span><span></span>
+          </div>
+          <div id="examplesWrap" class="setup-list"></div>
           <div class="setup-section-save">
             <button class="btn btn-primary btn-small js-save-config">
               <span class="material-symbols-outlined">save</span> Save
@@ -583,8 +690,8 @@
   <script src="admin-core.js?v=20261010a"></script>
   <script src="admin-calendars.js?v=20261008b"></script>
   <script src="admin-hubs.js?v=20261008b"></script>
-  <script src="admin-accounts.js?v=20260927a"></script>
-  <script src="admin-reports.js?v=20261010b"></script>
+  <script src="admin-accounts.js?v=20261012a"></script>
+  <script src="admin-reports.js?v=20261017a"></script>
   <script src="admin-setup.js?v=20261009a"></script>
 </body>
 </html>

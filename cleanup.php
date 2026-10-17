@@ -26,8 +26,8 @@
  * 10) Accounts: delete expired account sessions, passkey sign-ups abandoned before finishing,
  *     emoji picks for deleted calendars/Hubs, and accounts unused for accounts.inactive_days
  *     (default 730) that no longer have any calendar name or Hub
- * 11) Reports: delete reports decided more than accounts.reports_keep_days ago (default 180);
- *     open reports are left for the super admin
+ * 11) Reports: delete member-to-member reports whose calendar was deleted, and reports decided
+ *     more than accounts.reports_keep_days ago (default 180); open reports are left alone
  *
  * Steps 3 and 6 clean the old PIN session tables and are skipped once migration 008 drops them.
  *
@@ -462,19 +462,28 @@ try {
     echo "[10] ERROR cleaning accounts: " . $e->getMessage() . "\n";
 }
 
-// 11. Reports (migrations/011_report_users.sql)
+// 11. Reports (migrations/011_report_users.sql, migrations/016_report_audience.sql)
 // -----------------------------------------------------------------------------
-// Open reports are never touched: they are waiting for the super admin. Closed ones are kept
-// for reports.keep_days (default 180) as an audit trail, then removed.
+// Open reports are never touched: they are waiting for someone to decide them. Closed ones are
+// kept for reports_keep_days (default 180) as an audit trail, then removed. Member-to-member
+// reports caught in step 1's calendar sweep are removed with their calendar; reports about an
+// organiser are kept even when the calendar is gone, so they can still be reviewed.
 try {
     $reportsReady = true;
     try {
-        $pdo->query("SELECT status FROM reports LIMIT 0");
+        $pdo->query("SELECT status, audience FROM reports LIMIT 0");
     } catch (PDOException $e) {
         $reportsReady = false;
-        echo "[11] Reports: skipped - run migrations/011_report_users.sql\n";
+        echo "[11] Reports: skipped - run migrations/011_report_users.sql and migrations/016_report_audience.sql\n";
     }
     if ($reportsReady) {
+        $stmtOrphan = $pdo->query("
+            DELETE r FROM reports r
+            LEFT JOIN calendars c ON c.id = r.calendar_id
+            WHERE r.audience = 'organiser' AND c.id IS NULL
+        ");
+        echo "[11] Organiser reports for deleted calendars removed: " . ($stmtOrphan === false ? 0 : $stmtOrphan->rowCount()) . "\n";
+
         $reportsKeepDays = max(1, (int)($config['accounts']['reports_keep_days'] ?? 180));
         $stmt = $pdo->prepare("
             DELETE FROM reports

@@ -21,10 +21,11 @@ We never receive your email, real name or photo from Google or Facebook - only a
 
 Tap your name in the top corner of any page to open your profile (`account.html`). There you can:
 
-- Change your username or profile name. A new profile name updates every calendar where you use it (not the ones where you chose a different name). If that name is already taken on a calendar, you are told which one keeps the old name.
+- Change your **default name on calendars**. A new profile name updates every calendar where you use it (not the ones where you chose a different name). If that name is already taken on a calendar, you are told which one keeps the old name.
 - Manage **Ways to sign in**: add Google, Facebook or a passkey for this device, or remove one (you always keep at least one). The Google and Facebook buttons disappear once linked; you can add a passkey on each device you use.
-- Usernames are 3-20 lowercase letters, numbers or `_`. A few, such as `admin` and `whenrufree`, are reserved.
+- Your **private username** is fixed at sign-up and only you can see it; it is never shown on calendars. Usernames are 3-20 lowercase letters, numbers or `_`. A few, such as `admin` and `whenrufree`, are reserved.
 - See all your **calendars** and **Hubs** - handy if you lose a link. A calendar where the organiser blocked you shows "Blocked".
+- Leave a calendar you have joined with **Leave calendar** (beside the name): it removes your name and every choice you made, and the calendar stays for everyone else. Organisers see **Delete calendar** on their own calendars instead, which removes it for everyone and stops the link working. Both ask you to confirm first.
 - **Sign out** of this device.
 - **Delete your account**: shows what will be removed (the calendars and Hubs you organise, and your names on other calendars), then asks you to type your username.
 
@@ -81,6 +82,7 @@ As the organiser, you can:
 - **Filter dates**: If you chose "only" or "except" mode, tap date column headers to select/deselect which dates participants can see. Changes auto-save.
 - **Block users**: In the People list, tap the **more** menu next to a name to open **Manage person**. Choose **Block** and confirm: that person sees "The organiser has blocked you from this calendar" and their answers are left out of the calendar and Best Match (bookings still hold their places). Choose **Unblock** the same way to restore them; nothing is deleted.
 - **Delete or report a person**: the same **Manage person** menu can delete someone (permanently) or send a report to the super admin. You can combine the choices; a review step shows exactly what will happen before you apply it.
+- **Reports from your people**: when a member reports another member, a **flag** button appears in the header with a count. Open it to see who reported whom, the reason and any details. You can **Dismiss** it (silent: the reporter is not told and the person is unchanged), **Block** or **Remove** the person, or **Send to super admin**. Reports about you never appear there: they go straight to the super admin.
 - **Reset availability**: Use the delete icon to clear your own selections, or the warning icon to reset ALL users (requires typing "RESET" to confirm).
 - **Rename**: Open the **People** list and tap the **person edit** icon on your own line (listed first) to change your name on this calendar, or tap **Use my profile name** to follow your profile name again.
 - **Your coloured edge**: on Open calendars, your own answers show as a coloured left edge on everyone's time slots. If you don't want to steer people's choices, open **Settings** (gear) and untick **Show my answers on everyone's calendar**. People can still see your answers in Best Match and the People list.
@@ -176,6 +178,15 @@ Use **Go to code** (`go/`) to open a calendar or Hub when you have a code or ful
 ### Picking the Access Emoji
 
 If the organiser set an emoji, a grid of 35 emoji appears before the calendar or Hub opens. Pick the one the organiser gave you (it is usually written next to the link) and tap **Open**. Your account remembers it, so you are not asked again on other devices. Three wrong picks lock you out for a few minutes, then longer. If you do not know it, ask the organiser.
+
+### Reporting Someone
+
+If someone on a calendar is using an inappropriate name or behaving badly, open **People** (the group icon), find their name and tap the **flag** icon.
+
+- **Reporting another member:** the report goes to that calendar's organiser, who sees who reported. The person you reported is not told who reported them, and nothing happens to them until the organiser decides.
+- **Reporting the organiser:** the report goes straight to the super admin, because an organiser cannot decide a complaint about themselves. The organiser does not see it.
+- Pick a reason and, if you like, add a short note. You can only report the same person on the same calendar once while the report is open, and not again straight after a decision.
+- Reporting never blocks or removes anyone. If the organiser blocks you or leaves a complaint unanswered, you can still use the same flag to report that.
 
 ### Blocked from a Calendar
 

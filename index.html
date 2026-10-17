@@ -39,9 +39,9 @@
     </style>
 
   <!-- Page styles -->
-  <link rel="stylesheet" href="index.css?v=20261011b">
+  <link rel="stylesheet" href="index.css?v=20261012c">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
-  <link rel="stylesheet" href="account.css?v=20261009b">
+  <link rel="stylesheet" href="account.css?v=20261012a">
 </head>
 <body>
   <div class="card">
@@ -52,7 +52,7 @@
     <p class="sub"><strong>When RU Free</strong> helps your group arrange a time when everyone is available or create a bookings calendar. Create free shared calendars, schedule availability, plan events and take bookings. Sign in with Google, Facebook or a passkey.</p>
     
     <div class="info-box">
-      Use <a href="https://whenrufree.net/ideas.html">these templates</a> to get started quickly, or create your own calendar from scratch below.
+      Use <a href="ideas.html">these templates</a> (with examples) to get started quickly, or create your own calendar from scratch below.
       <br><br>
       Managing multiple calendars? <a href="hub.html?create=1">Create a Hub</a> - one link for your group to find all calendars.
     </div>
@@ -86,11 +86,6 @@ celebration
     </div> -->
 
     
-    <div class="warn">
-      <strong>What does it look like?</strong> Try a <a href="https://whenrufree.net/calendar.html?c=Ua1dsF5q" target="_blank">working example</a> (Emoji: &#x1F680; Rocket). Sign in, pick the emoji, then join with any name. *The organiser's choices (maybe) highlighted as a coloured bar on the left of the Slot</em>.
-    </div>
-
-
     <!-- Title -->
     <div class="field">
       <label for="titleInput">Your Event Title</label>
@@ -273,6 +268,15 @@ celebration
           <span class="status-grid-weight" aria-hidden="true"></span>
           <span class="status-grid-default" aria-hidden="true"></span>
         </div>
+        <!-- State line for the Options: says what a Slot starts as, so the case where no Default
+             option is ticked is never silent. Same wording the settings modal used, with the same
+             check box the Option rows' toggles use, and it changes with the choice. The row above
+             hides once a Default option is ticked, so this sits under the Options either way.
+             paintStatusDefaults() fills it in; keepNullRowLast() keeps it under the row. -->
+        <p class="status-null-hint" id="statusNullHint" aria-live="polite">
+          <span class="material-symbols-outlined" id="statusNullHintIcon" aria-hidden="true">check_box_outline_blank</span>
+          <span id="statusNullHintText">Slots start un-answered.</span>
+        </p>
       </div>
       <div class="row">
         <button id="addStatusBtn" class="btn btn-ghost btn-small" type="button">+ Add status</button>
@@ -284,13 +288,13 @@ celebration
     <!-- Date range -->
     <div class="section">
       <h2>Dates</h2>
-      <p class="muted">Select start & end date. Max range is <span id="maxRangeDaysHint">360</span> days. Choose 1 day if Voting</p>
+      <p class="muted dates-intro">Select start &amp; end date. Max range is <span id="maxRangeDaysHint">360</span> days. Choose 1 day if Voting</p>
 
 
 
       <!-- MOVED: Quick range chips to top of section per request -->
       <div class="row">
-        <div class="field" style="min-width:340px;">
+        <div class="field dates-presets" style="min-width:340px;">
           <label>Quick presets (from today)</label>
           <div class="chips" id="datePresetsBar"> <span style="font-size: 0.8em; color: #333; vertical-align: middle; margin-top:0.2em;">e.g. </span> 
             <button class="btn-chip" type="button" data-range="1day">1 day</button>
@@ -304,7 +308,7 @@ celebration
         </div>
       </div>
 
-      <div class="row date-row-mobile" style="margin-top: 16px;">
+      <div class="row date-row-mobile">
         <div class="field" style="min-width:240px;">
           <label for="startDate">Start date</label>
           <input id="startDate" type="date" min="2026-01-01" max="2030-12-31"/>
@@ -474,8 +478,8 @@ celebration
 
   <!-- Page script -->
   <script src="passkey.js?v=20260927a" defer></script>
-  <script src="account-core.js?v=20261010m" defer></script>
+  <script src="account-core.js?v=20261012a" defer></script>
   <script src="emoji.js?v=20261008b" defer></script>
-  <script src="index.js?v=20261010y" defer></script>
+  <script src="index.js?v=20261012c" defer></script>
 </body>
 </html>

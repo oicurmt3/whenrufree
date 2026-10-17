@@ -38,27 +38,33 @@ function makeIcon(name) {
   return s;
 }
 
-function listItem(iconName, main, sub, extra) {
+function listItem(iconName, main, sub, extra, actions) {
   const li = document.createElement('li');
   li.appendChild(typeof iconName === 'string' ? makeIcon(iconName) : iconName);
   const text = document.createElement('span');
   text.className = 'acct-item-text';
-  text.appendChild(main);
+  const body = document.createElement('span');
+  body.className = 'acct-item-body';
+  body.appendChild(main);
   if (sub) {
     const s = document.createElement('span');
     s.className = 'acct-item-sub';
     s.textContent = sub;
-    text.appendChild(s);
+    body.appendChild(s);
   }
+  text.appendChild(body);
+  // Row actions sit beside the name, and wrap under it only when the row is too narrow
+  if (actions) text.appendChild(actions);
   li.appendChild(text);
   if (extra) li.appendChild(extra);
   return li;
 }
 
-function emptyItem(listEl, message) {
+function emptyItem(listEl, message, linkHref, linkText) {
   const li = document.createElement('li');
   li.className = 'acct-empty';
-  li.textContent = message;
+  li.appendChild(document.createTextNode(message));
+  if (linkHref && linkText) li.appendChild(link(linkHref, linkText));
   listEl.appendChild(li);
 }
 
@@ -139,6 +145,73 @@ function initProfile() {
 // Calendars and Hubs
 // -------------------------
 
+/**
+ * The buttons under a calendar on the profile page: organisers delete it for everyone, everyone
+ * else removes their own name and choices. Both confirm first, then reload the list.
+ */
+function calendarActions(c) {
+  const wrap = document.createElement('span');
+  wrap.className = 'acct-item-actions';
+  const title = c.title || 'Untitled calendar';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  if (c.role === 'admin') {
+    btn.className = 'acct-btn acct-btn-danger acct-btn-small';
+    btn.textContent = 'Delete calendar';
+    btn.setAttribute('aria-label', `Delete ${title} for everyone`);
+    btn.addEventListener('click', () => deleteCalendar(c, title, btn));
+  } else {
+    btn.className = 'acct-btn acct-btn-ghost acct-btn-small';
+    btn.textContent = 'Leave calendar';
+    btn.setAttribute('aria-label', `Leave ${title} and remove your choices`);
+    btn.addEventListener('click', () => leaveCalendar(c, title, btn));
+  }
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+function calendarStatus(message) {
+  const el = $('calendarStatus');
+  if (el) el.textContent = message;
+}
+
+async function leaveCalendar(c, title, btn) {
+  const ok = confirm(
+    `Leave "${title}"?\n\nYour name and every choice you made on it will be removed. ` +
+    'The calendar itself stays for everyone else, and opening the link again joins you back with a blank calendar.'
+  );
+  if (!ok) return;
+  calendarStatus('');
+  btn.disabled = true;
+  const r = await Account.postJson('account_leave_calendar', {}, { c: c.token });
+  if (!r.ok) {
+    calendarStatus(r.data.message || 'Could not leave the calendar.');
+    btn.disabled = false;
+    return;
+  }
+  await loadMemberships();
+  calendarStatus(`You left "${title}".`);
+}
+
+async function deleteCalendar(c, title, btn) {
+  const ok = confirm(
+    `Delete "${title}" for everyone?\n\n` +
+    'Every name and every answer on it will be deleted, and the link will stop working. ' +
+    'This cannot be undone.'
+  );
+  if (!ok) return;
+  calendarStatus('');
+  btn.disabled = true;
+  const r = await Account.postJson('account_delete_calendar', {}, { c: c.token });
+  if (!r.ok) {
+    calendarStatus(r.data.message || 'Could not delete the calendar.');
+    btn.disabled = false;
+    return;
+  }
+  await loadMemberships();
+  calendarStatus(`"${title}" was deleted.`);
+}
+
 async function loadMemberships() {
   const r = await Account.getJson('account_memberships');
   const calList = $('calendarList');
@@ -161,10 +234,10 @@ async function loadMemberships() {
     if (c.start_date && c.end_date) parts.push(`${formatDay(c.start_date)} - ${formatDay(c.end_date)}`);
     if (c.name_custom) parts.push(`you appear as "${c.display_name}"`);
     if (c.hub) parts.push(`in Hub "${c.hub.title || 'Untitled Hub'}"`);
-    calList.appendChild(listItem('calendar_month', wrap, parts.join(' - ')));
+    calList.appendChild(listItem('calendar_month', wrap, parts.join(' - '), null, calendarActions(c)));
   });
 
-  if (!r.data.hubs.length) emptyItem(hubList, 'No Hubs yet.');
+  if (!r.data.hubs.length) emptyItem(hubList, 'No Hubs yet. ', 'hub.html?create=1', 'Create a Hub.');
   r.data.hubs.forEach((h) => {
     const wrap = document.createElement('span');
     wrap.appendChild(link(`hub.html?g=${encodeURIComponent(h.token)}`, h.title || 'Untitled Hub'));

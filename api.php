@@ -142,6 +142,9 @@ if ($action === 'account_me' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         'needs_setup' => $acct !== null && $acct['needs_setup'],
         'username' => $acct['username'] ?? null,
         'display_name' => $acct['display_name'] ?? null,
+        // Test users have no sign-in method of their own, so being signed in as one means the
+        // admin opened it from the panel. Pages use this to show the "return" banner.
+        'is_test_user' => $acct !== null && accountIsAdminCreated($pdo, (int)$acct['id']),
         'methods' => [
             'google' => oauthProviderEnabled($config, 'google'),
             'facebook' => oauthProviderEnabled($config, 'facebook'),
@@ -205,6 +208,70 @@ if ($action === 'account_remove_method' && $_SERVER['REQUEST_METHOD'] === 'POST'
 if ($action === 'account_memberships' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $acct = requireAccount($pdo);
     respond(200, ['status' => 'success'] + accountMemberships($pdo, $acct['id']));
+}
+
+// Leave a calendar: remove your own name and every choice you made there. The link keeps working,
+// so opening it again joins you back with an empty calendar.
+if ($action === 'account_leave_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $acct = requireAccount($pdo);
+    $cal = accessCalendarRow($pdo, requireToken());
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+
+    $calId = (int)$cal['id'];
+    $mine = accountCalendarUser($pdo, $calId, $acct['id']);
+    if ($mine === null) respond(404, ['status' => 'error', 'message' => 'You are not on this calendar.']);
+    if ($mine['role'] === 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'You organise this calendar, so delete it instead of leaving it.']);
+    }
+
+    // Remove their choices explicitly, then their name. The FK cascades this too, but leaving
+    // the DELETE here keeps the promise honest on a schema without that constraint.
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("DELETE FROM availability WHERE calendar_id = :cid AND user_id = :uid")
+            ->execute([':cid' => $calId, ':uid' => $mine['id']]);
+        $pdo->prepare("DELETE FROM users WHERE id = :uid AND calendar_id = :cid")
+            ->execute([':uid' => $mine['id'], ':cid' => $calId]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    logSecurityEvent('CALENDAR_LEFT', ['calendar_id' => $calId, 'account_id' => $acct['id']]);
+    respond(200, ['status' => 'success']);
+}
+
+// Delete a calendar you organise, for everyone. Cascades to its names, answers and access grants.
+if ($action === 'account_delete_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $acct = requireAccount($pdo);
+    $cal = accessCalendarRow($pdo, requireToken());
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+
+    $calId = (int)$cal['id'];
+    $mine = accountCalendarUser($pdo, $calId, $acct['id']);
+    if ($mine === null || $mine['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can delete this calendar.']);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("DELETE FROM calendars WHERE id = :cid")->execute([':cid' => $calId]);
+        // Reports between this calendar's members die with it; reports about its organiser stay,
+        // so deleting a calendar can never erase a complaint about the person who deleted it.
+        reportsDeleteForCalendar($pdo, $calId);
+        // Calendar grants outlive the row unless removed, and would match a future calendar id.
+        // requireAccount() has already confirmed the accounts tables (account_access included).
+        $pdo->prepare("DELETE FROM account_access WHERE kind = 'calendar' AND subject_id = :cid")
+            ->execute([':cid' => $calId]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    logSecurityEvent('CALENDAR_DELETED', ['calendar_id' => $calId, 'account_id' => $acct['id']]);
+    respond(200, ['status' => 'success']);
 }
 
 // What deleting the account would remove
@@ -418,7 +485,7 @@ if ($action === 'set_group_access_emoji' && $_SERVER['REQUEST_METHOD'] === 'POST
 if ($action === 'manage_calendar_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     if (!membersTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Managing people is not available yet']);
-    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
+    $stmtC = $pdo->prepare("SELECT id, title FROM calendars WHERE token = :t");
     $stmtC->execute([':t' => requireToken()]);
     $cal = $stmtC->fetch();
     if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
@@ -461,16 +528,25 @@ if ($action === 'manage_calendar_user' && $_SERVER['REQUEST_METHOD'] === 'POST')
         if (!reportReasonValid($reason)) {
             respond(400, ['status' => 'error', 'message' => 'Choose a reason for the report.']);
         }
-        $reportId = reportCreate(
-            $pdo,
-            $calId,
-            (int)$person['id'],
-            $person['account_id'] !== null ? (int)$person['account_id'] : null,
-            (int)$session['account_id'],
-            $person['display_name'] !== null ? (string)$person['display_name'] : null,
-            $reason,
-            reportCleanDetails($_POST['report_details'] ?? null)
-        );
+        // The organiser's own name here is the report's "reported by", never their username
+        $stmtMe = $pdo->prepare("SELECT display_name FROM users WHERE id = :uid AND calendar_id = :cid LIMIT 1");
+        $stmtMe->execute([':uid' => (int)$session['user_id'], ':cid' => $calId]);
+        $reporterName = $stmtMe->fetchColumn();
+        $reportId = reportCreate($pdo, [
+            'calendar_id' => $calId,
+            'user_id' => (int)$person['id'],
+            'account_id' => $person['account_id'] !== null ? (int)$person['account_id'] : null,
+            'reporter_account_id' => (int)$session['account_id'],
+            'reporter_user_id' => (int)$session['user_id'],
+            'reporter_name' => $reporterName === false ? null : (string)$reporterName,
+            'display_name' => $person['display_name'] !== null ? (string)$person['display_name'] : null,
+            'calendar_title' => (string)($cal['title'] ?? ''),
+            'target_role' => (string)$person['role'],
+            // An organiser's report always goes to the super admin
+            'audience' => REPORTS_AUDIENCE_SUPER,
+            'reason' => $reason,
+            'details' => reportCleanDetails($_POST['report_details'] ?? null),
+        ]);
         logSecurityEvent('USER_REPORTED', ['calendar_id' => $calId, 'user_id' => (int)$person['id'], 'report_id' => $reportId, 'reason' => $reason]);
     }
 
@@ -502,6 +578,203 @@ if ($action === 'manage_calendar_user' && $_SERVER['REQUEST_METHOD'] === 'POST')
         'reported' => $reportId !== null,
         'report_id' => $reportId,
     ]);
+}
+
+/**
+ * Report someone on this calendar (any member). A report about another member goes to the
+ * calendar's organiser; a report about the organiser goes straight to the super admin, because
+ * an organiser cannot decide a complaint about themselves. Reporting never blocks, hides or
+ * deletes anyone: it only records the report.
+ */
+if ($action === 'report_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!reportsTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Reporting is not available yet']);
+    $stmtC = $pdo->prepare("SELECT id, title FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+
+    // A blocked account is refused by membersGate before this action runs
+    $session = requireSession($pdo, $calId);
+    $userId = (int)($_POST['user_id'] ?? 0);
+    if ($userId <= 0) respond(400, ['status' => 'error', 'message' => 'Invalid user ID']);
+    if ($userId === (int)$session['user_id']) {
+        respond(400, ['status' => 'error', 'message' => 'You cannot report yourself.']);
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT id, role, account_id, display_name
+         FROM users WHERE id = :uid AND calendar_id = :cid LIMIT 1"
+    );
+    $stmt->execute([':uid' => $userId, ':cid' => $calId]);
+    $person = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$person) respond(404, ['status' => 'error', 'message' => 'Person not found']);
+
+    $reason = (string)($_POST['reason'] ?? $_POST['report_reason'] ?? '');
+    if (!reportReasonValid($reason)) {
+        respond(400, ['status' => 'error', 'message' => 'Choose a reason for the report.']);
+    }
+
+    $ip = clientIp();
+    enforceActionRateLimit($pdo, $ip, 'rep' . gmdate('YmdH'), 20, 'Too many reports from here. Try again later.');
+
+    $cooldown = max(1, (int)($config['accounts']['report_cooldown_days'] ?? 30));
+    $recent = reportRecentId($pdo, $calId, (int)$session['user_id'], $userId, $cooldown);
+    if ($recent !== null) {
+        respond(409, [
+            'status' => 'error',
+            'code' => 'ALREADY_REPORTED',
+            'message' => 'You already reported this person here. The organiser or super admin is looking at it.',
+        ]);
+    }
+
+    $audience = reportAudienceFor((string)$session['role'], (string)$person['role']);
+
+    $stmtMe = $pdo->prepare("SELECT display_name FROM users WHERE id = :uid AND calendar_id = :cid LIMIT 1");
+    $stmtMe->execute([':uid' => (int)$session['user_id'], ':cid' => $calId]);
+    $reporterName = $stmtMe->fetchColumn();
+
+    $reportId = reportCreate($pdo, [
+        'calendar_id' => $calId,
+        'user_id' => (int)$person['id'],
+        'account_id' => $person['account_id'] !== null ? (int)$person['account_id'] : null,
+        'reporter_account_id' => (int)$session['account_id'],
+        'reporter_user_id' => (int)$session['user_id'],
+        'reporter_name' => $reporterName === false ? null : (string)$reporterName,
+        'display_name' => $person['display_name'] !== null ? (string)$person['display_name'] : null,
+        'calendar_title' => (string)($cal['title'] ?? ''),
+        'target_role' => (string)$person['role'],
+        'audience' => $audience,
+        'reason' => $reason,
+        'details' => reportCleanDetails($_POST['details'] ?? $_POST['report_details'] ?? null),
+    ]);
+
+    logSecurityEvent('USER_REPORTED', [
+        'calendar_id' => $calId,
+        'user_id' => (int)$person['id'],
+        'report_id' => $reportId,
+        'reason' => $reason,
+        'audience' => $audience,
+    ]);
+
+    respond(200, [
+        'status' => 'success',
+        'report_id' => $reportId,
+        'audience' => $audience,
+        'message' => $audience === REPORTS_AUDIENCE_SUPER
+            ? 'Reported to the super admin.'
+            : 'Reported to the organiser of this calendar.',
+    ]);
+}
+
+// Reports waiting for this calendar's organiser (organiser only). No usernames, ever.
+if ($action === 'calendar_reports' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can see reports']);
+    }
+    if (!reportsTablesReady($pdo)) {
+        respond(200, ['status' => 'success', 'available' => false, 'open' => 0, 'reports' => []]);
+    }
+    respond(200, [
+        'status' => 'success',
+        'available' => true,
+        'open' => reportsOpenCountForCalendar($pdo, $calId),
+        'reasons' => reportReasons(),
+        'reports' => reportListForOrganiser($pdo, $calId),
+    ]);
+}
+
+/**
+ * Decide a report only that calendar's organiser can see: dismiss it (silent, nothing is sent
+ * to the reporter), block or remove the reported person, or escalate it to the super admin.
+ */
+if ($action === 'decide_calendar_report' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!reportsTablesReady($pdo)) respond(503, ['status' => 'error', 'message' => 'Reporting is not available yet']);
+    $stmtC = $pdo->prepare("SELECT id FROM calendars WHERE token = :t");
+    $stmtC->execute([':t' => requireToken()]);
+    $cal = $stmtC->fetch();
+    if (!$cal) respond(404, ['status' => 'error', 'message' => 'Calendar not found']);
+    $calId = (int)$cal['id'];
+    $session = requireSession($pdo, $calId);
+    if ($session['role'] !== 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can decide reports']);
+    }
+
+    $reportId = (int)($_POST['report_id'] ?? 0);
+    $decision = (string)($_POST['decision'] ?? '');
+    if ($reportId <= 0) respond(400, ['status' => 'error', 'message' => 'Invalid report ID']);
+    if (!in_array($decision, ['dismiss', 'block', 'remove', 'escalate'], true)) {
+        respond(400, ['status' => 'error', 'message' => 'Choose what to do with the report.']);
+    }
+
+    $report = reportFind($pdo, $reportId);
+    if (!$report) respond(404, ['status' => 'error', 'message' => 'Report not found']);
+    // A calendar's organiser can only decide its own member-to-member reports
+    if ((int)$report['calendar_id'] !== $calId || (string)$report['audience'] !== REPORTS_AUDIENCE_ORGANISER) {
+        respond(404, ['status' => 'error', 'message' => 'Report not found']);
+    }
+    if ((string)$report['status'] !== 'open') {
+        respond(409, ['status' => 'error', 'message' => 'That report is already closed']);
+    }
+
+    $targetId = $report['user_id'] !== null ? (int)$report['user_id'] : 0;
+    $target = null;
+    if ($targetId > 0) {
+        $stmt = $pdo->prepare(
+            "SELECT id, role, display_name FROM users WHERE id = :uid AND calendar_id = :cid LIMIT 1"
+        );
+        $stmt->execute([':uid' => $targetId, ':cid' => $calId]);
+        $target = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    if ($decision === 'escalate') {
+        reportEscalate($pdo, $reportId);
+        logSecurityEvent('REPORT_ESCALATED', ['calendar_id' => $calId, 'report_id' => $reportId]);
+        respond(200, ['status' => 'success', 'open' => reportsOpenCountForCalendar($pdo, $calId)]);
+    }
+
+    if ($decision === 'dismiss') {
+        reportClose($pdo, $reportId, 'dismissed');
+        logSecurityEvent('REPORT_DISMISSED', ['calendar_id' => $calId, 'report_id' => $reportId]);
+        respond(200, ['status' => 'success', 'open' => reportsOpenCountForCalendar($pdo, $calId)]);
+    }
+
+    // block / remove need the person to still be on this calendar
+    if ($target === null) {
+        respond(410, ['status' => 'error', 'message' => 'That person has already left this calendar. Dismiss the report instead.']);
+    }
+    if ((string)$target['role'] === 'admin') {
+        respond(403, ['status' => 'error', 'message' => 'The organiser cannot be changed here.']);
+    }
+
+    if ($decision === 'block') {
+        $pdo->prepare("UPDATE users SET blocked = 1 WHERE id = :uid AND calendar_id = :cid AND role <> 'admin'")
+            ->execute([':uid' => $targetId, ':cid' => $calId]);
+        logSecurityEvent('USER_BLOCKED', ['calendar_id' => $calId, 'user_id' => $targetId, 'blocked' => true]);
+    } else {
+        $pdo->prepare("DELETE FROM availability WHERE calendar_id = :cid AND user_id = :uid")
+            ->execute([':cid' => $calId, ':uid' => $targetId]);
+        $pdo->prepare("DELETE FROM users WHERE id = :uid AND calendar_id = :cid")
+            ->execute([':uid' => $targetId, ':cid' => $calId]);
+        logSecurityEvent('ORGANISER_DELETE_USER', [
+            'actor_id' => (int)$session['user_id'],
+            'target_id' => $targetId,
+            'target_name' => $target['display_name'],
+            'calendar_id' => $calId,
+        ]);
+    }
+
+    reportClose($pdo, $reportId, $decision === 'block' ? 'blocked' : 'removed');
+    $pdo->prepare("UPDATE calendars SET last_activity = NOW() WHERE id = :cid")->execute([':cid' => $calId]);
+    respond(200, ['status' => 'success', 'open' => reportsOpenCountForCalendar($pdo, $calId)]);
 }
 
 // Show or hide the organiser's answers as a coloured edge on everyone's slots (calendar organiser)
@@ -1104,7 +1377,6 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     // Reporting a person when blocking them (migrations/011); the option is hidden until it runs
     $cal['reports_available'] = $members && reportsTablesReady($pdo);
     $cal['report_reasons'] = $cal['reports_available'] ? reportReasons() : null;
-
     unset($cal['group_id'], $cal['group_token'], $cal['group_title'], $cal['show_organiser_marks']);
 
     $cal['access'] = accessPublicInfo($pdo, accessRequirementForCalendar(accessCalendarRow($pdo, $token) ?? []));
@@ -1119,6 +1391,12 @@ if ($action === 'calendar_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         'me' => $me,
         'claimable' => (bool)$stmtCl->fetchColumn(),
     ];
+
+    // Reports waiting for this calendar's organiser (badge on the toolbar), members included so
+    // the People list can offer Report on the people they can actually see
+    $cal['open_reports'] = ($me !== null && $me['role'] === 'admin' && $cal['reports_available'])
+        ? reportsOpenCountForCalendar($pdo, (int)$cal['id'])
+        : 0;
 
     respond(200, ['status' => 'success', 'calendar' => $cal, 'account' => $account]);
 }
@@ -1784,6 +2062,12 @@ if ($action === 'admin_login_account' && $_SERVER['REQUEST_METHOD'] === 'POST') 
     if ($acct === null) {
         respond(401, ['status' => 'error', 'code' => 'ACCOUNT_REQUIRED', 'message' => 'Sign in to When RU Free first.']);
     }
+    // A test user must never reach the panel, even if its id is listed in admin.account_ids:
+    // opening it from the Accounts tab would otherwise hand it full admin rights.
+    if (accountIsAdminCreated($pdo, (int)$acct['id'])) {
+        logSecurityEvent('ADMIN_ACCOUNT_DENIED', ['account_id' => $acct['id'], 'reason' => 'test_user']);
+        respond(403, ['status' => 'error', 'code' => 'NOT_ADMIN', 'message' => 'Test users cannot open the admin panel.']);
+    }
     if (!in_array($acct['id'], $allowed, true)) {
         logSecurityEvent('ADMIN_ACCOUNT_DENIED', ['account_id' => $acct['id']]);
         respond(403, ['status' => 'error', 'code' => 'NOT_ADMIN', 'message' => 'This account is not an admin.']);
@@ -1904,6 +2188,8 @@ if ($action === 'admin_delete_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST'
     // Delete calendar (cascades to users, sessions, availability)
     $stmt = $pdo->prepare("DELETE FROM calendars WHERE id = :id");
     $stmt->execute([':id' => $calendarId]);
+    // Member-to-member reports go with the calendar; reports about an organiser are kept
+    reportsDeleteForCalendar($pdo, $calendarId);
 
     logSecurityEvent('ADMIN_DELETE_CALENDAR', [
         'calendar_id' => $calendarId,
@@ -2240,10 +2526,12 @@ if ($action === 'admin_accounts' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $where = 'WHERE a.username LIKE :q';
         $params[':q'] = $q . '%';
     }
+    $testSelect = adminTestUsersReady($pdo) ? ', a.created_by_admin' : ', 0 AS created_by_admin';
     $stmt = $pdo->prepare(
         "SELECT a.id, a.username, a.display_name, a.created_at, a.last_seen_at,
                 (SELECT COUNT(*) FROM users u WHERE u.account_id = a.id) AS calendar_count,
                 (SELECT COUNT(*) FROM `groups` g WHERE g.organiser_account_id = a.id) AS hub_count
+                {$testSelect}
          FROM accounts a {$where}
          ORDER BY a.last_seen_at DESC LIMIT 100"
     );
@@ -2258,9 +2546,144 @@ if ($action === 'admin_accounts' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             'last_seen_at' => (string)$r['last_seen_at'],
             'calendar_count' => (int)$r['calendar_count'],
             'hub_count' => (int)$r['hub_count'],
+            'is_test' => (int)$r['created_by_admin'] === 1,
         ];
     }
     respond(200, ['status' => 'success', 'available' => true, 'methods' => $methods, 'totals' => $totals, 'accounts' => $accounts]);
+}
+
+// -------------------------
+// Test users: accounts created from this panel, used only for testing
+// -------------------------
+
+/** List the test users. */
+if ($action === 'admin_test_users' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    requireAdminSession();
+    accountRequireTables($pdo);
+    if (!adminTestUsersReady($pdo)) {
+        respond(200, ['status' => 'success', 'available' => false, 'users' => []]);
+    }
+    respond(200, ['status' => 'success', 'available' => true, 'users' => accountListTestUsers($pdo)]);
+}
+
+/**
+ * Create one test user, or a numbered batch (super admin only). A test user has no sign-in
+ * method of its own, so it can only ever be entered from this panel.
+ */
+if ($action === 'admin_create_test_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAdminSession();
+    requireCsrf();
+    accountRequireTables($pdo);
+    adminTestUsersRequire($pdo);
+    enforceActionRateLimit($pdo, clientIp(), 'atu' . gmdate('YmdH'), 60, 'Too many test users created from here. Try again later.');
+
+    // allowReserved: test users may want names like "admin" or "test" for realistic testing
+    $username = accountNormaliseUsername($_POST['username'] ?? '', true);
+    if ($username === null) {
+        respond(400, ['status' => 'error', 'message' => 'Username must be 3-20 characters: a-z, 0-9 or _.']);
+    }
+    $displayName = accountNormaliseName($_POST['display_name'] ?? '');
+    if ($displayName === null) {
+        respond(400, ['status' => 'error', 'message' => "Name must use letters, numbers, spaces, ' or - (up to 32)."]);
+    }
+
+    $count = (int)($_POST['count'] ?? 1);
+    if ($count < 1) $count = 1;
+    if ($count > 10) $count = 10;
+
+    $created = [];
+    for ($i = 1; $i <= $count; $i++) {
+        $uname = accountFreeTestUsername($pdo, $username . ($count > 1 ? (string)$i : ''));
+        if ($uname === null) {
+            respond(500, ['status' => 'error', 'message' => 'Could not find a free username. Try a different one.']);
+        }
+        // Number the display name too, so a batch stays readable in the list below
+        $dname = $count > 1 ? (accountNormaliseName($displayName . ' ' . $i) ?? $displayName) : $displayName;
+        $id = accountCreateTestUser($pdo, $uname, $dname);
+        $created[] = ['id' => $id, 'username' => $uname, 'display_name' => $dname];
+    }
+
+    logSecurityEvent('ADMIN_CREATE_TEST_USER', ['created' => count($created), 'ids' => array_column($created, 'id')]);
+    respond(200, ['status' => 'success', 'created' => $created, 'users' => accountListTestUsers($pdo)]);
+}
+
+/** Remove every test user in one go (super admin only). */
+if ($action === 'admin_delete_test_users' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAdminSession();
+    requireCsrf();
+    accountRequireTables($pdo);
+    adminTestUsersRequire($pdo);
+
+    $ids = accountTestUserIds($pdo);
+    foreach ($ids as $id) {
+        accountDelete($pdo, $id);
+    }
+    logSecurityEvent('ADMIN_DELETE_TEST_USERS', ['deleted' => count($ids)]);
+    respond(200, ['status' => 'success', 'deleted' => count($ids)]);
+}
+
+/**
+ * Open a test user in this browser (super admin only). Only accounts flagged created_by_admin
+ * can be opened, so no real person's account is reachable this way.
+ */
+if ($action === 'admin_impersonate' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAdminSession();
+    requireCsrf();
+    accountRequireTables($pdo);
+    adminTestUsersRequire($pdo);
+
+    $targetId = (int)($_POST['account_id'] ?? 0);
+    if ($targetId <= 0) respond(400, ['status' => 'error', 'message' => 'Invalid account ID']);
+    if (!accountIsAdminCreated($pdo, $targetId)) {
+        logSecurityEvent('ADMIN_IMPERSONATE_DENIED', ['account_id' => $targetId]);
+        respond(403, ['status' => 'error', 'message' => 'Only test users added from this panel can be opened.']);
+    }
+
+    // Remember where to return. The account cookie swap does not touch the PHP session, which
+    // holds both the admin token and this marker. A password-only admin has no account to
+    // return to, so there is nothing to remember and "return" just signs the test user out.
+    // Only set it once, and never to another test user: chaining test users without returning
+    // first must still remember the admin's own account, not the previous test user.
+    $current = accountCurrent($pdo);
+    $currentIsTest = $current !== null && accountIsAdminCreated($pdo, (int)$current['id']);
+    if ($current !== null && !$currentIsTest && empty($_SESSION['wruf_impersonator'])) {
+        $_SESSION['wruf_impersonator'] = (int)$current['id'];
+    }
+
+    accountCreateSession($pdo, $targetId);
+    logSecurityEvent('ADMIN_IMPERSONATE', ['account_id' => $targetId]);
+    respond(200, ['status' => 'success', 'account_id' => $targetId]);
+}
+
+/**
+ * Leave the test user and hand the browser back to the admin's own account.
+ * Deliberately does not require an admin session: the panel is normally open in the same tab
+ * during impersonation, but a new tab has no admin token and should still be able to return.
+ * Authority comes from the session marker set by admin_impersonate, and the worst case for
+ * anyone else is simply signing the test user out.
+ */
+if ($action === 'admin_impersonate_end' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    accountRequireTables($pdo);
+
+    startSecureSession();
+    $back = (int)($_SESSION['wruf_impersonator'] ?? 0);
+    unset($_SESSION['wruf_impersonator']);
+
+    accountLogout($pdo);
+
+    if ($back > 0) {
+        $stmt = $pdo->prepare("SELECT 1 FROM accounts WHERE id = :id");
+        $stmt->execute([':id' => $back]);
+        if ($stmt->fetchColumn()) {
+            accountCreateSession($pdo, $back);
+            logSecurityEvent('ADMIN_IMPERSONATE_END', ['account_id' => $back]);
+            respond(200, ['status' => 'success', 'restored' => true]);
+        }
+    }
+
+    logSecurityEvent('ADMIN_IMPERSONATE_END', ['account_id' => 0]);
+    respond(200, ['status' => 'success', 'restored' => false]);
 }
 
 /**
@@ -2309,10 +2732,11 @@ if ($action === 'admin_report_decide' && $_SERVER['REQUEST_METHOD'] === 'POST') 
         if (!$stmt->fetchColumn()) respond(404, ['status' => 'error', 'message' => 'That account no longer exists']);
         accountDelete($pdo, $accountId);
         logSecurityEvent('ADMIN_REPORT_DELETE_ACCOUNT', ['report_id' => $reportId, 'account_id' => $accountId]);
+        reportClose($pdo, $reportId, 'removed');
     } else {
         logSecurityEvent('ADMIN_REPORT_DISMISSED', ['report_id' => $reportId]);
+        reportClose($pdo, $reportId, 'dismissed');
     }
-    reportClose($pdo, $reportId);
     respond(200, ['status' => 'success', 'open' => reportsOpenCount($pdo)]);
 }
 
@@ -2501,6 +2925,8 @@ if ($action === 'get_site_config' && $_SERVER['REQUEST_METHOD'] === 'GET') {
  *  - options.defaults: [{label, weight}]           max 5
  *  - dates.max_range_days: int 1-365
  *  - dates.presets: [{key, label, days}]           max 20
+ *  - examples.items: [{card, url, label?, icon?, emoji?}] max 40
+ *                                                   (Templates page example buttons, migration-free)
  *  - retention.inactive_days: int 1-3650           (calendar auto-delete threshold)
  *  - retention.hub_inactive_days: int 1-3650       (Hub auto-delete threshold)
  */
@@ -2532,6 +2958,12 @@ if ($action === 'admin_save_config' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $sanitiseKey = function($v): string {
         // Keys stored in JSON: alphanumeric + underscores only
         return preg_replace('/[^a-zA-Z0-9_]/', '', (string)($v ?? ''));
+    };
+
+    // Template card keys are slug-style ("team-name-vote") and must keep their hyphens,
+    // so they cannot use $sanitiseKey above.
+    $sanitiseCardKey = function($v): string {
+        return substr(preg_replace('/[^a-z0-9_-]/', '', strtolower((string)($v ?? ''))), 0, 40);
     };
 
     $cfg = [];
@@ -2626,6 +3058,38 @@ if ($action === 'admin_save_config' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'max_range_days' => $maxRange,
         'presets'        => $datePresets,
     ];
+
+    // --- template examples (Templates page) ---
+    // Each item adds an "Example" button to one card on ideas.html, matched by the card's
+    // data-tpl key. Saved into site_config, so no migration is needed.
+    $rawExampleItems = is_array($incoming['examples']['items'] ?? null) ? $incoming['examples']['items'] : [];
+    $exampleItems = [];
+    foreach (array_slice($rawExampleItems, 0, 40) as $ex) {
+        if (!is_array($ex)) continue;
+        $card  = $sanitiseCardKey($ex['card'] ?? '');
+        $label = $sanitiseStr($ex['label'] ?? '', 30);
+        $icon  = mb_substr(preg_replace('/[^a-z0-9_]/', '', strtolower((string)($ex['icon'] ?? ''))), 0, 40);
+        $emoji = mb_substr(trim((string)($ex['emoji'] ?? '')), 0, 8);
+        $url   = mb_substr(preg_replace('/[\x00-\x1F\x7F]/', '', trim((string)($ex['url'] ?? ''))), 0, 300);
+
+        // Absolute links must be http(s) and well formed; anything else must be a same-site
+        // relative path. This is what blocks javascript: and data: URLs, which the page would
+        // otherwise make clickable when it sets the button's href.
+        if ($url !== '' && preg_match('#^[a-z][a-z0-9+.-]*:#i', $url)) {
+            if (!preg_match('#^https?://#i', $url) || filter_var($url, FILTER_VALIDATE_URL) === false) continue;
+        } elseif ($url !== '' && !preg_match('{^[a-zA-Z0-9_./?=&%#~-]+$}', $url)) {
+            continue;
+        }
+
+        if ($card === '' || $url === '') continue;
+
+        $item = ['card' => $card, 'url' => $url];
+        if ($label !== '') $item['label'] = $label;
+        if ($icon  !== '') $item['icon']  = $icon;
+        if ($emoji !== '') $item['emoji'] = $emoji;
+        $exampleItems[] = $item;
+    }
+    $cfg['examples'] = ['items' => $exampleItems];
 
     // --- retention (auto-delete) ---
     // inactive_days: number of days a non-permanent calendar can sit without

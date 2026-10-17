@@ -4,6 +4,27 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
+## 2026-10-17 - Reports for everyone, test users, profile actions
+
+### Added
+- **Reporting for every member:** the People list now has a flag on each person you can see. A report about another member goes to that calendar's organiser, who sees who reported and can **Dismiss** (silent), **Block**, **Remove** or **Send to super admin**. A report about the organiser goes straight to the super admin, because an organiser cannot decide a complaint about themselves. Waiting reports show as a count on a new **Reports** button in the calendar toolbar
+- **Profile page actions:** organisers get **Delete calendar** on each calendar they organise, and members get **Leave calendar**, which removes their name and every choice they made. Both confirm first; the calendar stays for everyone else when you leave
+- **Test users in the admin panel:** the Accounts tab can create up to 10 test accounts at a time (no sign-in method of their own), open one in this browser with **Open as**, and return with **Return to my account**. The same marker shows a banner on every tab
+- **Template examples from the Setup tab:** an **Example** button can be attached to each template card on `ideas.html`, with its own link, label, icon and access emoji, instead of editing the page by hand
+
+### Changed
+- **Reports survive the right things:** member-to-member reports are deleted with their calendar, but reports about an organiser are kept after the calendar is gone, so deleting a calendar can never erase a complaint about the person who deleted it
+- The organiser's **Manage person** menu still reports to the super admin, as before; a super admin's Reports tab now shows the reporter's name, the calendar title snapshot and which reports were escalated
+- Profile page copy: **Your default name on calendars**, "Only you can see it; it is never shown on calendars", and an **empty Hubs** line that links to creating one
+- Templates page heading for the sports card is now **Weekday Sports Tryouts**
+
+### API
+- New `report_user` (any joined member), `calendar_reports` and `decide_calendar_report` (organiser); `calendar_meta` adds `open_reports`
+- New `account_leave_calendar` and `account_delete_calendar`; new `admin_test_users`, `admin_create_test_user`, `admin_delete_test_users`, `admin_impersonate` and `admin_impersonate_end`
+- `migrations/015_admin_test_users.sql` adds `accounts.created_by_admin`; `migrations/016_report_audience.sql` adds `reports.audience`, `target_role`, `reporter_user_id`, `reporter_name`, `calendar_title` and `outcome`
+
+---
+
 ## 2026-10-12 - Option controls on the create page, Hidden names opt-out
 
 ### Changed

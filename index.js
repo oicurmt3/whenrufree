@@ -1230,7 +1230,7 @@ function makeStatusRow(initialLabel='', initialWeight=null, initialColor=null){
   });
   defCol.appendChild(defBtn);
 
-  input.addEventListener('input', validateStatusesUI);
+  input.addEventListener('input', () => { validateStatusesUI(); paintStatusDefaults(); });
   colorPicker.addEventListener('input', () => {
     // Mark that user has manually set this color (prevents auto-reassignment on reorder)
     colorPicker.dataset.userSet = 'true';
@@ -1293,8 +1293,9 @@ function getDefaultStatus(){
 }
 
 /**
- * Paints the default-option boxes and the "No option" row: ticking any box hides the row, because
- * that option is what every Slot begins with, so there is no un-answered state left to colour.
+ * Paints the default-option boxes, the "No option" row and the state line under the Options:
+ * ticking a box hides the row, because that option is what every Slot begins with, so there is no
+ * un-answered state left to colour. The state line stays, and says the same thing in words.
  */
 function paintStatusDefaults(){
   statusWrap.querySelectorAll('.status-row').forEach(row => {
@@ -1307,14 +1308,40 @@ function paintStatusDefaults(){
     const icon = btn.querySelector('.material-symbols-outlined');
     if (icon) icon.textContent = on ? 'check_box' : 'check_box_outline_blank';
   });
+  // With a Default option set no Slot is ever un-answered, so the "No option" colour has nothing
+  // left to apply to.
+  const unAnswered = getDefaultStatus() === 0;
+  // State line under the Options: the same wording the settings modal used, so the case where no
+  // Default option is ticked is never silent. Its icon is the same check box the rows' toggles use,
+  // so it changes with the choice. It stays put when the "No option" row hides, because then it
+  // says what every Slot starts as instead.
+  const hintIcon = document.getElementById('statusNullHintIcon');
+  if (hintIcon) hintIcon.textContent = unAnswered ? 'check_box_outline_blank' : 'check_box';
+  const hintText = document.getElementById('statusNullHintText');
+  if (hintText){
+    // Name the chosen option as it is typed, falling back to its position if it has no name yet
+    let label = '';
+    if (!unAnswered && defaultRowEl){
+      const input = defaultRowEl.querySelector('.label-input');
+      label = ((input && input.value) || '').trim() || `option ${getDefaultStatus()}`;
+    }
+    hintText.textContent = unAnswered
+      ? 'Slots start un-answered.'
+      : `Every Slot starts as ${label}.`;
+  }
+  // The row itself only applies while no Option is the default, since then there is nothing left
+  // un-answered to colour.
   const nullRow = document.getElementById('statusNullRow');
-  if (nullRow) nullRow.classList.toggle('hideme', getDefaultStatus() !== 0);
+  if (nullRow) nullRow.classList.toggle('hideme', !unAnswered);
 }
 
-/** The "No option" row always sits after the Options, never among them. */
+/** The "No option" row and its state line always sit after the Options, never among them. */
 function keepNullRowLast(){
   const nullRow = document.getElementById('statusNullRow');
   if (nullRow) statusWrap.appendChild(nullRow);
+  // The state line follows the row, so it stays directly under the Options
+  const nullHint = document.getElementById('statusNullHint');
+  if (nullHint) statusWrap.appendChild(nullHint);
 }
 
 function setStatuses(items){
@@ -2238,10 +2265,10 @@ function showTemplateBanner() {
     <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; padding:4px; font-size:1.2rem; line-height:1; color:#1565c0;">&times;</button>
   `;
   
-  // Insert after the first warning div
-  const firstWarn = document.querySelector('.card > .warn');
-  if (firstWarn) {
-    firstWarn.parentNode.insertBefore(banner, firstWarn);
+  // Insert above the first info box (a stable card child)
+  const anchor = document.querySelector('.card > .info-box');
+  if (anchor) {
+    anchor.parentNode.insertBefore(banner, anchor);
   }
 }
 

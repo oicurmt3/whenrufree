@@ -56,6 +56,10 @@ ALTER TABLE calendars
 
 14. **Remove Invite only** - run `migrations/014_drop_invite_only.sql` **after** uploading the code that no longer uses it (drops `access_requests` and the `invite_only` columns on `calendars` and `groups`). Safe to re-run. `calendars.hide_names` and `users.blocked` from migration 009 stay.
 
+15. **Test users** - run `migrations/015_admin_test_users.sql` (adds `accounts.created_by_admin`, default 0). Safe to re-run. Until it runs, sign-in is unaffected; the admin **Test users** section says to run the migration.
+
+16. **Reports for everyone** - run `migrations/016_report_audience.sql` (adds `reports.audience`, `target_role`, `reporter_user_id`, `reporter_name`, `calendar_title`, `outcome` and an index). Safe to re-run. Until it runs, member reporting and the organiser **Reports** inbox are hidden and the organiser's **Manage person** menu no longer offers Report; blocking, deleting and the existing super-admin reports keep working.
+
 And fix the known column width issue:
 
 ```sql
@@ -222,6 +226,7 @@ All files must use plain ASCII only. No em dashes, curly quotes, or Unicode char
 8. **2026-10-09 release** (signed-out home page, People view with eye toggle, rename in People, organiser marks, compact account badge, template privacy / join): run migration 010, then upload `api.php`, `includes/data.php`, `includes/security.php`, `index.html`, `hub.html`, `calendar.html`, `account.html`, `admin.html`, `go/index.html`, `faq.html`, `guide.html`, `ideas.html`, `privacy.html`, `account-core.js`, `account.css`, `index.js`, `hub.js`, `admin-setup.js`, `calendar-core.js`, `calendar-users.js`, `calendar-grid.js`, `calendar-main.js` and `calendar.css`. No config changes.
 9. **2026-10-10 release** (Manage person menu, reports, private usernames): run migration 011, then upload the same files as step 8 plus `includes/members.php`, `includes/reports.php`, `cleanup.php`, `calendar-core.js`, `admin-reports.js`, `admin-core.js`, `admin.css` and `account.js`. No config changes.
 10. **Invite only removal** (the link is the only access control): run migration 014, then upload `api.php`, `cleanup.php`, `includes/access.php`, `includes/accounts.php`, `includes/members.php`, `includes/security.php`, `index.html`, `index.js`, `index.css`, `calendar.html`, `calendar-core.js`, `calendar-users.js`, `calendar.css`, `hub.html`, `hub.js`, `hub.css`, `account.html`, `account-core.js`, `account.js`, `account.css`, `admin-core.js`, `admin-calendars.js`, `admin-hubs.js`, `admin.css`, `faq.html`, `guide.html`, `ideas.html` and `privacy.html`. No config changes.
+11. **2026-10-17 release** (reports for everyone, profile leave / delete, admin test users, template examples in Setup): run migrations 015 and 016, then upload `api.php`, `cleanup.php`, `includes/accounts.php`, `includes/data.php`, `includes/reports.php`, `includes/security.php`, `calendar.html`, `calendar.css`, `calendar-core.js`, `calendar-users.js`, `calendar-main.js`, `account.html`, `account.css`, `account-core.js`, `account.js`, `admin.html`, `admin.css`, `admin-accounts.js`, `admin-reports.js`, `admin-setup.js`, `index.html`, `index.js`, `index.css`, `page.css`, `hub.html`, `go/index.html`, `ideas.html`, `faq.html`, `guide.html` and `privacy.html`. No config changes.
 
 ## Monitoring
 

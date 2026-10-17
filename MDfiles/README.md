@@ -12,11 +12,12 @@ An organiser signs in, creates a calendar with custom time slots, date ranges, a
 
 - Sign in with Google (openid only), Facebook (user ID only) or a passkey (fingerprint, face or screen lock). Only a keyed hash of the provider's ID is stored - never an email, name or photo
 - Private unique username; a profile name used on calendars by default, with a per-calendar override
-- Profile page: edit your name, manage sign-in methods, see all your calendars and Hubs, sign out, delete your account
+- Profile page: edit your name, manage sign-in methods, see all your calendars and Hubs, sign out, delete your account; organisers can delete a calendar and members can leave one (their name and choices are removed)
 - No PINs: the unique link is the invite, and who you are comes from your account. Names and Hubs from before accounts can be claimed once with their old PIN
 - Optional access emoji: the organiser picks 1 of 35 emoji for a calendar or Hub as an invite confirmation; each account picks it once (calendars in a Hub use the Hub's emoji unless they have their own)
 - Anyone signed in with the link can open and join a calendar or Hub; the link is the only access control, so share it only with people you trust
 - Organisers can block anyone on a calendar; their access is paused and their answers are left out until unblocked
+- Reporting: any member can report another member to the organiser (who sees who reported and decides silently, blocks, removes or escalates); a report about the organiser goes straight to the super admin, so it can never be dismissed by the person it is about
 - Three privacy modes: Open (everyone sees all), Hidden (only organiser sees individual choices), Blind (nobody sees individual choices). Names are private on Blind, and on Hidden unless the organiser ticks "Show everyone who has joined (but not their choices)"
 - Customisable time slots (1-6), status options (1-5 with colours and weights), and date ranges (up to 360 days)
 - Tick an option as the default (every slot starts there), or leave all options unticked and pick one of five greys for slots nobody has answered
@@ -34,8 +35,8 @@ An organiser signs in, creates a calendar with custom time slots, date ranges, a
 - Mobile-responsive with 44x44px touch targets
 - Automatic cleanup of inactive calendars, Hubs and accounts (configurable retention)
 - Up to 17 category icons (Material Symbols Outlined)
-- **Calendar Hubs:** one private link lists multiple calendars; open create-in-Hub; managed by the account that created it
-- Super admin panel: opens with the admin password, or straight away for accounts listed in `config.php` `admin.account_ids`
+- Calendar Hubs: one private link lists multiple calendars; open create-in-Hub; managed by the account that created it
+- Super admin panel: opens with the admin password, or straight away for accounts listed in `config.php` `admin.account_ids`; manages calendars, Hubs, accounts, reports, permanent retention and site config, and can create test users to open in this browser (no separate sign-in)
 
 ## Tech Stack
 
@@ -66,12 +67,12 @@ account.css      - Sign-in panel, badge and profile page styles
 passkey.js       - Passkey browser helper (window.Passkey)
 emoji.js         - Access emoji list, picker, gate popup and grant storage (window.AccessEmoji)
 emoji.css        - Access emoji picker / gate styles
-includes/        - Server-only PHP helpers for api.php (http, data, security, sessions, hubs, accounts, oauth, webauthn, lockout, access, booking, members); blocked by .htaccess
+includes/        - Server-only PHP helpers for api.php (http, data, security, sessions, hubs, accounts, oauth, webauthn, lockout, access, booking, members, reports); blocked by .htaccess
 migrations/      - SQL migrations (blocked from the web)
 admin.html       - Super admin panel
 admin-*.js       - Admin panel logic, 5 files loaded in order: core, calendars, hubs, accounts, setup
 admin.css        - Admin panel styles
-api.php          - All backend endpoints (~2,400 lines); helpers live in includes/
+api.php          - All backend endpoints (~3,100 lines); helpers live in includes/
 cleanup.php      - Cron maintenance script
 _htaccess        - Apache security rules
 guide.html       - User help page
@@ -84,7 +85,7 @@ robots.txt       - Search engine directives
 
 ## Database Tables
 
-- `accounts` - Private username, profile name, created / last seen
+- `accounts` - Private username, profile name, created / last seen (`created_by_admin` flags test users)
 - `account_identities` - Google / Facebook logins as keyed hashes of the provider's user ID
 - `account_passkeys` - Passkey public keys
 - `account_sessions` - Hashed 30-day sign-in sessions
@@ -96,6 +97,7 @@ robots.txt       - Search engine directives
 - `availability` - Status selections per user/date/slot
 - `access_grants` - Hashed 30-day grants issued after the right access emoji is picked
 - `access_attempts` - Wrong emoji picks per IP and calendar/Hub
+- `reports` - Someone reported on a calendar: a snapshot of their name, the reason and details, the reporter's name, and the audience (`organiser` or `super`) that decides it
 - `api_rate_limit` - Per-IP request throttling
 
 The old `user_sessions`, `group_sessions`, `user_passkeys` and `group_passkeys` tables are dropped by `migrations/008_drop_pins.sql` about 90 days after accounts go live.
@@ -109,6 +111,7 @@ The old `user_sessions`, `group_sessions`, `user_passkeys` and `group_passkeys` 
 - Passkeys: user verification required, origin + RP ID checked, single-use challenges, sign-counter replay detection
 - Old PIN claims: password_verify; 5 wrong PINs lock for 5 min, then 15 min, 2 hours, 2 days
 - Block: checked server-side after the emoji on every calendar request; a blocked person gets 403 `BLOCKED` and their answers are left out of views and Best Match
+- Reports: routed server-side, never by the client. A report about another member goes to the calendar's organiser (`audience = 'organiser'`); a report about the organiser goes to the super admin (`audience = 'super'`), whose queue also keeps reports after the calendar is deleted. Organiser inboxes never see usernames; only the super admin panel does
 - Access emoji: checked server-side before every calendar/Hub request; 3 wrong picks lock that IP for 5 min, then 15 min, 2 hours, 2 days; max 20 wrong picks and 30 unknown codes per IP per hour; grants stored as SHA-256 hashes; the emoji is never sent to visitors
 - Calendar tokens: 8-char URL-safe (new) or 48-char (legacy)
 - All dynamic HTML output escaped

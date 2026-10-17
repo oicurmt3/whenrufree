@@ -78,7 +78,7 @@ When an organiser locks in a date+slot, the calendar enters a "frozen" state. Th
 
 ## File-by-File Guide
 
-### api.php (~2,450 lines) and includes/
+### api.php (~3,100 lines) and includes/
 
 `api.php` is the single entry point and holds every endpoint. All endpoints are `if ($action === '...')` blocks that fall through to a final `respond(404, ...)`. No classes, no routing library. Shared helpers live in `includes/` (blocked from the web by `includes/.htaccess`), loaded by one `require_once` block near the top of `api.php`:
 
@@ -93,6 +93,7 @@ When an organiser locks in a date+slot, the calendar enters a "frozen" state. Th
 | `includes/oauth.php` | Google / Facebook sign-in: provider config, signed state cookie, authorize URL, code exchange, callback |
 | `includes/webauthn.php`, `lockout.php`, `access.php`, `booking.php` | Account passkeys, escalating claim lockout, access emoji, booking rules (see below) |
 | `includes/members.php` | Block and private names: `membersGate()`, `membersCalendarBlocked()`, `membersNamesHidden()` (see below) |
+| `includes/reports.php` | Reports: `reportReasons()`, `reportAudienceFor()` (who decides), `reportCreate()`, `reportList()` (super admin), `reportListForOrganiser()`, `reportsOpenCount*()`, `reportRecentId()` (dedupe + cooldown), `reportClose()`, `reportEscalate()`, `reportsDeleteForCalendar()` (see below) |
 
 Each include declares `strict_types=1`, like `api.php`. `logSecurityEvent()` writes to `grape_private/logs/` next to the webroot (the path is relative to `includes/`, so it uses `dirname(__DIR__)`).
 
@@ -114,7 +115,7 @@ The claim lockout lives in `includes/lockout.php` (`pinLockoutCheck`, `pinLockou
 The largest and most complex part. Loaded by `calendar.html` after `passkey.js`, `account-core.js` and `emoji.js`, in this order (see "Split scripts" above):
 
 1. **calendar-core.js**: constants and config (TIME_SLOTS, STATUS_OPTIONS, CATEGORY_META, strength palette), utilities, pending changes queue and autosave, date helpers, the `els` object (caches all querySelector calls), the single `state` object, CSRF, access emoji gate and account errors (`accessFetch`), `apiGet` / `apiPost`
-2. **calendar-users.js**: `loadCalendarMeta` (+ `applyMe`), `loadUsers`, People modal (your name first with a `person_edit` rename button, claimable old names, an eye button to show / hide someone's calendar read only via `toggleUserView` / `openUserView` / `closeUserView`), delete, submit and user UI, Hub bar, organiser Settings (access emoji, organiser marks), join / rename modal (`openUserModal`, `saveMyName`), claim modal (`openClaimModal`), `promptJoin`, `ensureAuthedForUser`
+2. **calendar-users.js**: `loadCalendarMeta` (+ `applyMe`), `loadUsers`, People modal (your name first with a `person_edit` rename button, claimable old names, an eye button to show / hide someone's calendar read only via `toggleUserView` / `openUserView` / `closeUserView`, and a flag button on reportable people), reporting (`canReportUser`, `openReportModal`, `submitReport`) and the organiser's report inbox (`updateReportsButton`, `loadCalendarReports`, `decideCalendarReport`), delete, submit and user UI, Hub bar, organiser Settings (access emoji, organiser marks), join / rename modal (`openUserModal`, `saveMyName`), claim modal (`openClaimModal`), `promptJoin`, `ensureAuthedForUser`
 3. **calendar-grid.js**: availability loading, slot status, date filter, `renderDateRangeSkeleton`, past dates, `refreshCalendarValues`, `cycleStatus`, `onSlotClick`, `savePending` and reset operations
 4. **calendar-rank.js**: calendar links, share, `buildRankScores`, sort / limit toggles, organiser message, chosen / frozen state, `renderRankings`, `debouncedRank`
 5. **calendar-booking.js**: booking mode (cells, caps, Bookings card, close / reopen, polling)
@@ -122,9 +123,9 @@ The largest and most complex part. Loaded by `calendar.html` after `passkey.js`,
 
 Function-by-function locations are in `js_functions.md`.
 
-### admin-*.js (~2,700 lines, 5 files)
+### admin-*.js (~3,000 lines, 5 files)
 
-Loaded by `admin.html` in this order: `admin-core.js` (password or account login, API helper, utilities, tabs), `admin-calendars.js` (Calendars tab and Users expander; unclaimed old names show dashed with "not claimed"), `admin-hubs.js` (Hubs tab), `admin-accounts.js` (Accounts tab: provider status, totals incl. unclaimed names / Hubs, username search, delete account), `admin-setup.js` (Setup tab).
+Loaded by `admin.html` in this order: `admin-core.js` (password or account login, API helper, utilities, tabs, the return-from-test-user call on startup), `admin-calendars.js` (Calendars tab and Users expander; unclaimed old names show dashed with "not claimed"), `admin-hubs.js` (Hubs tab), `admin-accounts.js` (Accounts tab: provider status, totals incl. unclaimed names / Hubs, username search, delete account, test users and **Open as**), `admin-setup.js` (Setup tab, including the Example buttons on the template cards).
 
 ### account-core.js, account.js (~620 lines)
 
@@ -162,7 +163,7 @@ CLI-only cron script. Operations include:
 8. Reset `lockout_level` after `pin_lockout.reset_after_days` (default 30) without a lockout; skipped until migration 002 is applied
 9. Delete expired / orphaned `access_grants` and `access_attempts` rows unlocked and idle for `access_emoji.attempts_keep_days` (default 30); skipped until migration 003 is applied
 10. Accounts: delete expired `account_sessions`, passkey sign-ups abandoned before finishing, `account_access` rows for deleted calendars/Hubs, and accounts unused for `accounts.inactive_days` (default 730) that have no names and no Hubs; skipped until migration 007 is applied
-11. Reports: delete closed reports older than `accounts.reports_keep_days` (default 180); open reports are never touched; skipped until migration 011 is applied
+11. Reports: delete `organiser`-audience reports whose calendar is gone (super-audience reports are kept), and closed reports older than `accounts.reports_keep_days` (default 180); open reports are never touched; skipped until migrations 011 and 016 are applied
 
 The inactivity default is 40 days everywhere (cleanup.php, admin Setup and `admin_save_config`); a value saved in Admin > Setup wins.
 
@@ -293,6 +294,22 @@ See the "Adding a Category" Word document. Two files: `CATEGORY_META` in calenda
 - **Default option (migration 013):** `calendars.default_status`, the 1-based option every slot starts on, set only in `create_calendar` and never for booking calendars. `calendar_meta` returns `default_status` and `default_status_available`; `defaultSlotStatus()` / `effectiveSlotStatus()` (calendar-core.js) draw it on un-answered slots. It never counts in Best Match - only answers the person actually sent are ranked.
 - **Create page:** the options list (`#statusWrap`) ends with a static **No option** row (`#statusNullRow`) styled like an option row; each real option row has a `.default-toggle` checkbox. `paintStatusDefaults()` keeps one default and hides the No option row while a default is set (no slot starts un-answered); `keepNullRowLast()` keeps the row at the bottom on add / reorder; `initNullColorPicker()` runs the five-grey popover. `createCalendar()` sends `default_status` when a box is ticked, otherwise `null_color` when it is not the default grey.
 - **Not changeable:** the Calendar settings modal no longer offers un-answered colour or default status, and the `set_null_color` / `set_slot_default` endpoints were removed.
+
+## Built: Reports (members and organisers)
+
+- **Two audiences, decided on the server:** `reportAudienceFor($reporterRole, $targetRole)` returns `super` whenever either side is the organiser, otherwise `organiser`. The client never chooses it. A member report about another member belongs to that calendar's organiser; a report about the organiser goes straight to the super admin, who also keeps receiving the organiser's own reports from the Manage person menu.
+- **Reporting a person:** `report_user` (any joined account, sensitive POST, 20 an hour per IP) records a snapshot: the name the person is using, their account id, the reporter's name on that calendar, the calendar title, the reason and optional details. It never blocks, hides or deletes anyone. `reportRecentId()` enforces one open report per reporter and person, and a cooldown after a decision (`accounts.report_cooldown_days`, default 30) before the same pair can report again; a duplicate is 409 `ALREADY_REPORTED`.
+- **Organiser inbox:** `calendar_reports` returns only this calendar's open `organiser` reports, oldest first, with the reporter's name and never a username or account. The toolbar flag button and its count come from `calendar_meta.open_reports`. `decide_calendar_report` accepts `dismiss` (silent), `block`, `remove` or `escalate`; it checks the report belongs to that calendar and its audience is `organiser`, refuses the organiser as the target, and answers 410 if the person has already left. Escalating flips `audience` to `super` and leaves the report open, so it joins the super admin queue.
+- **Lifetime:** `reportsDeleteForCalendar()` removes `organiser` reports when the calendar goes (profile delete, admin delete, account delete), and cleanup.php step 11 removes any left orphaned plus closed reports older than `reports_keep_days` (default 180). `super` reports are never deleted with a calendar: a complaint about an organiser must survive the calendar being deleted.
+- **Self-disabling:** `reportsTablesReady()` probes for the 016 columns as well as the 011 table. Without them, `reports_available` is false, no flag or inbox appears and the organiser's Manage menu hides its report rows; blocking still works.
+- **Browser:** `calendar-users.js` (`canReportUser()`, `openReportModal()`, `submitReport()`, `updateReportsButton()`, `loadCalendarReports()`, `renderCalendarReports()`, `decideCalendarReport()`), `calendar.html` (`#reportUserModal`, `#reportsModal`, `#reportsBtn`), `calendar.css` (`.user-select-report`, `.icon-badge`, `.report-item*`). `admin-reports.js` shows the reporter snapshot, the `escalated` tag, and links a report to its calendar only when the calendar still exists.
+
+## Built: Test users (admin panel)
+
+- **What they are:** accounts flagged `accounts.created_by_admin = 1` (migration 015), created only from the Accounts tab. They have no OAuth identity and no passkey, and `accountIsAdminCreated()` makes the OAuth, passkey and admin-account sign-in paths refuse them, so the only way in is `admin_impersonate`.
+- **Opening one:** `admin_impersonate` requires an admin session and a test-user target (403 otherwise, logged), swaps the `wruf_account` cookie and stores the admin's own account id in `$_SESSION['wruf_impersonator']` (set once; never overwritten by a previous test user). `admin_impersonate_end` deliberately needs only CSRF, so a new tab can still return: it restores that account, or signs the test user out when the admin signed in with the password only. `account-core.js` calls it on startup when the marker is present, and every tab shows the banner.
+- **Creating and cleaning up:** `admin_create_test_user` makes 1-10 at a time (`accountNormaliseUsername(..., true)` allows reserved names), appending a number to a taken username and numbering the display names; `admin_delete_test_users` deletes them all through `accountDelete()`. Rate limit: 60 an hour.
+- **Self-disabling:** `adminTestUsersReady()` checks the column separately from `accountsTablesReady()` so a server without the migration keeps signing everyone in; the section then shows "Run migrations/015_admin_test_users.sql".
 
 ## Future ideas
 

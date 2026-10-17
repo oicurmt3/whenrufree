@@ -143,11 +143,31 @@ if(els.manageUserConfirm) els.manageUserConfirm.addEventListener('click', openCo
 if(els.choiceBack) els.choiceBack.addEventListener('click', closeConfirmChoices);
 if(els.choiceApply) els.choiceApply.addEventListener('click', applyManageChoices);
 
+// Report someone (everyone) and the organiser's report inbox
+if(els.reportReason){
+  els.reportReason.addEventListener('change', ()=>{
+    els.reportSend.disabled = els.reportReason.value === '';
+  });
+}
+if(els.reportCancel) els.reportCancel.addEventListener('click', closeReportModal);
+if(els.reportSend) els.reportSend.addEventListener('click', submitReport);
+if(els.reportsBtn) els.reportsBtn.addEventListener('click', openReportsModal);
+if(els.reportsClose) els.reportsClose.addEventListener('click', closeReportsModal);
+if(els.reportsList){
+  els.reportsList.addEventListener('click', (e)=>{
+    const b = e.target.closest('button[data-decision]');
+    if(!b || b.disabled) return;
+    decideCalendarReport(Number(b.dataset.reportId), b.dataset.decision, b);
+  });
+}
+
 // Escape closes the top layer only, so Back behaviour is predictable
 document.addEventListener('keydown', (e)=>{
   if(e.key !== 'Escape') return;
   if(els.choiceModal && els.choiceModal.classList.contains('active')) closeConfirmChoices();
   else if(els.manageUserModal && els.manageUserModal.classList.contains('active')) closeManageModal();
+  else if(els.reportUserModal && els.reportUserModal.classList.contains('active')) closeReportModal();
+  else if(els.reportsModal && els.reportsModal.classList.contains('active')) closeReportsModal();
 });
 
 // Info modal event listeners

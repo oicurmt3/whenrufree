@@ -367,6 +367,58 @@ body.acct-locked {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
 
+/* ---------- Test user bar (shown while a test user is open) ---------- */
+.acct-impersonate {
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  background: #fff8e1;
+  border-bottom: 1px solid #f0d68a;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-size: 0.9rem;
+  color: #6b5200;
+}
+
+.acct-impersonate > .material-symbols-outlined {
+  font-size: 20px;
+  color: #b58100;
+  flex-shrink: 0;
+}
+
+.acct-impersonate-text {
+  flex: 1;
+  min-width: 140px;
+  font-weight: 600;
+  color: #4d3b00;
+}
+
+.acct-impersonate-btn {
+  padding: 6px 12px;
+  min-height: 36px;
+  border: 1px solid #e6a700;
+  border-radius: var(--acct-radius, 8px);
+  background: #fff;
+  color: #8a6500;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.acct-impersonate-btn:hover:not(:disabled) {
+  background: #fff3cd;
+}
+
+.acct-impersonate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ---------- Profile page (account.html) ---------- */
 .acct-page {
   background: var(--acct-bg);
@@ -375,6 +427,9 @@ body.acct-locked {
 .acct-page .card {
   width: min(760px, 100%);
 }
+
+/* page.css tints every h1; the profile title reads as plain white on the bar */
+.acct-page h1 { color: #fff; }
 
 .acct-section {
   background: var(--acct-card);
@@ -485,6 +540,16 @@ body.acct-locked {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+/* Name and details; the flex basis is what makes the actions wrap only on narrow rows */
+.acct-item-body {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
 }
 
@@ -498,6 +563,16 @@ body.acct-locked {
 .acct-item-sub {
   font-size: 0.85rem;
   color: var(--acct-muted);
+}
+
+/* Actions inside a calendar's text column (leave / delete): beside the name, or under it
+   only when the row is too narrow to fit both. */
+.acct-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .acct-tag {
@@ -520,6 +595,12 @@ body.acct-locked {
   font-size: 0.95rem;
 }
 
+.acct-empty a {
+  color: var(--acct-primary);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .acct-danger-zone {
   border-color: #f1b8c0;
 }
@@ -529,4 +610,6 @@ body.acct-locked {
   .acct-row .acct-btn,
   .acct-row .gsi-material-button { flex: 1 1 auto; max-width: none; }
   .acct-badge { max-width: 160px; }
+  /* Once the action wraps under the name, keep it flush left with the text */
+  .acct-item-actions { margin-left: 0; }
 }

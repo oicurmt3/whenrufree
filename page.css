@@ -294,7 +294,8 @@ h3 .material-symbols-outlined {
   gap: 6px;
   background: var(--primary);
   color: #fff;
-  border: none;
+  /* Transparent border keeps this the same height as the outlined example button */
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 8px 14px;
   font-size: 0.9rem;
@@ -312,6 +313,33 @@ h3 .material-symbols-outlined {
 
 .template-card .use-template-btn .material-symbols-outlined {
   font-size: 18px;
+}
+
+/* Buttons added to a card sit in one row: template first, then any example */
+.template-card .template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* The row carries the spacing, so the buttons inside it do not repeat it */
+.template-card .template-actions .use-template-btn {
+  margin-top: 0;
+}
+
+/* Example button reads as secondary next to "Use This Template" */
+.template-card .use-template-btn.is-example {
+  background: #fff;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.template-card .use-template-btn.is-example:hover {
+  background: var(--grey-bg);
+  color: var(--primary-dark);
+  border-color: var(--primary-dark);
 }
 
 /* ============================================
