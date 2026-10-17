@@ -146,33 +146,199 @@ function initProfile() {
 // -------------------------
 
 /**
- * The buttons under a calendar on the profile page: organisers delete it for everyone, everyone
- * else removes their own name and choices. Both confirm first, then reload the list.
+ * The buttons under a calendar on the profile page: organisers can put it in a Hub or delete it
+ * for everyone, everyone else removes their own name and choices. Both confirm first, then
+ * reload the list.
  */
 function calendarActions(c) {
   const wrap = document.createElement('span');
   wrap.className = 'acct-item-actions';
   const title = c.title || 'Untitled calendar';
-  const btn = document.createElement('button');
-  btn.type = 'button';
   if (c.role === 'admin') {
-    btn.className = 'acct-btn acct-btn-danger acct-btn-small';
-    btn.textContent = 'Delete calendar';
-    btn.setAttribute('aria-label', `Delete ${title} for everyone`);
-    btn.addEventListener('click', () => deleteCalendar(c, title, btn));
+    // Hub first, then the destructive action last
+    const hubBtn = document.createElement('button');
+    hubBtn.type = 'button';
+    hubBtn.className = 'acct-btn acct-btn-secondary acct-btn-small acct-btn-iconable';
+    hubBtn.appendChild(makeIcon('hub'));
+    hubBtn.appendChild(buttonText('Hub'));
+    hubBtn.title = c.hub ? `Move ${title} to another Hub` : `Add ${title} to a Hub`;
+    hubBtn.setAttribute('aria-label', hubBtn.title);
+    hubBtn.addEventListener('click', () => openHubPicker(c, hubBtn));
+    wrap.appendChild(hubBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'acct-btn acct-btn-danger acct-btn-small acct-btn-iconable';
+    delBtn.appendChild(makeIcon('delete'));
+    delBtn.appendChild(buttonText('Delete calendar'));
+    delBtn.setAttribute('aria-label', `Delete ${title} for everyone`);
+    delBtn.addEventListener('click', () => deleteCalendar(c, title, delBtn));
+    wrap.appendChild(delBtn);
   } else {
+    const btn = document.createElement('button');
+    btn.type = 'button';
     btn.className = 'acct-btn acct-btn-ghost acct-btn-small';
     btn.textContent = 'Leave calendar';
     btn.setAttribute('aria-label', `Leave ${title} and remove your choices`);
     btn.addEventListener('click', () => leaveCalendar(c, title, btn));
+    wrap.appendChild(btn);
   }
-  wrap.appendChild(btn);
   return wrap;
+}
+
+/** The label half of a button whose text collapses to its icon on narrow screens. */
+function buttonText(label) {
+  const s = document.createElement('span');
+  s.className = 'acct-btn-text';
+  s.textContent = label;
+  return s;
 }
 
 function calendarStatus(message) {
   const el = $('calendarStatus');
   if (el) el.textContent = message;
+}
+
+// Last account_memberships payload, so the Hub picker opens instantly instead of refetching.
+let lastMemberships = null;
+
+function closeHubPicker() {
+  show('hubPickModal', false);
+}
+
+/**
+ * The Hub a calendar should belong to. Lists every Hub the account organises or has opened,
+ * organisers first. Each row carries the action it performs: an add icon for Hubs it is not in,
+ * a delete icon on the Hub it is in now (which takes the calendar back out).
+ * @param {object} c - calendar row from accountMemberships()
+ */
+function openHubPicker(c) {
+  const list = $('hubPickList');
+  const errorEl = $('hubPickError');
+  const title = c.title || 'Untitled calendar';
+  errorEl.textContent = '';
+  list.textContent = '';
+  $('hubPickCalName').textContent = title;
+  $('hubPickTitle').textContent = c.hub ? 'Move to a Hub' : 'Add to a Hub';
+  show('hubPickModal', true);
+
+  const hubs = ((lastMemberships && lastMemberships.hubs) || []).slice()
+    .sort((a, b) => (b.is_organiser ? 1 : 0) - (a.is_organiser ? 1 : 0));
+  if (!hubs.length) {
+    emptyItem(list, 'No Hubs yet. ', 'hub.html?create=1', 'Create a Hub.');
+    return;
+  }
+
+  hubs.forEach((h) => {
+    const current = !!c.hub && c.hub.token === h.token;
+    // Hubs take calendars from their organiser only unless they have opened adds up
+    const locked = !current && !h.is_organiser && !h.allow_member_calendars;
+    const hubTitle = h.title || 'Untitled Hub';
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = current ? 'acct-btn acct-btn-ghost hub-pick-btn hub-pick-btn-current' : 'acct-btn acct-btn-ghost hub-pick-btn';
+    btn.appendChild(makeIcon('hub'));
+
+    const text = document.createElement('span');
+    text.className = 'hub-pick-text';
+    const name = document.createElement('span');
+    name.className = 'hub-pick-name';
+    name.textContent = hubTitle;
+    const sub = document.createElement('span');
+    sub.className = 'hub-pick-sub';
+    sub.textContent = `${h.calendar_count} calendar${h.calendar_count === 1 ? '' : 's'}`
+      + (h.is_organiser ? ' - you organise it' : '')
+      + (current ? ' - current' : '')
+      + (locked ? ' - organiser adds only' : '');
+    text.appendChild(name);
+    text.appendChild(sub);
+    btn.appendChild(text);
+
+    // Add for Hubs it can go into, delete for the one it is in now
+    const action = makeIcon(current ? 'delete' : (locked ? 'lock' : 'add_circle'));
+    action.classList.add('hub-pick-action');
+    btn.appendChild(action);
+
+    if (locked) {
+      btn.disabled = true;
+      btn.title = `Only the organiser adds calendars to "${hubTitle}"`;
+    } else {
+      btn.title = current
+        ? `Remove from "${hubTitle}"`
+        : (c.hub ? `Move to "${hubTitle}"` : `Add to "${hubTitle}"`);
+    }
+    btn.setAttribute('aria-label', btn.title);
+    btn.addEventListener('click', () => (current
+      ? unlinkCalendarFromHub(c, btn)
+      : linkCalendarToHub(c, h, btn)));
+
+    li.appendChild(btn);
+    list.appendChild(li);
+  });
+}
+
+/**
+ * Puts the calendar in the chosen Hub. If it is already in one, it is moved: the old link is
+ * removed first, so a failed add is reported as "no longer in any Hub" rather than leaving the
+ * user guessing which Hub it ended up in.
+ */
+async function linkCalendarToHub(c, h, btn) {
+  const errorEl = $('hubPickError');
+  const title = c.title || 'Untitled calendar';
+  const hubTitle = h.title || 'Untitled Hub';
+  const moving = !!c.hub && c.hub.token !== h.token;
+
+  if (moving) {
+    const ok = confirm(
+      `Move "${title}" from "${c.hub.title || 'Untitled Hub'}" to "${hubTitle}"?\n\n` +
+      'It will disappear from the old Hub and appear in the new one.'
+    );
+    if (!ok) return;
+  }
+
+  errorEl.textContent = '';
+  btn.disabled = true;
+  if (moving) {
+    const rm = await Account.postJson('remove_calendar_from_group', {}, { c: c.token });
+    if (!rm.ok) {
+      errorEl.textContent = rm.data.message || 'Could not remove it from its current Hub.';
+      btn.disabled = false;
+      return;
+    }
+  }
+  const r = await Account.postJson('add_calendar_to_group', { group_token: h.token }, { c: c.token, g: h.token });
+  if (!r.ok) {
+    const message = r.data.message || 'Could not add it to that Hub.';
+    errorEl.textContent = moving ? `${message} It is no longer in any Hub.` : message;
+    btn.disabled = false;
+    return;
+  }
+  closeHubPicker();
+  await loadMemberships();
+  calendarStatus(`"${title}" is now in Hub "${hubTitle}".`);
+}
+
+/** Takes the calendar out of its Hub. The calendar itself is untouched and stays at its own link. */
+async function unlinkCalendarFromHub(c, btn) {
+  const errorEl = $('hubPickError');
+  const title = c.title || 'Untitled calendar';
+  const hubTitle = (c.hub && c.hub.title) || 'Untitled Hub';
+  const ok = confirm(
+    `Remove "${title}" from "${hubTitle}"?\n\nThe calendar stays open at its own link; it just stops appearing in that Hub.`
+  );
+  if (!ok) return;
+  errorEl.textContent = '';
+  btn.disabled = true;
+  const r = await Account.postJson('remove_calendar_from_group', {}, { c: c.token });
+  if (!r.ok) {
+    errorEl.textContent = r.data.message || 'Could not remove it from that Hub.';
+    btn.disabled = false;
+    return;
+  }
+  closeHubPicker();
+  await loadMemberships();
+  calendarStatus(`"${title}" was removed from Hub "${hubTitle}".`);
 }
 
 async function leaveCalendar(c, title, btn) {
@@ -222,7 +388,7 @@ async function loadMemberships() {
     emptyItem(calList, r.data.message || 'Could not load your calendars.');
     return;
   }
-
+  lastMemberships = r.data;
   if (!r.data.calendars.length) emptyItem(calList, 'No calendars yet. Open a calendar link to join, or create one from Home.');
   r.data.calendars.forEach((c) => {
     const main = link(`calendar.html?c=${encodeURIComponent(c.token)}`, c.title || 'Untitled calendar');
@@ -412,6 +578,17 @@ async function init() {
   show('signedIn', true);
   initProfile();
   initSignOutAndDelete();
+
+  // Hub picker: closes on the button, the backdrop, or Escape
+  $('hubPickClose').addEventListener('click', closeHubPicker);
+  $('hubPickCancel').addEventListener('click', closeHubPicker);
+  $('hubPickModal').addEventListener('click', (e) => {
+    if (e.target === $('hubPickModal')) closeHubPicker();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('hubPickModal').classList.contains('hide')) closeHubPicker();
+  });
+
   if (signinResult === 'linked' || signinResult === 'taken') {
     $('methodStatus').textContent = Account.SIGNIN_MESSAGES[signinResult];
   }

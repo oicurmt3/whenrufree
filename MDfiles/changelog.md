@@ -4,24 +4,30 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ---
 
-## 2026-10-17 - Reports for everyone, test users, profile actions
+## 2026-10-17 - Reports for everyone, test users, Hub add policy
 
 ### Added
 - **Reporting for every member:** the People list now has a flag on each person you can see. A report about another member goes to that calendar's organiser, who sees who reported and can **Dismiss** (silent), **Block**, **Remove** or **Send to super admin**. A report about the organiser goes straight to the super admin, because an organiser cannot decide a complaint about themselves. Waiting reports show as a count on a new **Reports** button in the calendar toolbar
 - **Profile page actions:** organisers get **Delete calendar** on each calendar they organise, and members get **Leave calendar**, which removes their name and every choice they made. Both confirm first; the calendar stays for everyone else when you leave
 - **Test users in the admin panel:** the Accounts tab can create up to 10 test accounts at a time (no sign-in method of their own), open one in this browser with **Open as**, and return with **Return to my account**. The same marker shows a banner on every tab
 - **Template examples from the Setup tab:** an **Example** button can be attached to each template card on `ideas.html`, with its own link, label, icon and access emoji, instead of editing the page by hand
+- **Hubs are closed to strangers by default:** a new **Let other people add their own calendars** switch on the Hub create form and in **Hub settings** decides whether anyone with the Hub link may add their own calendar or create one inside the Hub. It starts off, so only the Hub organiser adds calendars. When it is off, other people see the Hub list without the add and create buttons, and the calendar page's Hub bar refuses the add with 403 `HUB_ADDS_CLOSED`
+- **Add or move a calendar to a Hub from the profile page:** organisers get a **Hub** button on each calendar they organise, opening a **Move to a Hub** window. Every Hub is a row with an add icon (add or move there) or, on the Hub the calendar is already in, a red delete icon that takes it out. Hubs that only take calendars from their organiser are shown with a lock and are not selectable
+- **Add one of your calendars from a Hub page:** a new **Add one of my calendars** button next to **Create new calendar in this Hub** lists the calendars you organise that are not in a Hub yet. The Hub organiser can also remove any calendar from the Hub page; anyone else sees **Remove** only on calendars they organise
 
 ### Changed
 - **Reports survive the right things:** member-to-member reports are deleted with their calendar, but reports about an organiser are kept after the calendar is gone, so deleting a calendar can never erase a complaint about the person who deleted it
 - The organiser's **Manage person** menu still reports to the super admin, as before; a super admin's Reports tab now shows the reporter's name, the calendar title snapshot and which reports were escalated
 - Profile page copy: **Your default name on calendars**, "Only you can see it; it is never shown on calendars", and an **empty Hubs** line that links to creating one
 - Templates page heading for the sports card is now **Weekday Sports Tryouts**
+- **Delete calendar and Hub buttons collapse on mobile:** on the profile page both become icon-only (44x44 tap targets) below 600px, keeping their labels on wider screens
+- **Hub picker wording and hints:** the window says "Pick the Hub this calendar should appear in (only one Hub allowed).", the calendar icon is shown before the calendar name, and Hub rows are spaced apart. The old **Remove from "Hub"** button is gone: each row's action icon does the work
 
 ### API
 - New `report_user` (any joined member), `calendar_reports` and `decide_calendar_report` (organiser); `calendar_meta` adds `open_reports`
 - New `account_leave_calendar` and `account_delete_calendar`; new `admin_test_users`, `admin_create_test_user`, `admin_delete_test_users`, `admin_impersonate` and `admin_impersonate_end`
-- `migrations/015_admin_test_users.sql` adds `accounts.created_by_admin`; `migrations/016_report_audience.sql` adds `reports.audience`, `target_role`, `reporter_user_id`, `reporter_name`, `calendar_title` and `outcome`
+- New `set_group_add_policy` (Hub organiser) toggles `allow_member_calendars`; `group_meta` adds `allow_member_calendars`, `add_policy_available` and per-calendar `can_remove`, and `account_memberships` adds `allow_member_calendars` per Hub; `create_group` and `create_calendar` (with `group_token`) follow the policy; `get_site_config` adds `features.hub_add_policy`; `set_group_add_policy` joins the sensitive POST list
+- `migrations/015_admin_test_users.sql` adds `accounts.created_by_admin`; `migrations/016_report_audience.sql` adds `reports.audience`, `target_role`, `reporter_user_id`, `reporter_name`, `calendar_title` and `outcome`; `migrations/017_hub_add_policy.sql` adds `groups.allow_member_calendars` (default 0 = organiser only)
 
 ---
 

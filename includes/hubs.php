@@ -11,6 +11,43 @@ const HUB_MAX_CALENDARS = 50;
 const HUB_ADD_PER_IP_PER_HUB_HOUR = 5;
 const HUB_ADD_PER_IP_GLOBAL_HOUR = 15;
 
+/**
+ * True once migrations/017_hub_add_policy.sql has been applied. Until then Hubs stay closed to
+ * everyone but their organiser, so no data change is needed here.
+ */
+function hubAddPolicyColumnReady(PDO $pdo): bool {
+    static $cache = [];
+    $key = spl_object_id($pdo);
+    if (!isset($cache[$key])) {
+        try {
+            $pdo->query('SELECT allow_member_calendars FROM `groups` LIMIT 0');
+            $cache[$key] = true;
+        } catch (PDOException $e) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
+}
+
+/** Whether this Hub lets people other than its organiser add calendars (default off). */
+function hubAllowsMemberCalendars(array $group): bool {
+    return (int)($group['allow_member_calendars'] ?? 0) === 1;
+}
+
+/**
+ * Refuses an add when the Hub takes calendars from its organiser only. Runs before any capacity
+ * or rate-limit bookkeeping, so a refused add costs the caller nothing.
+ */
+function requireHubAddAllowed(PDO $pdo, array $group): void {
+    if (hubAllowsMemberCalendars($group)) return;
+    if (getOptionalGroupSession($pdo, (int)$group['id']) !== null) return;
+    respond(403, [
+        'status' => 'error',
+        'code' => 'HUB_ADDS_CLOSED',
+        'message' => 'This Hub only accepts calendars from its organiser.',
+    ]);
+}
+
 function hubLimitsConfig(array $config): array {
     $hl = $config['hub_limits'] ?? [];
     return [
@@ -66,9 +103,11 @@ function requireGroupTokenParam(): string {
 }
 
 function getGroupByToken(PDO $pdo, string $token): ?array {
+    // Always expose the key, even before migration 017: 0 means "organiser only".
+    $policyCol = hubAddPolicyColumnReady($pdo) ? 'allow_member_calendars' : '0 AS allow_member_calendars';
     $stmt = $pdo->prepare(
         "SELECT id, token, title, organiser_name, organiser_pin_hash, organiser_account_id, failed_attempts, locked_until,
-                created_at, last_activity, never_expires
+                created_at, last_activity, never_expires, {$policyCol}
          FROM `groups` WHERE token = :t LIMIT 1"
     );
     $stmt->execute([':t' => $token]);

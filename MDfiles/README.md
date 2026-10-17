@@ -35,7 +35,7 @@ An organiser signs in, creates a calendar with custom time slots, date ranges, a
 - Mobile-responsive with 44x44px touch targets
 - Automatic cleanup of inactive calendars, Hubs and accounts (configurable retention)
 - Up to 17 category icons (Material Symbols Outlined)
-- Calendar Hubs: one private link lists multiple calendars; open create-in-Hub; managed by the account that created it
+- Calendar Hubs: one private link lists multiple calendars; calendars are added by the Hub organiser only unless the organiser turns on "Let other people add their own calendars"; managed by the account that created it
 - Super admin panel: opens with the admin password, or straight away for accounts listed in `config.php` `admin.account_ids`; manages calendars, Hubs, accounts, reports, permanent retention and site config, and can create test users to open in this browser (no separate sign-in)
 
 ## Tech Stack
@@ -92,7 +92,7 @@ robots.txt       - Search engine directives
 - `account_access` - Access emoji already picked by an account
 - `account_hubs` - Hubs an account has opened (profile page list)
 - `calendars` - Calendar configuration and metadata (`group_id` FK when in a Hub; `hide_names`, `show_organiser_marks`)
-- `groups` - Hub metadata, organiser account (`organiser_account_id`) and, until claimed, the old organiser PIN hash
+- `groups` - Hub metadata, organiser account (`organiser_account_id`), who may add calendars (`allow_member_calendars`) and, until claimed, the old organiser PIN hash
 - `users` - Names per calendar (`account_id`, `name_custom`, role, `blocked`; old unclaimed names still have a PIN hash)
 - `availability` - Status selections per user/date/slot
 - `access_grants` - Hashed 30-day grants issued after the right access emoji is picked

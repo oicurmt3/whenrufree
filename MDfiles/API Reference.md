@@ -46,7 +46,7 @@ All requests are rate-limited per IP address. Default: 120 requests per minute. 
 
 Client IP is taken from `REMOTE_ADDR` by default. `X-Forwarded-For` is honoured only when the direct connection comes from an IP listed in `config.php` `trusted_proxies` (empty by default).
 
-If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `admin_login_account`, `claim_name`, `claim_hub`, `create_calendar`, `create_group`, `save`, `join_calendar`, `account_update`, `account_remove_method`, `account_delete`, the six `account_passkey_*` actions, `access_check`, `set_access_emoji`, `set_group_access_emoji`, `set_bookings_closed`, `manage_calendar_user`, `admin_report_decide` and `set_organiser_marks`) return HTTP 503 instead of running unthrottled.
+If the rate-limit table is unavailable, read-only GET traffic continues; sensitive POST actions (`admin_login`, `admin_login_account`, `claim_name`, `claim_hub`, `create_calendar`, `create_group`, `save`, `join_calendar`, `account_update`, `account_remove_method`, `account_delete`, the six `account_passkey_*` actions, `access_check`, `set_access_emoji`, `set_group_access_emoji`, `set_group_add_policy`, `set_bookings_closed`, `manage_calendar_user`, `admin_report_decide` and `set_organiser_marks`) return HTTP 503 instead of running unthrottled.
 
 Exceeding the limit returns HTTP 429:
 ```json
@@ -336,13 +336,19 @@ Opening a calendar with `from_hub=1&g=HUB_TOKEN` (matching its Hub) counts as Hu
 
 Hub listing (secret URL). Parameter: `g` (hub token). Also remembers the Hub on the account's profile page (`account_hubs`).
 
-**Response:** `{ group: {title, token, calendar_count, organiser_name, is_organiser, claimable, access: {available, enabled, inherited}}, calendars: [{token, title, start_date, end_date, is_frozen, slot_capacity, last_activity}] }`. `claimable` is `true` for an old Hub whose organiser PIN has not been claimed yet. `is_frozen` is also `true` for a booking calendar whose bookings are closed; `slot_capacity` is non-null for booking calendars.
+**Response:** `{ group: {title, token, calendar_count, organiser_name, is_organiser, claimable, allow_member_calendars, add_policy_available, access: {available, enabled, inherited}}, calendars: [{token, title, start_date, end_date, is_frozen, slot_capacity, last_activity, can_remove}] }`. `claimable` is `true` for an old Hub whose organiser PIN has not been claimed yet. `allow_member_calendars` says whether anyone with the link may add calendars; `add_policy_available` is `true` once migration 017 has run. `can_remove` is `true` for the Hub organiser or for a calendar this account organises. `is_frozen` is also `true` for a booking calendar whose bookings are closed; `slot_capacity` is non-null for booking calendars.
 
 ### POST create_group
 
-Creates a Hub organised by the signed-in account. CSRF required. Body: `title`, optional `organiser_name` (blank = profile name), optional `access_emoji` (0-34).
+Creates a Hub organised by the signed-in account. CSRF required. Body: `title`, optional `organiser_name` (blank = profile name), optional `access_emoji` (0-34), optional `allow_member_calendars` (1 = anyone with the link may add calendars; absent or 0 = organiser only, the default).
 
 **Response:** `{ status, token, title }`
+
+### POST set_group_add_policy
+
+Hub organiser only. CSRF + `g`. Body: `allow` (1 = anyone signed in with the Hub link may add their own calendars or create one in it; 0 = organiser only). Logged as `HUB_ADD_POLICY_CHANGED`. 503 when migration 017 has not run.
+
+**Response:** `{ status, allow_member_calendars }`
 
 ### POST claim_hub
 
@@ -354,7 +360,7 @@ Claims an old Hub (created before accounts) once, with its organiser PIN. CSRF +
 
 Attach calendar to hub. CSRF + `c`, calendar organiser only. Body: `group_token` (Hub code or valid token string).
 
-Calendar must not already belong to a Hub. Subject to Hub capacity and per-IP rate limits (see above). If the Hub has an emoji and the account has not picked it, `X-Access-Grant` must include a grant for that Hub, otherwise 403 `HUB_ACCESS_REQUIRED`.
+Calendar must not already belong to a Hub. Unless the Hub organiser asked, the Hub must allow member calendars (`groups.allow_member_calendars = 1`); otherwise 403 `HUB_ADDS_CLOSED`. Subject to Hub capacity and per-IP rate limits (see above). If the Hub has an emoji and the account has not picked it, `X-Access-Grant` must include a grant for that Hub, otherwise 403 `HUB_ACCESS_REQUIRED`.
 
 **Response:** `{ status, group: { token, title } }`
 
@@ -435,7 +441,7 @@ Creates a new calendar. The signed-in account becomes its organiser.
 | date_filter_mode | string | No | "all", "only", or "except" |
 | is_private | int | No | 0=open, 1=hidden, 2=blind |
 | admin_name | string | No | Organiser name on this calendar (max 32 chars). Blank = the account's profile name |
-| group_token | string | No | Hub token - assigns new calendar to that Hub (valid token only; no Hub organiser needed; rate limited; needs the Hub's emoji if it has one) |
+| group_token | string | No | Hub token - assigns new calendar to that Hub (valid token only; rate limited; needs the Hub's emoji if it has one; 403 `HUB_ADDS_CLOSED` when the Hub only takes calendars from its organiser) |
 | access_emoji | int | No | 0-34: the calendar's own access emoji |
 | hide_names | int | No | Hidden calendars (`is_private` 1) only: 1 = names are private (members see only themselves, the organisers and a total). Omit it for the Hidden default of showing who has joined. Blind always hides names. Ignored for other modes |
 | null_color | string | No | Availability calendars only: `#rrggbb` from the five greys (`#000000`, `#404040`, `#808080`, `#bfbfbf`, `#ffffff`) for slots nobody has answered. 400 if not one of them; ignored until migration 012 has run |

@@ -159,7 +159,7 @@ body.acct-locked {
 .acct-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .acct-btn:focus-visible { outline: 3px solid #9fa8da; outline-offset: 2px; }
 
-.acct-btn .material-symbols-outlined { font-size: 20px; }
+.acct-btn .material-symbols-outlined { font-size: 20px; color: inherit; }
 
 .acct-btn-primary { background: var(--acct-primary); color: #fff; }
 .acct-btn-secondary { background: #e8eaf6; color: var(--acct-primary-dark); border-color: #c5cae9; }
@@ -179,6 +179,9 @@ body.acct-locked {
 }
 .acct-btn-facebook:hover { filter: none; background: #166fe5; border-color: #166fe5; }
 .acct-btn-small { min-height: 44px; padding: 8px 12px; font-size: 0.9rem; }
+
+/* Row buttons that show their label on desktop and only their icon on a phone */
+.acct-btn-iconable .acct-btn-text { white-space: nowrap; }
 
 /* ---------- Sign in with Google button ----------
    Google's HTML button from https://developers.google.com/identity/branding-guidelines, as generated
@@ -534,7 +537,8 @@ body.acct-locked {
 
 .acct-list li:last-child { border-bottom: none; }
 
-.acct-list .material-symbols-outlined { color: var(--acct-muted); }
+/* Only the row's own leading icon is muted; icons inside row buttons inherit the button colour */
+.acct-list > li > .material-symbols-outlined { color: var(--acct-muted); }
 
 .acct-item-text {
   flex: 1;
@@ -605,6 +609,65 @@ body.acct-locked {
   border-color: #f1b8c0;
 }
 
+/* ---------- Hub picker ---------- */
+/* The overlay sets display:flex, so it needs a stronger rule than page.css .hide */
+.acct-overlay.hide { display: none; }
+
+.hub-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+/* Each row is a bordered button, so drop the list's own separator and padding */
+.hub-pick-list li { padding: 0; border-bottom: 0; }
+
+/* The calendar being moved: icon then name, so it reads as a calendar and not a Hub */
+.hub-pick-cal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+.hub-pick-cal .material-symbols-outlined { font-size: 20px; color: var(--acct-muted); }
+
+.hub-pick-btn {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 0.9rem;
+  border-color: var(--acct-border);
+}
+
+/* The add / delete affordance at the end of each row */
+.hub-pick-btn .hub-pick-action {
+  margin-left: auto;
+  font-size: 22px;
+  color: var(--acct-muted);
+}
+.hub-pick-btn:hover .hub-pick-action { color: var(--acct-primary); }
+
+/* The Hub it is in now: this row removes the calendar instead of adding it */
+.hub-pick-btn-current .hub-pick-action { color: var(--acct-danger); }
+.hub-pick-btn-current:hover {
+  border-color: #f1b8c0;
+  background: #fdf3f5;
+}
+
+.hub-pick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hub-pick-name { font-weight: 600; overflow-wrap: anywhere; }
+.hub-pick-sub { font-size: 0.8rem; font-weight: 500; color: var(--acct-muted); }
+
 @media (max-width: 600px) {
   .acct-box { padding: 18px 14px 12px; }
   .acct-row .acct-btn,
@@ -612,4 +675,8 @@ body.acct-locked {
   .acct-badge { max-width: 160px; }
   /* Once the action wraps under the name, keep it flush left with the text */
   .acct-item-actions { margin-left: 0; }
+  /* Row actions keep their 44x44 target but lose the label, so both fit beside the name */
+  .acct-btn-iconable { padding: 8px; min-width: 44px; }
+  .acct-btn-iconable .acct-btn-text { display: none; }
+  .acct-btn-iconable .material-symbols-outlined { font-size: 22px; }
 }

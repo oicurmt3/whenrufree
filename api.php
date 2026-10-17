@@ -477,6 +477,29 @@ if ($action === 'set_group_access_emoji' && $_SERVER['REQUEST_METHOD'] === 'POST
 }
 
 /**
+ * Who may add calendars to this Hub (Hub organiser): everyone with the link, or the organiser
+ * alone. Off by default, so a Hub is closed to strangers until its organiser opts in.
+ */
+if ($action === 'set_group_add_policy' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    if (!hubAddPolicyColumnReady($pdo)) {
+        respond(503, ['status' => 'error', 'message' => 'This setting is not available yet']);
+    }
+    $grp = getGroupByToken($pdo, requireGroupTokenParam());
+    if (!$grp) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
+    $groupId = (int)$grp['id'];
+    requireGroupOrganiserSession($pdo, $groupId);
+
+    $allow = !empty($_POST['allow']) ? 1 : 0;
+    $pdo->prepare("UPDATE `groups` SET allow_member_calendars = :a WHERE id = :id")
+        ->execute([':a' => $allow, ':id' => $groupId]);
+    touchGroupActivity($pdo, $groupId);
+    logSecurityEvent('HUB_ADD_POLICY_CHANGED', ['group_id' => $groupId, 'allow_member_calendars' => $allow]);
+
+    respond(200, ['status' => 'success', 'allow_member_calendars' => $allow === 1]);
+}
+
+/**
  * One person, one decision (calendar organiser): block or unblock, delete, and/or report to the
  * super admin. The page sends whichever were chosen together, and they are applied in a fixed
  * order: the report first (it needs the name and account that a delete removes), then the block,
@@ -907,6 +930,8 @@ if ($action === 'create_calendar' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($groupTokenPost !== null) {
         $grp = getGroupByToken($pdo, $groupTokenPost);
         if (!$grp) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
+        // Creating a calendar inside a Hub is an add, so it follows the Hub's add policy
+        requireHubAddAllowed($pdo, $grp);
         $groupId = (int)$grp['id'];
         prepareHubCalendarAdd($pdo, $groupId, $config);
     }
@@ -1018,6 +1043,9 @@ if ($action === 'create_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($accessEmoji !== null && !accessTablesReady($pdo)) {
         respond(400, ['status' => 'error', 'message' => 'Access emoji is not available yet']);
     }
+
+    // Off unless the organiser ticks it, and ignored until migration 017 has run.
+    $allowMemberCalendars = !empty($_POST['allow_member_calendars']) && hubAddPolicyColumnReady($pdo);
     for ($i = 0; $i < 5; $i++) {
         $token = createToken(8);
         try {
@@ -1039,6 +1067,10 @@ if ($action === 'create_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare("UPDATE `groups` SET access_emoji = :e WHERE id = :id")
                     ->execute([':e' => $accessEmoji, ':id' => $groupId]);
             }
+            if ($allowMemberCalendars) {
+                $pdo->prepare("UPDATE `groups` SET allow_member_calendars = 1 WHERE id = :id")
+                    ->execute([':id' => $groupId]);
+            }
             logSecurityEvent('HUB_CREATED', ['group_id' => $groupId, 'account_id' => $acct['id']]);
             respond(200, ['status' => 'success', 'token' => $token, 'title' => $titleForDb]);
         } catch (PDOException $e) {
@@ -1059,15 +1091,20 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     if (!$grp) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
 
     $groupId = (int)$grp['id'];
+    $acct = requireAccount($pdo);
+    $isHubOrganiser = $grp['organiser_account_id'] !== null && (int)$grp['organiser_account_id'] === $acct['id'];
 
+    // is_mine: this account organises that calendar, so it may detach it from the Hub too
     $bookingCols = bookingColumnsReady($pdo) ? ', slot_capacity, max_per_user, bookings_closed' : '';
     $stmt = $pdo->prepare(
-        "SELECT token, title, start_date, end_date, chosen_date, chosen_slot, last_activity{$bookingCols}
+        "SELECT token, title, start_date, end_date, chosen_date, chosen_slot, last_activity{$bookingCols},
+                EXISTS(SELECT 1 FROM users u
+                        WHERE u.calendar_id = calendars.id AND u.account_id = :aid AND u.role = 'admin') AS is_mine
          FROM calendars
          WHERE group_id = :gid
          ORDER BY last_activity DESC, created_at DESC"
     );
-    $stmt->execute([':gid' => $groupId]);
+    $stmt->execute([':gid' => $groupId, ':aid' => $acct['id']]);
     $calRows = $stmt->fetchAll();
 
     $calendars = [];
@@ -1081,10 +1118,10 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             'is_frozen' => (!empty($row['chosen_date']) && !empty($row['chosen_slot'])) || $booking['closed'],
             'slot_capacity' => $booking['capacity'],
             'last_activity' => $row['last_activity'] ?? null,
+            'can_remove' => $isHubOrganiser || (int)$row['is_mine'] === 1,
         ];
     }
 
-    $acct = requireAccount($pdo);
     accountTouchHub($pdo, $acct['id'], $groupId);
     $ownerId = $grp['organiser_account_id'] !== null ? (int)$grp['organiser_account_id'] : null;
 
@@ -1097,6 +1134,8 @@ if ($action === 'group_meta' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             'organiser_name' => (string)$grp['organiser_name'],
             'is_organiser' => $ownerId === $acct['id'],
             'claimable' => $ownerId === null && !empty($grp['organiser_pin_hash']),
+            'allow_member_calendars' => hubAllowsMemberCalendars($grp),
+            'add_policy_available' => hubAddPolicyColumnReady($pdo),
             'access' => accessPublicInfo($pdo, accessRequirementForGroup(accessGroupRow($pdo, $token) ?? [])),
         ],
         'calendars' => $calendars,
@@ -1178,6 +1217,9 @@ if ($action === 'add_calendar_to_group' && $_SERVER['REQUEST_METHOD'] === 'POST'
     $grp = getGroupByToken($pdo, $groupTokenPost);
     if (!$grp) respond(404, ['status' => 'error', 'message' => 'Hub not found']);
     $groupId = (int)$grp['id'];
+
+    // Organiser-only Hubs refuse anyone else before any rate-limit bookkeeping
+    requireHubAddAllowed($pdo, $grp);
 
     $hubReq = accessTablesReady($pdo) ? accessRequirementForGroup(accessGroupRow($pdo, $groupTokenPost) ?? []) : null;
     if ($hubReq !== null
@@ -2891,6 +2933,7 @@ if ($action === 'get_site_config' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         'booking_styles' => bookingColumnsReady($pdo) && bookingStyleColumnsReady($pdo),
         'accounts' => accountsTablesReady($pdo),
         'hide_names' => membersTablesReady($pdo),
+        'hub_add_policy' => hubAddPolicyColumnReady($pdo),
     ];
     try {
         $stmt = $pdo->query("SELECT config_json FROM site_config WHERE id = 1 LIMIT 1");

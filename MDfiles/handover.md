@@ -88,7 +88,7 @@ When an organiser locks in a date+slot, the calendar enters a "frozen" state. Th
 | `includes/data.php` | `normaliseTitle()`, `normaliseName()`, `validateSlotsArray()`, `validateStatusesArray()`, `dateRangeOk()`, `MESSAGE_MAX_LEN`, `respondDuplicateName()`, `buildAvailabilitySummary()`, `organiserMarksColumnReady()` (migration 010) |
 | `includes/security.php` | `pdo()`, `logSecurityEvent()`, rate limiting (`enforceRateLimit()`, `enforceActionRateLimit()`, `rateLimitKey()`, `isSensitivePostAction()`), admin login lockout, `adminAccountIds()`, `adminIssueSession()`, `requireAdminSession()`, claim lockout wrappers, `verifyPin()` (old PINs are only checked when claiming), `createToken()` |
 | `includes/sessions.php` | `getOptionalSession()` / `requireSession()` (the account's name on a calendar; 403 `NOT_JOINED`), `getOptionalGroupSession()` / `requireGroupOrganiserSession()` (the account organises the Hub) |
-| `includes/hubs.php` | Hub limits (`HUB_*`, `hubLimitsConfig()`, `prepareHubCalendarAdd()`), `requireGroupTokenParam()`, `getGroupByToken()`, `touchGroupActivity()`, Hub claim lockout wrappers, `resolveGroupTokenFromPost()` |
+| `includes/hubs.php` | Hub limits (`HUB_*`, `hubLimitsConfig()`, `prepareHubCalendarAdd()`), Hub add policy (`hubAddPolicyColumnReady()`, `hubAllowsMemberCalendars()`, `requireHubAddAllowed()`), `requireGroupTokenParam()`, `getGroupByToken()`, `touchGroupActivity()`, Hub claim lockout wrappers, `resolveGroupTokenFromPost()` |
 | `includes/accounts.php` | Account config, sessions and cookie, `accountGate()`, `requireAccount()`, identities, username / name rules, `accountNameForCalendar()`, `accountUpdateProfile()`, methods, memberships, deletion, per-account emoji picks, legacy clean-up after a claim |
 | `includes/oauth.php` | Google / Facebook sign-in: provider config, signed state cookie, authorize URL, code exchange, callback |
 | `includes/webauthn.php`, `lockout.php`, `access.php`, `booking.php` | Account passkeys, escalating claim lockout, access emoji, booking rules (see below) |
@@ -227,11 +227,19 @@ See the "Adding a Category" Word document. Two files: `CATEGORY_META` in calenda
 - Hub organiser is the account in `groups.organiser_account_id` (set by `create_group` or `claim_hub`); `group_meta` returns `is_organiser`.
 - Post-create save panel: auto copy, auto `.txt` download, Share, Email, Poster, acknowledgement checkbox gate.
 - Public Hub link bar: copy link/code for everyone; Share, Email, Poster, Download for organiser only.
-- Open contribution: anyone with Hub link can create a calendar via `index.html?g=TOKEN`; server rate limits apply.
-- Attach existing calendar: calendar organiser only, from calendar page Hub bar (`add_calendar_to_group`).
-- Remove from Hub: Hub organiser or calendar organiser (`remove_calendar_from_group`).
+- Open contribution is opt-in: a new Hub starts closed, so only the Hub organiser adds calendars. `groups.allow_member_calendars` (migration 017, default 0) is flipped by `set_group_add_policy` from **Hub settings**; when it is 1, anyone signed in with the link can add their own calendar or create one via `index.html?g=TOKEN`. `requireHubAddAllowed()` in `includes/hubs.php` refuses everyone else with 403 `HUB_ADDS_CLOSED` on both `add_calendar_to_group` and `create_calendar?group_token=`, before capacity/rate-limit bookkeeping. Until migration 017 runs, `hubAddPolicyColumnReady()` is false and Hubs stay closed.
+- Attach existing calendar: calendar organiser only, from the calendar page Hub bar (`add_calendar_to_group`), the Hub page **Add one of my calendars** picker, or the profile page **Hub** button.
+- Remove from Hub: Hub organiser or calendar organiser (`remove_calendar_from_group`); `group_meta` returns `can_remove` per calendar.
 - `go/index.html`: Calendar/Hub toggle; accepts code or full URL (`normalizeLinkInput` prepends `https://` when needed).
 - Hub rate limits in `includes/hubs.php`: max 50 calendars/Hub; 5 adds/IP/Hub/hour; 15 adds/IP/hour global (override via `config.php` `hub_limits`).
+
+## Built: Hub add policy
+
+- **Closed by default:** `groups.allow_member_calendars` (migration 017, `TINYINT(1) NOT NULL DEFAULT 0`). 0 means only the Hub organiser adds calendars; 1 lets anyone signed in with the link add their own or create one inside the Hub. The "who can add" decision lives in one place: `requireHubAddAllowed($pdo, $groupRow)` in `includes/hubs.php`, called by both add paths (`add_calendar_to_group` and `create_calendar` with `group_token`) before capacity or rate-limit bookkeeping, so a refused add costs the caller nothing.
+- **Organiser only switch:** `set_group_add_policy` (POST `?g=`, CSRF, `requireGroupOrganiserSession()`) takes `allow` 1/0, updates the column, touches Hub activity and logs `HUB_ADD_POLICY_CHANGED`. It is in the sensitive POST list, so it fails closed without the rate limiter.
+- **UI:** the switch `#hubAllowAdds` sits on the create form (`hub.html`, off) and in Hub settings (`#settingsAddPolicy`, rendered by `renderAddPolicySwitch()`); both only appear once `get_site_config` `features.hub_add_policy` / `group_meta.add_policy_available` is true. Non-organisers on a closed Hub lose `#addCalToHubBtn` and `#createCalInHubBtn` (`updateHubPublicUI()`), and the profile page's **Move to a Hub** picker disables those Hubs with a lock.
+- **Self-disabling:** until migration 017 runs, `hubAddPolicyColumnReady()` is false, `getGroupByToken()` reports 0, every add by a non-organiser is refused and the switches are hidden.
+- **Not built yet:** reporting a bad calendar inside a Hub. Today the organiser's protection is the closed default plus removing the calendar from the Hub page.
 
 ## Built: Passkeys
 

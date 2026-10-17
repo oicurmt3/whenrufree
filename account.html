@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -8,7 +8,7 @@
   <meta name="description" content="Your When RU Free profile: your name, sign-in methods, calendars and Hubs.">
   <title>Your profile - When RU Free</title>
   <link rel="stylesheet" href="page.css">
-  <link rel="stylesheet" href="account.css?v=20261017c">
+  <link rel="stylesheet" href="account.css?v=20261017g">
 </head>
 <body class="acct-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -127,8 +127,28 @@
     </p>
   </div>
 
+  <!-- Choose which Hub a calendar belongs to -->
+  <div id="hubPickModal" class="acct-overlay acct-overlay-soft hide" role="dialog" aria-modal="true" aria-labelledby="hubPickTitle">
+    <div class="acct-box">
+      <button type="button" id="hubPickClose" class="acct-close" aria-label="Close">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+      <h2 class="acct-title" id="hubPickTitle">Add to a Hub</h2>
+      <p class="acct-text hub-pick-cal">
+        <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+        <span id="hubPickCalName"></span>
+      </p>
+      <p class="acct-hint">Pick the Hub this calendar should appear in (only one Hub allowed).</p>
+      <ul id="hubPickList" class="acct-list hub-pick-list"></ul>
+      <p id="hubPickError" class="acct-error" role="alert"></p>
+      <div class="acct-row" style="margin-top:12px;">
+        <button type="button" id="hubPickCancel" class="acct-btn acct-btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="passkey.js?v=20260927a"></script>
   <script src="account-core.js?v=20261012a"></script>
-  <script src="account.js?v=20261017c"></script>
+  <script src="account.js?v=20261017g"></script>
 </body>
 </html>

@@ -297,10 +297,11 @@ Hub (group calendar folder) - one private URL lists multiple calendars.
 | last_activity | DATETIME | NULL | Last hub view or child calendar activity |
 | never_expires | TINYINT(1) | 0 | 1 = protected from cleanup.php Hub deletion |
 | access_emoji | TINYINT UNSIGNED | NULL | Hub access emoji position 0-34, NULL = none. Also guards every calendar in the Hub that has no emoji of its own. Migration 003 |
+| allow_member_calendars | TINYINT(1) | 0 | 1 = anyone signed in with the Hub link may add their own calendars (or create one in the Hub), 0 = only the Hub organiser. Changed by the organiser in Hub settings (`set_group_add_policy`). Migration 017 |
 
 **Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_groups_token` (`token`), INDEX `idx_groups_organiser_account` (`organiser_account_id`)
 
-**Business rules:** deleting the organiser's account deletes its Hubs (calendars in them are detached, not deleted). Old Hubs are claimed once with `claim_hub`.
+**Business rules:** deleting the organiser's account deletes its Hubs (calendars in them are detached, not deleted). Old Hubs are claimed once with `claim_hub`. Calendars may be added by the organiser only while `allow_member_calendars` is 0 (the default).
 
 ---
 

@@ -611,9 +611,13 @@ function accountMemberships(PDO $pdo, int $accountId): array {
         ];
     }
 
+    $policyCol = function_exists('hubAddPolicyColumnReady') && hubAddPolicyColumnReady($pdo)
+        ? 'g.allow_member_calendars'
+        : '0 AS allow_member_calendars';
     $stmt = $pdo->prepare(
         "SELECT g.token, g.title, (g.organiser_account_id = :aid) AS is_organiser,
                 (SELECT COUNT(*) FROM calendars c WHERE c.group_id = g.id) AS calendar_count,
+                {$policyCol},
                 COALESCE(ah.last_opened_at, g.created_at) AS sort_at
          FROM `groups` g
          LEFT JOIN account_hubs ah ON ah.group_id = g.id AND ah.account_id = :aid2
@@ -627,6 +631,7 @@ function accountMemberships(PDO $pdo, int $accountId): array {
             'token' => (string)$r['token'],
             'title' => (string)($r['title'] ?? ''),
             'is_organiser' => (int)$r['is_organiser'] === 1,
+            'allow_member_calendars' => (int)($r['allow_member_calendars'] ?? 0) === 1,
             'calendar_count' => (int)$r['calendar_count'],
         ];
     }

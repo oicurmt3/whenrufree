@@ -387,7 +387,7 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 
 ---
 
-## hub.js (~960 lines)
+## hub.js (~1,200 lines)
 
 Hub create/view page. Uses `hubSaveKit` object for copy, share, email, download, and poster output. Organiser status comes from `group_meta.is_organiser` (the signed-in account); there are no Hub PINs except to claim an old Hub.
 
@@ -399,7 +399,7 @@ Hub create/view page. Uses `hubSaveKit` object for copy, share, email, download,
 | `isCreateMode()` | 16 | True when `?create=1` (show create form). |
 | `toPlainAscii(str)` | 20 | Strips smart punctuation for plain-text share/download output. |
 
-`state` = `{token, title, auth: {organiser_name} | null, claimable, organiserName, calendars, accessAvailable, accessField, hubEmoji}`.
+`state` = `{token, title, auth: {organiser_name} | null, claimable, organiserName, calendars, accessAvailable, addPolicyAvailable, allowMemberCalendars, allowAddsInForm, accessField, hubEmoji}`.
 
 ### hubSaveKit (save panel and link bar)
 
@@ -421,33 +421,37 @@ Hub create/view page. Uses `hubSaveKit` object for copy, share, email, download,
 | `accessFetch(url, opts)` | 456 | Adds `X-Access-Grant`; on 403 `ACCESS_REQUIRED` shows the emoji popup and retries (max 3 tries); account errors go to `Account.handleApiError()`. |
 | `apiGet(action, params)` | 472 | GET helper with `?g=`. |
 | `hubPost(action, body)` | 481 | POST helper: adds `?g=` and CSRF. |
-| `removeCalendarFromHub(calToken, btn)` | 860 | POST `remove_calendar_from_group` (Hub organiser). |
-| `showPinModal()` / `hidePinModal()` / `setPinVisible(visible)` | 816 | "Claim this Hub" window (`#pinModal`) for an old Hub. |
-| `confirmClaimHub()` | 835 | POST `claim_hub` with the old organiser PIN; on success the account becomes organiser and `loadHubView()` / `loadHubEmoji()` refresh the page. |
+| `removeCalendarFromHub(calToken, btn)` | 953 | POST `remove_calendar_from_group` (Hub organiser, or the organiser of that calendar). |
+| `showPinModal()` / `hidePinModal()` / `setPinVisible(visible)` | 909 | "Claim this Hub" window (`#pinModal`) for an old Hub. |
+| `confirmClaimHub()` | 928 | POST `claim_hub` with the old organiser PIN; on success the account becomes organiser and `loadHubView()` / `loadHubEmoji()` refresh the page. |
 
-### Access emoji (Hub)
+### Add policy and access emoji (Hub)
 
 | Function | Line | Description |
 |----------|------|-------------|
 | `requireHubAccess()` | 427 | Blocking emoji popup; posts `access_check` with `?g=` and saves the Hub grant. |
-| `getHubMeta()` | 669 | Current Hub meta for the toolbar buttons (includes `access_emoji` for the organiser). |
-| `loadHubEmoji()` | 679 | GET `access_settings` when you are the organiser. |
-| `openHubSettings()` | 741 | Organiser **Settings** window: emoji on/off/change, POST `set_group_access_emoji`. |
-| `initCreateAccessField()` | 927 | Shows the emoji switch on the create form. |
+| `getHubMeta()` | 679 | Current Hub meta for the toolbar buttons (includes `access_emoji` for the organiser). |
+| `loadHubEmoji()` | 689 | GET `access_settings` when you are the organiser. |
+| `renderAddPolicySwitch(container)` | 768 | Organiser switch for **Let other people add their own calendars**; POST `set_group_add_policy`, then repaints the public panel. |
+| `openHubSettings()` | 820 | Organiser **Settings** window: add policy switch, then the emoji on/off/change (POST `set_group_access_emoji`). Shows whichever of the two the server supports. |
+| `initCreateAddPolicy(features)` | 1151 | Shows the add policy switch on the create form when `features.hub_add_policy`; off by default. |
+| `initCreateAccessField(features)` | 1172 | Shows the emoji switch on the create form. |
 
 ### UI
 
 | Function | Line | Description |
 |----------|------|-------------|
-| `showSaveHubPanel(meta)` | 514 | Post-create modal: copy, download, share, email, poster, ack checkbox. |
-| `createHub()` | 568 | POST `create_group` (optional `organiser_name`), then show the save panel. |
-| `renderCalendarGrid()` | 627 | Lists child calendars with links to `calendar.html?c=`. |
-| `updateHubPublicUI()` | 690 | Link bar, copy handlers, Create new calendar link. |
-| `updateOrganiserUI()` | 714 | "Organiser: X (you)" badge, organiser-only Share/Email/Poster/Download/Settings/Remove, and the **Claim this Hub** button for old Hubs. |
-| `loadHubView()` | 786 | GET `group_meta`, sets `organiserName`, `auth` (from `is_organiser`), `claimable` and `hubEmoji`, then renders the calendar grid. |
-| `initViewMode()` | 892 | `Account.require()`, account badge, then `loadHubView()`. |
-| `initCreateMode()` | 918 | `Account.require()`, account badge, profile name as the organiser name placeholder. |
-| `init()` | 947 | Picks create or view mode on `DOMContentLoaded`. |
+| `showSaveHubPanel(meta)` | 519 | Post-create modal: copy, download, share, email, poster, ack checkbox. |
+| `createHub()` | 573 | POST `create_group` (optional `organiser_name`, `access_emoji`, `allow_member_calendars`), then show the save panel. |
+| `renderCalendarGrid()` | 634 | Lists child calendars with links to `calendar.html?c=`; **Remove** only when `can_remove`. |
+| `updateHubPublicUI()` | 700 | Link bar, copy handlers, Create new calendar link, and hides the add/create row for non-organisers when adds are closed. |
+| `updateOrganiserUI()` | 739 | "Organiser: X (you)" badge, organiser-only Share/Email/Poster/Download/Settings/Remove, and the **Claim this Hub** button for old Hubs. |
+| `loadHubView()` | 877 | GET `group_meta`, sets `organiserName`, `auth` (from `is_organiser`), `claimable`, `allowMemberCalendars` and `addPolicyAvailable`, then renders the calendar grid. |
+| `openAddCalModal()` / `addCalendarToHub(cal, btn)` | 1029 / 1076 | **Add one of my calendars** picker: lists calendars you organise outside a Hub, then POST `add_calendar_to_group`. |
+| `initViewMode()` | 1097 | `Account.require()`, account badge, then `loadHubView()`. |
+| `initCreateMode()` | 1128 | `Account.require()`, profile name as the organiser name placeholder, then `initCreateFeatures()`. |
+| `initCreateFeatures()` | 1137 | One `get_site_config` call, then shows the add policy and emoji switches. |
+| `init()` | 1184 | Picks create or view mode on `DOMContentLoaded`. |
 
 ---
 
@@ -476,7 +480,7 @@ Loaded on every page after `passkey.js`. Exposes `window.Account`. Builds everyt
 | `renderSignInBadge(parent, onClick)` | 385 | Signed-out **Sign in** button in the badge spot (`acct-badge acct-badge-signin`, `login` icon). Calls `fitBadgeToHead()`. |
 | `logout()` | 396 | POST `account_logout`. |
 
-## account.js (~440 lines)
+## account.js (~600 lines)
 
 Profile page (`account.html`).
 
@@ -488,16 +492,18 @@ Profile page (`account.html`).
 | `saveProfile(form, errorEl, body)` | 89 | POST `account_update`; reports `renamed` / `conflicts`. |
 | `initSetup()` | 105 | First-time setup form: username + profile name, then back to the page the person came from. |
 | `initProfile()` | 122 | Profile form (name and private username). |
-| `calendarActions(c)` | 152 | Row buttons: **Delete calendar** (`.acct-btn-danger`) for organisers, **Leave calendar** (`.acct-btn-ghost`) for everyone else. |
-| `leaveCalendar(c, title, btn)` | 178 | Confirms, POSTs `account_leave_calendar`, reloads the list and reports into `#calendarStatus`. The calendar stays for everyone else; opening the link again joins with a blank calendar. |
-| `deleteCalendar(c, title, btn)` | 196 | Confirms, POSTs `account_delete_calendar`, reloads the list. Deletes the calendar for everyone; cannot be undone. |
-| `loadMemberships()` | 215 | GET `account_memberships`: calendars (role, name, Hub, "Blocked" tag, row actions) and Hubs (organiser or opened). |
-| `renderMethods(methods)` / `loadMethods()` | 254 / 276 | **Ways to sign in** list with Remove (disabled when only one is left), then redraws the Add buttons. |
-| `removeMethod(m, btn)` | 282 | POST `account_remove_method`. |
-| `addPasskey()` | 297 | `account_passkey_add_begin` -> create -> `account_passkey_add_finish`; "already has a passkey" when the device refuses a duplicate. |
-| `renderAddButtons(linked)` | 315 | **Add sign-in with Google** / **Add sign-in with Facebook** (`oauth_start` with `mode=link`), each hidden when already in `linked`; **Add a passkey on this device** always. |
-| `initSignOutAndDelete()` | 339 | Sign out; delete account (GET `account_delete_preview`, type the username, POST `account_delete`). |
-| `init()` | 392 | Handles `?signin=`, then setup or profile. |
+| `calendarActions(c)` | 153 | Row buttons: **Hub** (`.acct-btn-ghost`, organisers; icon-only below 600px) opening the Move to a Hub window, **Delete calendar** (`.acct-btn-danger`) for organisers, **Leave calendar** (`.acct-btn-ghost`) for everyone else. |
+| `openHubPicker(c)` / `closeHubPicker()` | 215 / 205 | **Move to a Hub** window: one row per Hub with an add icon (add or move there) or a red delete icon on the Hub it is in now (take it out). Hubs you do not organise with adds closed show a lock and are disabled. |
+| `linkCalendarToHub(c, h, btn)` / `unlinkCalendarFromHub(c, btn)` | 286 / 323 | POST `add_calendar_to_group` / `remove_calendar_from_group` from the picker, reloading the memberships. |
+| `leaveCalendar(c, title, btn)` | 344 | Confirms, POSTs `account_leave_calendar`, reloads the list and reports into `#calendarStatus`. The calendar stays for everyone else; opening the link again joins with a blank calendar. |
+| `deleteCalendar(c, title, btn)` | 362 | Confirms, POSTs `account_delete_calendar`, reloads the list. Deletes the calendar for everyone; cannot be undone. |
+| `loadMemberships()` | 381 | GET `account_memberships`: calendars (role, name, Hub, "Blocked" tag, row actions) and Hubs (organiser or opened). |
+| `renderMethods(methods)` / `loadMethods()` | 420 / 442 | **Ways to sign in** list with Remove (disabled when only one is left), then redraws the Add buttons. |
+| `removeMethod(m, btn)` | 448 | POST `account_remove_method`. |
+| `addPasskey()` | 463 | `account_passkey_add_begin` -> create -> `account_passkey_add_finish`; "already has a passkey" when the device refuses a duplicate. |
+| `renderAddButtons(linked)` | 481 | **Add sign-in with Google** / **Add sign-in with Facebook** (`oauth_start` with `mode=link`), each hidden when already in `linked`; **Add a passkey on this device** always. |
+| `initSignOutAndDelete()` | 505 | Sign out; delete account (GET `account_delete_preview`, type the username, POST `account_delete`). |
+| `init()` | 558 | Handles `?signin=`, then setup or profile. |
 
 ---
 

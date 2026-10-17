@@ -43,14 +43,15 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `calendar_reports` | GET | Account | organiser | Open member reports for this calendar, with who reported |
 | `decide_calendar_report` | POST | Account | organiser | `report_id` + `decision` dismiss / block / remove / escalate |
 | `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}`, `hide_names`, `names_private`, `null_color`, `default_status`, `organiser_marks`, `reports_available`, `open_reports` |
-| `group_meta` | GET | Account | - | Hub listing (`g` param, not `c`) with `organiser_name`, `is_organiser`, `claimable` |
-| `create_group` | POST | Account | - | Create Hub (optional `organiser_name`) |
+| `group_meta` | GET | Account | - | Hub listing (`g` param, not `c`) with `organiser_name`, `is_organiser`, `claimable`, `allow_member_calendars`, `add_policy_available` |
+| `create_group` | POST | Account | - | Create Hub (optional `organiser_name`, `access_emoji`, `allow_member_calendars`; adds stay organiser-only unless `allow_member_calendars` is sent) |
+| `set_group_add_policy` | POST | Account | Hub organiser | Who may add calendars: `allow` 1 = anyone with the link, 0 (default) = organiser only |
 | `claim_hub` | POST | Account | - | Claim an old Hub once with its organiser PIN (`g`, `pin`) |
-| `add_calendar_to_group` | POST | Account | organiser | Attach calendar to Hub |
+| `add_calendar_to_group` | POST | Account | organiser | Attach calendar to Hub; 403 `HUB_ADDS_CLOSED` unless the Hub organiser or `allow_member_calendars` is on |
 | `remove_calendar_from_group` | POST | Account | organiser or Hub organiser | Detach calendar from Hub |
 | `users` | GET | Account | - | List names (`mine`, `claimable`, `blocked` for the organiser) + `total`, `names_hidden` |
 | `availability` | GET | Account | - | Read availability (from/to params); blocked people left out |
-| `create_calendar` | POST | Account | - | Create calendar; the account is organiser (optional `admin_name`, `group_token`, `hide_names`, `null_color`, `default_status`) |
+| `create_calendar` | POST | Account | - | Create calendar; the account is organiser (optional `admin_name`, `group_token`, `hide_names`, `null_color`, `default_status`); with `group_token` the Hub add policy applies |
 | `join_calendar` | POST | Account | - | Join with the profile name or a per-calendar `display_name` |
 | `rename_user` | POST | Account | joined (self) / organiser | Rename (`display_name`, or `use_profile` for yourself) |
 | `claim_name` | POST | Account | - | Claim an old name once with its PIN (`user_id`, `pin`) |
@@ -103,7 +104,7 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | 410 | A report's person has already left the calendar (dismiss it instead of blocking or removing) |
 | 429 | Rate limited, old name / Hub locked after wrong PINs (`ACCOUNT_LOCKED`), too many wrong emoji picks (`ACCESS_LOCKED`), or too many unknown codes |
 | 500 | Server misconfiguration (e.g. missing `accounts.pepper`) |
-| 503 | Rate limiter unavailable on a sensitive POST, accounts tables missing (migration 007 not run), reports tables or audience columns missing (migrations 011/016 not run), test users missing (migration 015 not run), or `show_organiser_marks` missing (migration 010 not run) |
+| 503 | Rate limiter unavailable on a sensitive POST, accounts tables missing (migration 007 not run), reports tables or audience columns missing (migrations 011/016 not run), test users missing (migration 015 not run), `show_organiser_marks` missing (migration 010 not run), or the Hub add policy column missing (migration 017 not run) |
 
 ## Data Conventions
 

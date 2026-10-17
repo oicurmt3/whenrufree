@@ -133,6 +133,7 @@ function isSensitivePostAction(string $action): bool {
         'access_check',
         'set_access_emoji',
         'set_group_access_emoji',
+        'set_group_add_policy',
         'set_bookings_closed',
     ];
     return in_array($action, $sensitive, true);

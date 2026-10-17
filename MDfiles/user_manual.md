@@ -139,23 +139,25 @@ A **Hub** gives your group one link to find all related calendars (e.g. club fix
 1. Open **Create a Hub** from the home page footer or `hub.html?create=1` and sign in
 2. Enter the Hub name and, optionally, the organiser name shown on the Hub (blank = your profile name)
 3. Optional: turn on **Access emoji** and pick one. It guards the Hub and every calendar in it that has no emoji of its own
+4. Optional: turn on **Let other people add their own calendars**. It is off by default, which means only you add calendars to this Hub. You can change it later in **Settings**
 5. Save your Hub link from the save panel (copy, download, Share, Email, or Poster). The link is the invite; while you are signed in to this account the Hub is also listed on your profile page
 6. Tap **Continue to Hub**
 
 **Managing a Hub**
 
-- The account that created the Hub is its organiser. Open the Hub signed in to that account to get Share, Email, Poster, Download, **Settings** (the Hub's access emoji) and removing calendars from the Hub
+- The account that created the Hub is its organiser. Open the Hub signed in to that account to get Share, Email, Poster, Download, **Settings** (who can add calendars, and the Hub's access emoji) and removing calendars from the Hub
 - An old Hub (created with a PIN before accounts) shows **Claim this Hub**; see "Names and Hubs from Before Accounts"
 - Anyone signed in with the Hub link can open the Hub and its calendars
+- **Who can add calendars:** Hubs only take calendars from their organiser until you flip **Let other people add their own calendars** on in **Settings**. When it is off, everyone else sees the calendar list without the add and create buttons, and the calendar page's Hub bar refuses the add
 
 **Adding calendars to a Hub**
 
-- **New calendar:** Anyone with the Hub link can tap **Create new calendar in this Hub**
-- **Existing calendar:** As that calendar's organiser, open the Hub bar on the calendar page and enter the Hub code or link
+- **New calendar:** the Hub organiser can tap **Create new calendar in this Hub**. Other people see that button only when the Hub allows member calendars
+- **Existing calendar:** as that calendar's organiser, tap **Add one of my calendars** on the Hub page, use the **Hub** button on your profile page, or open the Hub bar on the calendar page and enter the Hub code or link. If the Hub only takes calendars from its organiser, the profile page shows it with a lock and will not add
 
 **Removing a calendar from a Hub**
 
-- The Hub organiser (on the Hub page), or the calendar's own organiser (from the calendar page Hub bar)
+- The Hub organiser (on the Hub page), or the calendar's own organiser (from the Hub page row labelled **Remove**, or from the profile page's **Move to a Hub** window using the delete icon on the current Hub)
 
 ### Go to code or link
 

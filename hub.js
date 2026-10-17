@@ -477,11 +477,13 @@ async function apiGet(action, params = {}) {
   return resp.json();
 }
 
-/** POST to a Hub action (?g=) with CSRF. Who you are comes from the account cookie. */
-async function hubPost(action, body = {}) {
+/** POST to a Hub action (?g=) with CSRF. Who you are comes from the account cookie.
+ *  Extra query params (e.g. ?c= for a calendar) go through params. */
+async function hubPost(action, body = {}, params = {}) {
   const url = new URL('api.php', window.location.href);
   url.searchParams.set('action', action);
   url.searchParams.set('g', state.token);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const headers = {
     'Content-Type': 'application/json',
     'X-CSRF-Token': (await ensureCsrfToken()) || ''
@@ -503,6 +505,9 @@ const state = {
   organiserName: '',
   calendars: [],
   accessAvailable: false, // Server has the access emoji tables (group_meta.group.access.available)
+  addPolicyAvailable: false, // Server has migrations/017 (group_meta.group.add_policy_available)
+  allowMemberCalendars: false, // Other people may add their calendars to this Hub
+  allowAddsInForm: false, // Create form switch, before the Hub exists
   accessField: null,      // Create form emoji switch (AccessEmoji.field)
   hubEmoji: null          // The Hub's emoji position, loaded for the organiser
 };
@@ -582,6 +587,8 @@ async function createHub() {
       organiser_name: organiserName
     };
     if (accessEmoji !== null) body.access_emoji = accessEmoji;
+    // Off by default: only send when the organiser ticked it
+    if (state.allowAddsInForm) body.allow_member_calendars = 1;
 
     const csrf = await ensureCsrfToken();
     const resp = await fetch('api.php?action=create_group', {
@@ -647,13 +654,16 @@ function renderCalendarGrid() {
       : '<span class="badge badge-open">Open</span>')
       + (isBooking ? '<span class="badge badge-booking">Booking</span>' : '');
 
+    // The Hub organiser can remove any calendar; anyone else only the calendars they organise
+    const canRemove = cal.can_remove === undefined ? !!state.auth : cal.can_remove === true;
+
     card.innerHTML = `
       <div class="cal-card-main">
         <p class="cal-card-title">${escapeHtml(title)}${badge}</p>
       </div>
       <div class="btn-row cal-card-actions">
         <a href="calendar.html?c=${encodeURIComponent(cal.token)}&amp;g=${encodeURIComponent(state.token)}&amp;from_hub=1" class="btn btn-open" style="text-decoration:none;">Open</a>
-        ${state.auth ? `<button type="button" class="btn btn-secondary btn-remove-cal" data-token="${escapeHtml(cal.token)}">Remove</button>` : ''}
+        ${canRemove ? `<button type="button" class="btn btn-secondary btn-remove-cal" data-token="${escapeHtml(cal.token)}">Remove</button>` : ''}
       </div>
     `;
 
@@ -705,6 +715,21 @@ function updateHubPublicUI() {
 
   qs('#createCalInHubBtn').href = `index.html?g=${encodeURIComponent(state.token)}`;
 
+  // Adds are organiser-only unless the organiser opened the Hub up. Gate both paths (add an
+  // existing calendar, or create one inside the Hub) and swap the hint to match.
+  const canAdd = !!state.auth || state.allowMemberCalendars;
+  qs('#hubAddBtnRow')?.classList.toggle('hideme', !canAdd);
+  const addHint = qs('#hubAddCalHint');
+  if (addHint) {
+    addHint.textContent = canAdd
+      ? "Already have a calendar open? Add this Hub's code from its Hub settings."
+      : 'Only the organiser adds calendars to this Hub.';
+  }
+  const emptyHint = qs('#emptyHint');
+  if (emptyHint) {
+    emptyHint.textContent = canAdd ? 'Create a new calendar below.' : 'Ask the organiser to add a calendar.';
+  }
+
   qs('#barCopyBtn').onclick = () => hubSaveKit.copyHubUrl(hubSaveKit.buildCopyText(getHubMeta()));
   qs('#barCopyCodeBtn').onclick = () => hubSaveKit.copyHubCode(state.token);
   qs('#hubCodeCopyIcon').onclick = () => hubSaveKit.copyHubCode(state.token);
@@ -730,23 +755,89 @@ function updateOrganiserUI() {
     organiserBtns.forEach(btn => btn.classList.add('hideme'));
   }
 
-  const showSettings = !!state.auth && state.accessAvailable && !!window.AccessEmoji;
+  const showSettings = !!state.auth
+    && (state.addPolicyAvailable || (state.accessAvailable && !!window.AccessEmoji));
   qs('#organiserSettingsBtn').classList.toggle('hideme', !showSettings);
 }
 
 // -------------------------
-// Hub settings (organiser): access emoji
+// Hub settings (organiser): who can add calendars, and the access emoji
 // -------------------------
 
+/** Switch controlling whether people other than the organiser may add their calendars. */
+function renderAddPolicySwitch(container) {
+  container.innerHTML = '';
+
+  const row = document.createElement('div');
+  row.className = 'hub-switch-row';
+  const label = document.createElement('span');
+  label.className = 'hub-switch-label';
+  label.id = 'settingsAddPolicyLabel';
+  label.textContent = 'Let other people add their own calendars';
+  const sw = document.createElement('button');
+  sw.type = 'button';
+  sw.className = 'hub-switch';
+  sw.setAttribute('role', 'switch');
+  sw.setAttribute('aria-labelledby', label.id);
+  row.append(label, sw);
+
+  const hint = document.createElement('p');
+  hint.className = 'ae-note';
+
+  container.append(row, hint);
+
+  const paint = () => {
+    const on = state.allowMemberCalendars;
+    sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    sw.setAttribute('aria-label', on ? 'Other people can add calendars: on' : 'Other people can add calendars: off');
+    hint.textContent = on
+      ? 'On: anyone signed in with the Hub link can add their calendars or create one here.'
+      : 'Off: only you can add calendars to this Hub.';
+  };
+
+  sw.onclick = async () => {
+    const next = !state.allowMemberCalendars;
+    if (next && !confirm('Let other people add their own calendars to this Hub?')) return;
+    sw.disabled = true;
+    try {
+      const res = await hubPost('set_group_add_policy', { allow: next ? 1 : 0 });
+      if (res.status !== 'success') {
+        showToast(res.message || 'Could not save this setting.');
+        return;
+      }
+      state.allowMemberCalendars = res.allow_member_calendars === true || next;
+      paint();
+      updateHubPublicUI();
+      showToast(next ? 'Other people can now add calendars' : 'Only you can add calendars now');
+    } finally {
+      sw.disabled = false;
+    }
+  };
+
+  paint();
+}
+
 async function openHubSettings() {
-  if (!state.auth || !window.AccessEmoji) return;
+  if (!state.auth) return;
   const modal = qs('#settingsModal');
+  const policyEl = qs('#settingsAddPolicy');
   const fieldEl = qs('#settingsAccessField');
   const errEl = qs('#settingsError');
   errEl.textContent = '';
-  fieldEl.innerHTML = '<p class="ae-note">Loading...</p>';
+  policyEl.innerHTML = '';
+  fieldEl.innerHTML = '';
   modal.classList.remove('hideme');
 
+  if (state.addPolicyAvailable) renderAddPolicySwitch(policyEl);
+
+  if (!state.accessAvailable || !window.AccessEmoji) {
+    if (!state.addPolicyAvailable) {
+      fieldEl.innerHTML = '<p class="ae-note">Settings are not available yet.</p>';
+    }
+    return;
+  }
+
+  fieldEl.innerHTML = '<p class="ae-note">Loading...</p>';
   const data = await apiGet('access_settings', { g: state.token });
   if (data.status !== 'success' || !data.available) {
     fieldEl.innerHTML = '';
@@ -794,6 +885,8 @@ async function loadHubView() {
   state.title = data.group?.title || 'Hub';
   state.calendars = data.calendars || [];
   state.accessAvailable = data.group?.access?.available === true;
+  state.addPolicyAvailable = data.group?.add_policy_available === true;
+  state.allowMemberCalendars = data.group?.allow_member_calendars === true;
   state.organiserName = data.group?.organiser_name || '';
   state.auth = data.group?.is_organiser === true ? { organiser_name: state.organiserName } : null;
   state.claimable = data.group?.claimable === true;
@@ -858,7 +951,7 @@ async function confirmClaimHub() {
 }
 
 async function removeCalendarFromHub(calToken, btn) {
-  if (!state.auth) return;
+  // The server decides: the Hub organiser, or the organiser of that calendar
   if (!confirm('Remove this calendar from the Hub? The calendar itself will still work at its own link.')) return;
 
   btn.disabled = true;
@@ -889,6 +982,118 @@ async function removeCalendarFromHub(calToken, btn) {
   }
 }
 
+/** "12 Oct 2026" from a YYYY-MM-DD column. */
+function formatCalDay(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!m) return '';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/**
+ * One-time list row for the picker: a calendar you organise that is not in a Hub yet.
+ * The whole row is the button, so it is a big, obvious tap target.
+ */
+function addCalRow(cal) {
+  const li = document.createElement('li');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'add-cal-item';
+
+  const icon = document.createElement('span');
+  icon.className = 'material-symbols-outlined';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = 'calendar_month';
+
+  const text = document.createElement('span');
+  text.className = 'add-cal-text';
+  const name = document.createElement('span');
+  name.className = 'add-cal-title';
+  name.textContent = cal.title || 'Untitled calendar';
+  const sub = document.createElement('span');
+  sub.className = 'add-cal-sub';
+  const from = formatCalDay(cal.start_date);
+  const to = formatCalDay(cal.end_date);
+  sub.textContent = from && to ? `${from} - ${to}` : 'No dates set';
+  text.appendChild(name);
+  text.appendChild(sub);
+
+  btn.appendChild(icon);
+  btn.appendChild(text);
+  btn.addEventListener('click', () => addCalendarToHub(cal, btn));
+  li.appendChild(btn);
+  return li;
+}
+
+/** Opens the picker with the calendars this account organises and has not put in a Hub. */
+async function openAddCalModal() {
+  const modal = qs('#addCalModal');
+  const list = qs('#addCalList');
+  const errEl = qs('#addCalError');
+  if (!modal || !list) return;
+  // Organiser-only until the Hub opens adds up
+  if (!state.auth && !state.allowMemberCalendars) return;
+
+  errEl.textContent = '';
+  list.textContent = '';
+  const loading = document.createElement('li');
+  loading.className = 'add-cal-empty';
+  loading.textContent = 'Loading your calendars...';
+  list.appendChild(loading);
+  modal.classList.remove('hideme');
+
+  let data;
+  try {
+    data = await apiGet('account_memberships');
+  } catch (e) {
+    list.textContent = '';
+    errEl.textContent = 'Could not load your calendars.';
+    return;
+  }
+  list.textContent = '';
+  if (data.status !== 'success') {
+    errEl.textContent = data.message || 'Could not load your calendars.';
+    return;
+  }
+
+  // You can only add a calendar you organise, and only if it is not already in a Hub
+  const mine = (data.calendars || []).filter(c => c.role === 'admin' && !c.hub);
+  if (!mine.length) {
+    const li = document.createElement('li');
+    li.className = 'add-cal-empty';
+    li.textContent = 'You have no calendars free to add. A calendar can be in one Hub at a time. ';
+    const make = document.createElement('a');
+    make.href = `index.html?g=${encodeURIComponent(state.token)}`;
+    make.textContent = 'Create a new calendar.';
+    li.appendChild(make);
+    list.appendChild(li);
+    return;
+  }
+  mine.forEach(cal => list.appendChild(addCalRow(cal)));
+}
+
+/** Adds one calendar to this Hub, then reloads the Hub so the card appears. */
+async function addCalendarToHub(cal, btn) {
+  const errEl = qs('#addCalError');
+  const title = cal.title || 'Untitled calendar';
+  errEl.textContent = '';
+  btn.disabled = true;
+  try {
+    const res = await hubPost('add_calendar_to_group', { group_token: state.token }, { c: cal.token });
+    if (res.status !== 'success') {
+      errEl.textContent = res.message || 'Could not add that calendar.';
+      return;
+    }
+    qs('#addCalModal').classList.add('hideme');
+    await loadHubView();
+    showToast(`"${title}" added to this Hub`);
+  } catch (e) {
+    errEl.textContent = 'Could not add that calendar.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function initViewMode() {
   state.token = getGroupTokenFromUrl();
   if (!state.token || !/^[A-Za-z0-9_-]{8,64}$/.test(state.token)) {
@@ -909,6 +1114,11 @@ async function initViewMode() {
   qs('#pinCancelBtn').addEventListener('click', hidePinModal);
   qs('#togglePinVisibility').addEventListener('click', () => setPinVisible(qs('#pinInput').type === 'password'));
   qs('#organiserSettingsBtn').addEventListener('click', openHubSettings);
+  qs('#addCalToHubBtn').addEventListener('click', openAddCalModal);
+  qs('#addCalCancel').addEventListener('click', () => qs('#addCalModal').classList.add('hideme'));
+  qs('#addCalModal').addEventListener('click', (e) => {
+    if (e.target === qs('#addCalModal')) qs('#addCalModal').classList.add('hideme');
+  });
   qs('#settingsClose').addEventListener('click', () => qs('#settingsModal').classList.add('hideme'));
   qs('#pinInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') confirmClaimHub();
@@ -920,11 +1130,11 @@ async function initCreateMode() {
   qs('#createSection').classList.remove('hideme');
   if (me.display_name) qs('#organiserName').placeholder = me.display_name;
   qs('#createHubBtn').addEventListener('click', createHub);
-  initCreateAccessField();
+  initCreateFeatures();
 }
 
-/** Shows the optional emoji switch once the server supports it. */
-async function initCreateAccessField() {
+/** Shows the optional create-form switches once the server supports them. */
+async function initCreateFeatures() {
   let features = {};
   try {
     const resp = await fetch('api.php?action=get_site_config', { credentials: 'same-origin' });
@@ -933,6 +1143,33 @@ async function initCreateAccessField() {
   } catch (e) {
     return;
   }
+  initCreateAddPolicy(features);
+  initCreateAccessField(features);
+}
+
+/** "Let other people add their own calendars" switch. Off by default. */
+function initCreateAddPolicy(features) {
+  if (features.hub_add_policy !== true) return;
+  const wrap = qs('#hubAllowAddsWrap');
+  const sw = qs('#hubAllowAdds');
+  const hint = qs('#hubAllowAddsHint');
+  const paint = () => {
+    const on = state.allowAddsInForm;
+    sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    hint.textContent = on
+      ? 'On: anyone signed in with the Hub link can add their calendars or create one here.'
+      : 'Off: only you can add calendars to this Hub. A calendar can be in one Hub at a time.';
+  };
+  sw.onclick = () => {
+    state.allowAddsInForm = !state.allowAddsInForm;
+    paint();
+  };
+  wrap.classList.remove('hideme');
+  paint();
+}
+
+/** Shows the optional emoji switch once the server supports it. */
+function initCreateAccessField(features) {
   if (!window.AccessEmoji || features.access_emoji !== true) return;
   state.accessField = AccessEmoji.field(qs('#hubAccessField'), {
     label: 'Access emoji',

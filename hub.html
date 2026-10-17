@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -22,9 +22,9 @@
       -webkit-font-smoothing:antialiased;
     }
   </style>
-  <link rel="stylesheet" href="hub.css?v=20261008b">
+  <link rel="stylesheet" href="hub.css?v=20261017c">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
-  <link rel="stylesheet" href="account.css?v=20261012a">
+  <link rel="stylesheet" href="account.css?v=20261017f">
 </head>
 <body>
   <div class="hub-wrap">
@@ -41,6 +41,13 @@
         <label for="organiserName">Organiser name shown on the Hub</label>
         <input type="text" id="organiserName" maxlength="32" placeholder="Your profile name" autocomplete="off">
         <p class="hint">Leave blank to use your profile name. Only your account can manage this Hub.</p>
+      </div>
+      <div class="field hideme" id="hubAllowAddsWrap">
+        <div class="hub-switch-row">
+          <span class="hub-switch-label" id="hubAllowAddsLabel">Let other people add their own calendars</span>
+          <button type="button" id="hubAllowAdds" class="hub-switch" role="switch" aria-checked="false" aria-labelledby="hubAllowAddsLabel"></button>
+        </div>
+        <p class="hint" id="hubAllowAddsHint">Off: only you can add calendars to this Hub. A calendar can be in one Hub at a time.</p>
       </div>
       <!-- Access emoji (optional; shown once migrations/003 has run) -->
       <div class="field hideme" id="hubAccessWrap">
@@ -110,10 +117,14 @@
         <div id="calGrid" class="cal-grid"></div>
 
         <div id="hubPublicPanel" class="hideme" style="margin-top:16px;">
-          <div class="btn-row">
+          <div class="btn-row" id="hubAddBtnRow">
+            <button type="button" id="addCalToHubBtn" class="btn btn-secondary">
+              <span class="material-symbols-outlined" aria-hidden="true">playlist_add</span>
+              Add one of my calendars
+            </button>
             <a id="createCalInHubBtn" class="btn btn-primary" href="#" style="text-decoration:none;">Create new calendar in this Hub</a>
           </div>
-          <p class="hub-code-hint hub-panel-hint">or, log into your current calendar and add it to this Hub by adding the Hub code.</p>
+          <p class="hub-code-hint hub-panel-hint" id="hubAddCalHint">Already have a calendar open? Add this Hub's code from its Hub settings.</p>
         </div>
 
         <div id="emptyState" class="empty-state hideme">
@@ -199,6 +210,7 @@
   <div id="settingsModal" class="modal-overlay hideme" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="modal">
       <h2 id="settingsTitle"><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">settings</span> Hub settings</h2>
+      <div id="settingsAddPolicy"></div>
       <div id="settingsAccessField"></div>
       <div class="error" id="settingsError"></div>
       <div class="modal-actions">
@@ -207,10 +219,23 @@
     </div>
   </div>
 
+  <!-- Add one of your own calendars to this Hub (signed-in users) -->
+  <div id="addCalModal" class="modal-overlay hideme" role="dialog" aria-modal="true" aria-labelledby="addCalTitle">
+    <div class="modal">
+      <h2 id="addCalTitle"><span class="material-symbols-outlined passkey-title-icon" aria-hidden="true">playlist_add</span> Add a calendar</h2>
+      <p class="hint">Pick one of your calendars to add to this Hub. A calendar can be in one Hub at a time.</p>
+      <ul id="addCalList" class="add-cal-list"></ul>
+      <div class="error" id="addCalError"></div>
+      <div class="modal-actions">
+        <button type="button" id="addCalCancel" class="btn btn-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
   <script src="passkey.js?v=20260927a" defer></script>
   <script src="account-core.js?v=20261012a" defer></script>
   <script src="emoji.js?v=20261008b" defer></script>
-  <script src="hub.js?v=20261010m" defer></script>
+  <script src="hub.js?v=20261017c" defer></script>
 </body>
 </html>
