@@ -7,7 +7,7 @@ All notable changes to When RU Free, in reverse chronological order.
 ## 2026-10-17 - Reports for everyone, test users, Hub add policy
 
 ### Added
-- **Reporting for every member:** the People list now has a flag on each person you can see. A report about another member goes to that calendar's organiser, who sees who reported and can **Dismiss** (silent), **Block**, **Remove** or **Send to super admin**. A report about the organiser goes straight to the super admin, because an organiser cannot decide a complaint about themselves. Waiting reports show as a count on a new **Reports** button in the calendar toolbar
+- **Reporting for every member:** the People list now has a flag on each person you can see. A report about another member goes to that calendar's organiser, who sees who reported and can **Dismiss** (silent), **Block**, **Remove** or **Send to WhenRUFree admin**. A report about the organiser goes straight to the WhenRUFree admin, because an organiser cannot decide a complaint about themselves. Waiting reports show as a count on a new **Reports** button in the calendar toolbar
 - **Profile page actions:** organisers get **Delete calendar** on each calendar they organise, and members get **Leave calendar**, which removes their name and every choice they made. Both confirm first; the calendar stays for everyone else when you leave
 - **Test users in the admin panel:** the Accounts tab can create up to 10 test accounts at a time (no sign-in method of their own), open one in this browser with **Open as**, and return with **Return to my account**. The same marker shows a banner on every tab
 - **Template examples from the Setup tab:** an **Example** button can be attached to each template card on `ideas.html`, with its own link, label, icon and access emoji, instead of editing the page by hand
@@ -16,8 +16,9 @@ All notable changes to When RU Free, in reverse chronological order.
 - **Add one of your calendars from a Hub page:** a new **Add one of my calendars** button next to **Create new calendar in this Hub** lists the calendars you organise that are not in a Hub yet. The Hub organiser can also remove any calendar from the Hub page; anyone else sees **Remove** only on calendars they organise
 
 ### Changed
+- **One word for one role:** calendar and Hub creators and managers are called **organiser** everywhere in the interface, the help pages and API messages; **WhenRUFree admin** now means only the site administrator (the admin panel). Buttons, tooltips and copy that said "admin" for an organiser were reworded, and the help pages say who is who
 - **Reports survive the right things:** member-to-member reports are deleted with their calendar, but reports about an organiser are kept after the calendar is gone, so deleting a calendar can never erase a complaint about the person who deleted it
-- The organiser's **Manage person** menu still reports to the super admin, as before; a super admin's Reports tab now shows the reporter's name, the calendar title snapshot and which reports were escalated
+- The organiser's **Manage person** menu still reports to the WhenRUFree admin, as before; the WhenRUFree admin's Reports tab now shows the reporter's name, the calendar title snapshot and which reports were escalated
 - Profile page copy: **Your default name on calendars**, "Only you can see it; it is never shown on calendars", and an **empty Hubs** line that links to creating one
 - Templates page heading for the sports card is now **Weekday Sports Tryouts**
 - **Delete calendar and Hub buttons collapse on mobile:** on the profile page both become icon-only (44x44 tap targets) below 600px, keeping their labels on wider screens
@@ -63,8 +64,8 @@ All notable changes to When RU Free, in reverse chronological order.
 
 ### Added
 - **Manage person menu:** the People list's separate block and delete buttons are replaced by one `more_vert` control per person, which opens a **Manage person** window: a two-way **Block / Unblock** toggle that opens on the person's current status, a **Delete this person** checkbox, and a **Report** dropdown with optional details. **Confirm choices** opens a review step listing exactly what will happen, with **Back** to change it and **Apply** to go ahead. The Apply button turns red when a delete is included
-- **Reporting to the super admin:** organisers can report a person (with a reason and up to 200 characters of detail) on its own or alongside a block or delete. Reports appear in the admin **Reports** tab (`admin_reports`, `admin_report_decide`), where the super admin dismisses a report or deletes the account. Needs `migrations/011_report_users.sql`; until it runs the Report dropdown is hidden
-- **Private usernames:** accounts get a fixed, auto-assigned username (`user######`) at sign-up, visible only to the super admin (and organisers, for reporting). Usernames are no longer editable; the profile name is what appears on calendars
+- **Reporting to the WhenRUFree admin:** organisers can report a person (with a reason and up to 200 characters of detail) on its own or alongside a block or delete. Reports appear in the admin **Reports** tab (`admin_reports`, `admin_report_decide`), where the WhenRUFree admin dismisses a report or deletes the account. Needs `migrations/011_report_users.sql`; until it runs the Report dropdown is hidden
+- **Private usernames:** accounts get a fixed, auto-assigned username (`user######`) at sign-up, visible only to the WhenRUFree admin (and organisers, for reporting). Usernames are no longer editable; the profile name is what appears on calendars
 
 ### Changed
 - **API:** `set_user_blocked`, `report_user` and `delete_user` are replaced by one `manage_calendar_user` action, which applies the choices in a fixed order - the report first (while the name and account still exist), then the block, then the delete - so a report sent alongside a delete is never lost. Sensitive POST list now carries `manage_calendar_user` and `admin_report_decide`
@@ -198,12 +199,12 @@ All notable changes to When RU Free, in reverse chronological order.
   - Security events: `PASSKEY_ADDED`, `PASSKEY_LOGIN`, `PASSKEY_REMOVED`, `PASSKEY_COUNTER_REPLAY`
 - **Escalating PIN lockout** (calendar users, organisers and Hub organisers): 5 wrong PINs in a row lock for 5 minutes, then 15 minutes, then 2 hours, then 2 days (repeats). Replaces the flat 15-minute lock.
   - The 5th wrong PIN now says straight away how long the lock lasts ("Too many wrong PINs. This name is locked for 15 minutes."); while locked: "Try again in 2 hours."
-  - Escalation resets on a correct PIN, a passkey login, a super admin Unlock, or after 30 days without a lockout (`cleanup.php` step 8)
+  - Escalation resets on a correct PIN, a passkey login, an Unlock by the WhenRUFree admin, or after 30 days without a lockout (`cleanup.php` step 8)
   - Admin panel: amber **Unlock** pill on locked users; lock_open button on locked Hubs. API: `admin_unlock_user`, `admin_unlock_group`; `admin_list_users` and `admin_groups` report `locked_seconds`
   - New columns `lockout_level`, `last_locked_at` on `users` and `groups`. Migration: `migrations/002_escalating_lockout.sql` (flat 15-minute lock until it runs)
   - New file `includes/lockout.php`; optional config `pin_lockout` (`max_attempts`, `schedule_minutes`, `reset_after_days`)
   - Security events: `GROUP_LOCKED`, `ADMIN_UNLOCK_USER`, `ADMIN_UNLOCK_GROUP`; `ACCOUNT_LOCKED` now includes `minutes`
-  - Super admin password login keeps its separate per-IP lockout
+  - WhenRUFree admin password login keeps its separate per-IP lockout
 
 ### Fixed
 - Calendar grid lost its colours (and the Decided highlight) after unlocking with a PIN / passkey or switching name: the values were painted and then the grid was rebuilt with blank cells. `renderDateRangeSkeleton()` now repaints its own cells (`refreshCalendarValues()` + `applyFrozenState()`).
@@ -344,4 +345,4 @@ All notable changes to When RU Free, in reverse chronological order.
 - Per-IP rate limiting
 - Security event logging
 - Automatic cleanup via cron
-- Super admin panel
+- WhenRUFree admin panel

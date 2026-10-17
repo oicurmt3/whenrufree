@@ -13,7 +13,7 @@ One row per person. Created by `migrations/007_accounts.sql`. No email, real nam
 | display_name | VARCHAR(40) | NULL | Profile name used on calendars by default (app limit 32). NULL until setup is finished |
 | created_at | DATETIME | - | Created |
 | last_seen_at | DATETIME | - | Last use (updated at most once a day with the session renewal) |
-| created_by_admin | TINYINT(1) | 0 | 1 = a test user added from the admin panel: it has no sign-in method of its own and can only be opened by a super admin. `migrations/015_admin_test_users.sql` |
+| created_by_admin | TINYINT(1) | 0 | 1 = a test user added from the WhenRUFree admin panel: it has no sign-in method of its own and can only be opened by the WhenRUFree admin. `migrations/015_admin_test_users.sql` |
 
 **Indexes:** PRIMARY KEY (`id`), UNIQUE `uq_accounts_username` (`username`), INDEX `idx_accounts_last_seen` (`last_seen_at`)
 
@@ -21,7 +21,7 @@ One row per person. Created by `migrations/007_accounts.sql`. No email, real nam
 - An account without `username` or `display_name` "needs setup" and can only use `account_*` actions
 - Deleting an account removes the calendars and Hubs it organises, its names and availability elsewhere, and every `account_*` row (FK cascades)
 - cleanup.php deletes accounts unused for `accounts.inactive_days` (default 730) that have no names and no Hubs, and passkey sign-ups abandoned before a passkey was saved
-- A test user (`created_by_admin = 1`) is refused by the OAuth and passkey sign-in paths and by the admin sign-in check, so the only way in is `admin_impersonate` from the super admin panel
+- A test user (`created_by_admin = 1`) is refused by the OAuth and passkey sign-in paths and by the admin sign-in check, so the only way in is `admin_impersonate` from the WhenRUFree admin panel
 
 ---
 
@@ -184,7 +184,7 @@ Names on a calendar. Each belongs to an account, except old names from before ac
 | id | BIGINT UNSIGNED | AUTO_INCREMENT | Primary key |
 | calendar_id | BIGINT UNSIGNED | - | FK to calendars.id (CASCADE DELETE) |
 | display_name | VARCHAR(40) | - | Name shown on this calendar (app limit 32) |
-| role | VARCHAR(10) | 'member' | "admin" (organiser) or "member" |
+| role | VARCHAR(10) | 'member' | "admin" (the database value for a calendar organiser) or "member" |
 | account_id | BIGINT UNSIGNED | NULL | FK to accounts.id (CASCADE DELETE). NULL = old name not claimed yet. Migration 007 |
 | name_custom | TINYINT(1) | 0 | 0 = follows the account's profile name; 1 = a name just for this calendar. Migration 007 |
 | pin_hash | VARCHAR(255) | NULL | Old names only: bcrypt hash of the 4-digit PIN, set to NULL when claimed (and for all rows by migration 008) |
@@ -208,10 +208,10 @@ Names on a calendar. Each belongs to an account, except old names from before ac
 - FK `fk_users_account` -> accounts.id ON DELETE CASCADE
 
 **Business rules:**
-- Each calendar has exactly one admin (the organiser: the account that created the calendar)
+- Each calendar has exactly one organiser (the account that created it; stored as the database role `admin`)
 - A claimable name has `account_id` NULL and a `pin_hash`. `claim_name` checks the PIN once, sets `account_id`, clears `pin_hash`
 - After 5 wrong PINs in a row the claim locks for 5 minutes, then 15 minutes, then 2 hours, then 2 days (repeats); `lockout_level` goes up by one each time and `failed_attempts` restarts at 0
-- A successful claim or super admin Unlock sets `lockout_level` back to 0; so does `cleanup.php` after 30 days without a lockout
+- A successful claim or WhenRUFree admin Unlock sets `lockout_level` back to 0; so does `cleanup.php` after 30 days without a lockout
 - Changing the profile name updates every row with `name_custom` = 0 (a calendar where that name is taken keeps the old one)
 - Names are unique per calendar (enforced by unique index)
 
@@ -409,9 +409,9 @@ Reports about a person on a calendar. Created by `migrations/011_report_users.sq
 | reporter_user_id | BIGINT UNSIGNED | NULL | The reporter's users.id on that calendar, used for one open report per pair (`migrations/016`) |
 | reporter_name | VARCHAR(40) | NULL | The reporter's name on that calendar, shown to the organiser (`migrations/016`) |
 | display_name | VARCHAR(40) | NULL | The name the person was using, as it was then |
-| calendar_title | VARCHAR(100) | NULL | Snapshot of the calendar title, so a super-admin report still reads sensibly after the calendar is deleted (`migrations/016`) |
+| calendar_title | VARCHAR(100) | NULL | Snapshot of the calendar title, so a report for the WhenRUFree admin still reads sensibly after the calendar is deleted (`migrations/016`) |
 | target_role | VARCHAR(10) | 'user' | `admin` or `user`: the reported person's role when it happened (`migrations/016`) |
-| audience | VARCHAR(10) | 'super' | `organiser` = that calendar's organiser decides; `super` = the super admin decides (`migrations/016`) |
+| audience | VARCHAR(10) | 'super' | `organiser` = that calendar's organiser decides; `super` = the WhenRUFree admin decides (`migrations/016`) |
 | reason | VARCHAR(32) | - | Reason key from `reportReasons()` (e.g. `inappropriate_name`, `behaviour`, `spam`) |
 | details | VARCHAR(200) | NULL | Optional free text from the reporter |
 | status | VARCHAR(10) | 'open' | `open` until decided, then `closed` |
@@ -423,12 +423,12 @@ Reports about a person on a calendar. Created by `migrations/011_report_users.sq
 
 **Business rules:**
 - No foreign keys on purpose: a report is a snapshot and survives the calendar, the name and the account it names
-- Usernames are never stored here (they stay private to the super admin); the admin panel joins them live
+- Usernames are never stored here (they stay private to the WhenRUFree admin); the WhenRUFree admin panel joins them live
 - Anything involving the organiser, on either side, gets `audience = 'super'` from `reportAudienceFor()`: a member reporting the organiser, or the organiser reporting anyone. Member-to-member reports get `audience = 'organiser'`
 - Written by `report_user` (any member) and by `manage_calendar_user` *before* any block or delete, so a report sent with a delete still records the name and account
 - One open report per reporter and person; after a decision the same pair cannot report again within `accounts.report_cooldown_days` (default 30)
-- A calendar's organiser decides its `organiser` reports in the calendar **Reports** inbox (`calendar_reports`, `decide_calendar_report`): dismiss (silent), block, remove, or escalate to the super admin
-- Super admin resolves `super` reports in the admin **Reports** tab (`admin_reports`, `admin_report_decide`)
+- A calendar's organiser decides its `organiser` reports in the calendar **Reports** inbox (`calendar_reports`, `decide_calendar_report`): dismiss (silent), block, remove, or escalate to the WhenRUFree admin
+- WhenRUFree admin resolves `super` reports in the WhenRUFree admin **Reports** tab (`admin_reports`, `admin_report_decide`)
 - `organiser` reports are deleted with their calendar; `super` reports are kept, so deleting a calendar cannot erase a complaint about its organiser
 - cleanup.php step 11 removes `organiser` reports whose calendar is gone and prunes closed reports older than `accounts.reports_keep_days` (default 180)
 

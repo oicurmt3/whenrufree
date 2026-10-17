@@ -52,11 +52,11 @@
     <button id="userSelectBtn" class="btn btn-ghost icon-btn" type="button" title="People" aria-label="People on this calendar" aria-haspopup="dialog">
       <span class="material-symbols-outlined" aria-hidden="true">group</span>
     </button>
-    <!-- Share (admin only) -->
+    <!-- Share (organiser only) -->
     <button id="shareBtn" class="btn btn-ghost icon-btn" type="button" title="Share" aria-label="Share" style="display:none;">
       <span class="material-symbols-outlined" aria-hidden="true">share</span>
     </button>
-    <!-- Calendar settings (admin only) -->
+    <!-- Calendar settings (organiser only) -->
     <button id="settingsBtn" class="btn btn-ghost icon-btn" type="button" title="Calendar settings" aria-label="Calendar settings" aria-haspopup="dialog" style="display:none;">
       <span class="material-symbols-outlined" aria-hidden="true">settings</span>
     </button>
@@ -64,7 +64,7 @@
     <button id="submitBtn" class="btn btn-submit icon-btn is-saved init-hidden" type="button" disabled title="Saved" aria-label="Saved">
       <span id="submitBtnIcon" class="material-symbols-outlined" aria-hidden="true">lock</span>
     </button>
-    <!-- Reports waiting for the organiser (admin only) -->
+    <!-- Reports waiting for the organiser (organiser only) -->
     <button id="reportsBtn" class="btn btn-ghost icon-btn has-badge" type="button" title="Reports" aria-label="Reports on this calendar" aria-haspopup="dialog" style="display:none;">
       <span class="material-symbols-outlined" aria-hidden="true">flag</span>
       <span id="reportsBtnBadge" class="icon-badge"></span>
@@ -73,8 +73,8 @@
     <button id="resetMineBtn" class="btn btn-danger icon-btn" type="button" title="Reset my availability" aria-label="Reset my availability" style="display:none;">
       <span class="material-symbols-outlined" aria-hidden="true">delete</span>
     </button>
-    <!-- Reset All (admin only) -->
-    <button id="resetAllBtn" class="btn btn-danger icon-btn" type="button" title="Reset ALL availability (admin)" aria-label="Reset ALL availability (admin)" style="display:none;">
+    <!-- Reset All (organiser only) -->
+    <button id="resetAllBtn" class="btn btn-danger icon-btn" type="button" title="Reset ALL availability (organiser)" aria-label="Reset ALL availability (organiser)" style="display:none;">
       <span class="material-symbols-outlined" aria-hidden="true">warning</span>
     </button>
   </div>
@@ -332,8 +332,8 @@
       <select id="manageReason"></select>
     </div>
     <div id="manageReportFields">
-      <textarea id="manageDetails" rows="3" maxlength="200" aria-label="Report details (optional)" placeholder="Anything the super admin should know (optional)"></textarea>
-      <p class="block-note">The super admin sees your report, this calendar and the name the person is using.</p>
+      <textarea id="manageDetails" rows="3" maxlength="200" aria-label="Report details (optional)" placeholder="Anything the WhenRUFree admin should know (optional)"></textarea>
+      <p class="block-note">The WhenRUFree admin sees your report, this calendar and the name the person is using.</p>
     </div>
     <p class="block-note" id="manageReportNone" hidden>Reports are not available yet.</p>
 
@@ -346,7 +346,7 @@
   </div>
 </div>
 
-<!-- Report someone on this calendar (everyone; goes to the organiser, or the super admin if it is about the organiser) -->
+<!-- Report someone on this calendar (everyone; goes to the organiser, or the WhenRUFree admin if it is about the organiser) -->
 <div class="modal-overlay" id="reportUserModal">
   <div class="modal">
     <h2 id="reportUserTitle">Report this person</h2>

@@ -45,7 +45,7 @@ The calendar page is split into six classic scripts that share global scope (no 
 
 | Function | File:Line | Description |
 |----------|------|-------------|
-| `isCurrentUserOrganiser()` | calendar-core.js:234 | Returns true if your name here has the admin role or matches adminUserId. |
+| `isCurrentUserOrganiser()` | calendar-core.js:234 | Returns true if your name here has the `admin` role (the calendar organiser) or matches `adminUserId`. |
 | `shouldShowRoster()` | calendar-core.js:313 | Privacy-gated: returns true if roster details should be visible in rankings (you must have joined). |
 | `shouldShowOrganiserDots()` | calendar-core.js:334 | Privacy-gated: returns true if organiser border indicators should show on slots. Open calendars: `state.organiserMarks`; Hidden: true (only the organiser has the rows); Blind and booking: false. |
 | `organiserMarksSettingShown()` | calendar-core.js:347 | True when Calendar settings offers the organiser-marks switch: migration 010 ran, Open privacy, not a booking calendar. |
@@ -124,7 +124,7 @@ The calendar page is split into six classic scripts that share global scope (no 
 | `renderDateRangeSkeleton()` | calendar-grid.js:228 | Builds the full calendar grid with day columns, headers, and slot elements. |
 | `refreshCalendarValues()` | calendar-grid.js:366 | Updates all slot colours and organiser dots for you, or for the person in the read-only view (`state.viewUserId`). |
 | `getStatus(userId, dateStr, slotId)` | calendar-grid.js:48 | Returns `{status, pending}` for a user/date/slot, checking pending changes first. |
-| `getOrganiserStatus(dateStr, slotId)` | calendar-grid.js:65 | Returns the admin's status for a slot (for organiser dots). |
+| `getOrganiserStatus(dateStr, slotId)` | calendar-grid.js:65 | Returns the organiser's status for a slot (for organiser dots). |
 | `setSlotClass(el, status)` | calendar-grid.js:71 | Applies `status-N` CSS class to a slot element. |
 | `updateOrganiserDot(slotEl, dateStr, slotId)` | calendar-grid.js:87 | Applies `org-border-N` CSS class for organiser's left-border indicator. Skipped on the organiser's own answers (yours, or theirs while viewing them). |
 | `cycleStatus(current)` | calendar-grid.js:393 | Cycles through statuses: NULL -> 1 -> 2 -> ... -> N -> NULL. |
@@ -189,8 +189,8 @@ The calendar page is split into six classic scripts that share global scope (no 
 | `closeUserView()` | calendar-users.js:187 | Back to your own calendar: clears `state.viewUserId`, hides the bar, redraws. Wired to the bar's X and Escape (when no modal is open) in calendar-main.js. |
 | `openUserSelectModal()` | calendar-users.js:353 | Shows the People modal after `populateUserSelectModal()`. |
 | `closeUserSelectModal()` | calendar-users.js:556 | Hides the People modal. |
-| `canReportUser(u, isOrganiser)` | calendar-users.js:584 | Whether a row gets the flag button: reporting is available (migration 016), the row is not you, not an unclaimed old name, and you are not the organiser (they use Manage instead). Organisers are reportable by members, because that report goes to the super admin. |
-| `openReportModal(u)` / `closeReportModal()` | calendar-users.js:609 / 629 | Report modal (`#reportUserModal`): fills the reasons from `state.reportReasons`, and sets the wording from the target's role - "The organiser decides what happens" for a member, "The super admin does not show this to the organiser" for the organiser. |
+| `canReportUser(u, isOrganiser)` | calendar-users.js:584 | Whether a row gets the flag button: reporting is available (migration 016), the row is not you, not an unclaimed old name, and you are not the organiser (they use Manage instead). Organisers are reportable by members, because that report goes to the WhenRUFree admin. |
+| `openReportModal(u)` / `closeReportModal()` | calendar-users.js:609 / 629 | Report modal (`#reportUserModal`): fills the reasons from `state.reportReasons`, and sets the wording from the target's role - "Tell the organiser about ... The organiser decides what happens" for a member, "Tell the WhenRUFree admin about the organiser of this calendar. The organiser does not see this report." for the organiser. |
 | `submitReport()` | calendar-users.js:634 | POST `report_user` with `user_id`, `reason` and optional `details`; toasts the audience the server chose, or shows the 409 `ALREADY_REPORTED` message. |
 | `updateReportsButton()` | calendar-users.js:669 | Shows `#reportsBtn` for the organiser once reporting exists, and sets its count badge from `state.openReports` (99+ cap). Called from `loadCalendarMeta()` and `updateUserUI()`. |
 | `openReportsModal()` / `closeReportsModal()` | calendar-users.js:681 / 688 | Organiser inbox (`#reportsModal`); opening loads the list. |
@@ -268,7 +268,7 @@ Active when `calendar_meta` has `slot_capacity` (`state.booking = {capacity, per
 | Function | File:Line | Description |
 |----------|------|-------------|
 | `resetMyAvailability()` | calendar-grid.js:650 | Confirmation then API call to delete current user's availability. |
-| `resetAllUsers()` | calendar-grid.js:720 | Double confirmation (confirm + type "RESET") then API call. Admin only. |
+| `resetAllUsers()` | calendar-grid.js:720 | Double confirmation (confirm + type "RESET") then API call. Organiser only. |
 
 ### Initialisation
 

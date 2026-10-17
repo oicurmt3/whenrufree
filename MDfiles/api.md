@@ -13,7 +13,7 @@ Concise endpoint list for `api.php?action=...&c=TOKEN`. Endpoints are in `api.ph
 
 ## Endpoints
 
-Role column: "joined" = the account has a name on the calendar; "organiser" = that name has role `admin`; "Hub organiser" = `groups.organiser_account_id`.
+Role column: "joined" = the account has a name on the calendar; "organiser" = that name holds the database role `admin`; "Hub organiser" = `groups.organiser_account_id`; "WhenRUFree admin" = the site panel in `admin.html` (the `super` role in the table below), never a calendar or Hub organiser.
 
 | Action | Method | Auth | Role | Description |
 |--------|--------|------|------|-------------|
@@ -38,8 +38,8 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `access_settings` | GET | Account | organiser / Hub organiser | Current emoji (`c` or `g`) |
 | `set_access_emoji` | POST | Account | organiser | Set or remove the calendar's emoji (`emoji` 0-34 or null) |
 | `set_group_access_emoji` | POST | Account | Hub organiser | Set or remove the Hub's emoji |
-| `manage_calendar_user` | POST | Account | organiser | One person, one decision (`user_id`): `blocked` 1/0, `delete` 1, `report_reason` / `report_details`; applied report, then block, then delete. Always reports to the super admin |
-| `report_user` | POST | Account | joined | Report someone (`user_id`, `reason`, optional `details`) to the organiser, or to the super admin when the report is about the organiser |
+| `manage_calendar_user` | POST | Account | organiser | One person, one decision (`user_id`): `blocked` 1/0, `delete` 1, `report_reason` / `report_details`; applied report, then block, then delete. Always reports to the WhenRUFree admin |
+| `report_user` | POST | Account | joined | Report someone (`user_id`, `reason`, optional `details`) to the organiser, or to the WhenRUFree admin when the report is about the organiser |
 | `calendar_reports` | GET | Account | organiser | Open member reports for this calendar, with who reported |
 | `decide_calendar_report` | POST | Account | organiser | `report_id` + `decision` dismiss / block / remove / escalate |
 | `calendar_meta` | GET | Account | - | Calendar config + `account: {profile_name, me, claimable}`, `hide_names`, `names_private`, `null_color`, `default_status`, `organiser_marks`, `reports_available`, `open_reports` |
@@ -65,29 +65,29 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 | `unchoose_slot` | POST | Account | organiser | Reopen frozen calendar |
 | `set_bookings_closed` | POST | Account | organiser | Close (`closed` 1) or reopen (0) bookings on a booking calendar |
 | `set_organiser_marks` | POST | Account | organiser | Show (`on` 1) or hide (0) your answers as a coloured slot edge on Open calendars (migration 010) |
-| `admin_login` | POST | CSRF | - | Super admin login |
-| `admin_login_account` | POST | CSRF + account | - | Super admin session for an account listed in `admin.account_ids` |
-| `admin_calendars` | GET | Admin | super | List all calendars (includes optional Hub fields) |
-| `admin_set_permanent` | POST | Admin | super | Toggle never_expires |
-| `admin_delete_calendar` | POST | Admin | super | Delete calendar |
-| `admin_groups` | GET | Admin | super | List all Hubs |
-| `admin_group_calendars` | GET | Admin | super | List calendars in a Hub |
-| `admin_set_group_permanent` | POST | Admin | super | Toggle Hub never_expires |
-| `admin_delete_group` | POST | Admin | super | Delete Hub (detaches calendars) |
-| `admin_list_users` | GET | Admin | super | List users for calendar (`has_account`, `locked_seconds`) |
-| `admin_delete_user` | POST | Admin | super | Delete user from calendar |
-| `admin_unlock_user` | POST | Admin | super | Clear a claim lockout on an old name |
-| `admin_unlock_group` | POST | Admin | super | Clear a claim lockout on an old Hub |
-| `admin_set_access_emoji` | POST | Admin | super | Remove a calendar's or Hub's emoji (`kind`, `id`) |
-| `admin_accounts` | GET | Admin | super | Account totals and list (optional `q` username prefix) |
-| `admin_delete_account` | POST | Admin | super | Delete an account (`account_id`) |
-| `admin_test_users` | GET | Admin | super | Test users created from the panel (migration 015) |
-| `admin_create_test_user` | POST | Admin | super | Create test users (`username`, `display_name`, optional `count` 1-10) |
-| `admin_delete_test_users` | POST | Admin | super | Delete every test user |
-| `admin_impersonate` | POST | Admin | super | Open a test user in this browser (`account_id`) |
-| `admin_impersonate_end` | POST | CSRF | - | Return to the admin's account, or sign the test user out |
-| `admin_reports` | GET | Admin | super | All reports (reporter, reason, details, calendar, audience); open first |
-| `admin_report_decide` | POST | Admin | super | Close a report, or delete the reported account, with `report_id` and `decision` dismiss / delete |
+| `admin_login` | POST | CSRF | - | WhenRUFree admin login |
+| `admin_login_account` | POST | CSRF + account | - | WhenRUFree admin session for an account listed in `admin.account_ids` |
+| `admin_calendars` | GET | WhenRUFree admin | super | List all calendars (includes optional Hub fields) |
+| `admin_set_permanent` | POST | WhenRUFree admin | super | Toggle never_expires |
+| `admin_delete_calendar` | POST | WhenRUFree admin | super | Delete calendar |
+| `admin_groups` | GET | WhenRUFree admin | super | List all Hubs |
+| `admin_group_calendars` | GET | WhenRUFree admin | super | List calendars in a Hub |
+| `admin_set_group_permanent` | POST | WhenRUFree admin | super | Toggle Hub never_expires |
+| `admin_delete_group` | POST | WhenRUFree admin | super | Delete Hub (detaches calendars) |
+| `admin_list_users` | GET | WhenRUFree admin | super | List users for calendar (`has_account`, `locked_seconds`) |
+| `admin_delete_user` | POST | WhenRUFree admin | super | Delete user from calendar |
+| `admin_unlock_user` | POST | WhenRUFree admin | super | Clear a claim lockout on an old name |
+| `admin_unlock_group` | POST | WhenRUFree admin | super | Clear a claim lockout on an old Hub |
+| `admin_set_access_emoji` | POST | WhenRUFree admin | super | Remove a calendar's or Hub's emoji (`kind`, `id`) |
+| `admin_accounts` | GET | WhenRUFree admin | super | Account totals and list (optional `q` username prefix) |
+| `admin_delete_account` | POST | WhenRUFree admin | super | Delete an account (`account_id`) |
+| `admin_test_users` | GET | WhenRUFree admin | super | Test users created from the panel (migration 015) |
+| `admin_create_test_user` | POST | WhenRUFree admin | super | Create test users (`username`, `display_name`, optional `count` 1-10) |
+| `admin_delete_test_users` | POST | WhenRUFree admin | super | Delete every test user |
+| `admin_impersonate` | POST | WhenRUFree admin | super | Open a test user in this browser (`account_id`) |
+| `admin_impersonate_end` | POST | CSRF | - | Return to the WhenRUFree admin's account, or sign the test user out |
+| `admin_reports` | GET | WhenRUFree admin | super | All reports (reporter, reason, details, calendar, audience); open first |
+| `admin_report_decide` | POST | WhenRUFree admin | super | Close a report, or delete the reported account, with `report_id` and `decision` dismiss / delete |
 
 "Account" in the Auth column also means CSRF on POSTs.
 
@@ -112,7 +112,7 @@ Role column: "joined" = the account has a name on the calendar; "organiser" = th
 - Hub token: `?g=TOKEN` on `group_meta`, `claim_hub`, Hub emoji calls, and Hub pages
 - Dates: YYYY-MM-DD strings
 - Availability status: integer (0=null/clear, 1..N=status option)
-- Roles: "admin" (organiser) or "member" (participant)
+- Roles: "organiser" (the creator/manager; stored as the database role `admin`) or "member" (participant)
 - Names: letters, numbers, spaces, `'` and `-`, up to 32 characters, unique per calendar; one name per account per calendar
 - Usernames: 3-20 lowercase letters, numbers or `_`, unique, private
 - Privacy: 0=open, 1=hidden, 2=blind; names are private on blind, and on hidden unless `hide_names` is 0 (default 1)

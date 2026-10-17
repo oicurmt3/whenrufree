@@ -282,7 +282,7 @@
   /**
    * Bar across the top of every page while a test user is open in this browser. A test user has
    * no sign-in method of its own, so this only ever appears after the admin opened one from the
-   * Accounts tab, and the button hands the browser back to the admin's own account.
+   * Accounts tab, and the button hands the browser back to the WhenRUFree admin's own account.
    * @param {object} info - account_me payload
    * @returns {HTMLElement|null}
    */

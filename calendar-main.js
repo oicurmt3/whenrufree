@@ -40,7 +40,7 @@ els.shareBtn.addEventListener('click', async ()=>{
 // Reset Mine button - resets current user's own availability
 els.resetMineBtn.addEventListener('click', ()=> resetMyAvailability());
 
-// Reset All button - admin only, resets all users
+// Reset All button - organiser only, resets all users
 els.resetAllBtn.addEventListener('click', ()=> resetAllUsers());
 
 // Sort toggle buttons - switch between score and date sorting

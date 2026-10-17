@@ -48,7 +48,7 @@ function reportRow(r) {
     const calendar = r.calendar_token
         ? `<a href="calendar.html?c=${encodeURIComponent(r.calendar_token || '')}" target="_blank" rel="noopener">${escapeHtml(r.calendar_title || 'Untitled calendar')}</a>`
         : `<span class="no-title">${r.calendar_title ? escapeHtml(r.calendar_title) + ' (deleted)' : `deleted (#${r.calendar_id})`}</span>`;
-    // Reports about an organiser reach the super admin directly; escalated ones came through an organiser
+    // Reports about an organiser reach the WhenRUFree admin directly; escalated ones came through an organiser
     const origin = r.outcome === 'escalated' ? ' <span class="acct-tag acct-tag-muted">escalated</span>' : '';
     const closed = r.status !== 'open';
     return `

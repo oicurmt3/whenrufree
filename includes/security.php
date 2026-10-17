@@ -277,19 +277,19 @@ function requireAdminSession(): void {
     
     $token = (string)($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '');
     if ($token === '') {
-        respond(401, ['status' => 'error', 'message' => 'Admin auth required']);
+        respond(401, ['status' => 'error', 'message' => 'WhenRUFree admin sign-in required']);
     }
 
     $storedToken = (string)($_SESSION['admin_token'] ?? '');
     $expires = (int)($_SESSION['admin_token_expires'] ?? 0);
 
     if ($storedToken === '' || !hash_equals($storedToken, $token)) {
-        respond(401, ['status' => 'error', 'message' => 'Invalid admin session']);
+        respond(401, ['status' => 'error', 'message' => 'Invalid WhenRUFree admin session']);
     }
 
     if ($expires < time()) {
         unset($_SESSION['admin_token'], $_SESSION['admin_token_expires']);
-        respond(401, ['status' => 'error', 'message' => 'Admin session expired']);
+        respond(401, ['status' => 'error', 'message' => 'WhenRUFree admin session expired']);
     }
 
     // Extend session on activity

@@ -148,7 +148,7 @@ function promptJoin(){
   openUserModal('add');
 }
 
-/*** Users include role; admin first with "(admin)" */
+/*** Users include role; the organiser first with "(organiser)" */
 async function loadUsers(){
   const data = await apiGet('users');
   if(data.status!=='success') throw new Error('Failed to load users');
@@ -159,9 +159,9 @@ async function loadUsers(){
   // Private names: the list only has you, the organisers and old names; total counts everyone
   state.usersTotal = Number.isInteger(data.total) ? data.total : state.users.length;
   state.namesHidden = data.names_hidden === true;
-  // admin first
+  // organiser first
   state.users.sort((a,b)=> (a.role==='admin'? -1:0) + (b.role==='admin'? 1:0));
-  // Cache admin user ID for organiser dots
+  // Cache the organiser's user ID for organiser dots
   const admin = state.users.find(u => u.role === 'admin');
   state.adminUserId = admin ? admin.id : null;
   // Keep the read-only view only while that person can still be viewed
@@ -342,7 +342,7 @@ function populateUserSelectModal(){
       item.appendChild(manageBtn);
     }
 
-    // Everyone else: report a person they can see. Reports about the organiser go to the super
+    // Everyone else: report a person they can see. Reports about the organiser go to the WhenRUFree
     // admin, so this is offered on the organiser's row too (including on Blind calendars, where
     // the organisers are the only other people a member can see).
     if(canReportUser(u, isOrganiser)){
@@ -404,7 +404,7 @@ function openManageModal(u){
   };
   const name = u.display_name;
   els.manageUserTitle.textContent = `Manage ${name}`;
-  els.manageUserText.textContent = `Block or unblock ${name}, delete them from this calendar, or report them to the super admin. You can combine these.`;
+  els.manageUserText.textContent = `Block or unblock ${name}, delete them from this calendar, or report them to the WhenRUFree admin. You can combine these.`;
   els.manageDelete.checked = false;
   els.manageReason.value = '';
   els.manageDetails.value = '';
@@ -502,7 +502,7 @@ function manageChoiceLines(){
   }
   if(m.reason !== ''){
     const label = (state.reportReasons && state.reportReasons[m.reason]) || m.reason;
-    lines.push({ text: `Report to the super admin: ${label}${m.details ? ` - "${m.details}"` : ''}` });
+    lines.push({ text: `Report to the WhenRUFree admin: ${label}${m.details ? ` - "${m.details}"` : ''}` });
   }
   return lines;
 }
@@ -577,7 +577,7 @@ function closeUserSelectModal(){
 
 // -------------------------
 // Report a person (everyone): member-to-member goes to the organiser, anything involving the
-// organiser goes to the super admin
+// organiser goes to the WhenRUFree admin
 // -------------------------
 
 /** Whether this row offers Report: anyone you can see, except yourself and an unclaimed old name. */
@@ -612,10 +612,10 @@ function openReportModal(u){
   const aboutOrganiser = u.role === 'admin';
   els.reportUserTitle.textContent = `Report ${u.display_name}`;
   els.reportUserText.textContent = aboutOrganiser
-    ? `Tell the super admin about the organiser of this calendar. The organiser does not see this report.`
+    ? `Tell the WhenRUFree admin about the organiser of this calendar. The organiser does not see this report.`
     : `Tell the organiser about ${u.display_name}. The organiser decides what happens; ${u.display_name} will not be told who reported them.`;
   els.reportWhoSees.textContent = aboutOrganiser
-    ? 'This report goes straight to the super admin, because an organiser cannot decide a complaint about themselves.'
+    ? 'This report goes straight to the WhenRUFree admin, because an organiser cannot decide a complaint about themselves.'
     : 'This report goes to the organiser of this calendar.';
   fillReportReasons();
   els.reportReason.value = '';
@@ -775,7 +775,7 @@ function renderCalendarReports(){
     add('dismiss', 'Dismiss', 'report-dismiss');
     add('block', 'Block', '');
     add('remove', 'Remove', 'report-remove');
-    add('escalate', 'Send to super admin', '');
+    add('escalate', 'Send to WhenRUFree admin', '');
     item.appendChild(actions);
 
     els.reportsList.appendChild(item);
@@ -790,7 +790,7 @@ async function decideCalendarReport(reportId, decision, btn){
   if(decision === 'dismiss') question = `Dismiss this report about ${name}?\n\nNothing happens to ${name} and ${r.reporter_name || 'the reporter'} is not told.`;
   else if(decision === 'block') question = `Block ${name}?\n\nThey can no longer open this calendar and their answers are hidden from views and Best Match. You can unblock them later.`;
   else if(decision === 'remove') question = `Remove ${name} from this calendar?\n\nTheir name and every answer they gave are deleted. This cannot be undone.`;
-  else question = `Send this report about ${name} to the super admin?\n\nThe super admin decides it from now on.`;
+  else question = `Send this report about ${name} to the WhenRUFree admin?\n\nThe WhenRUFree admin decides it from now on.`;
   if(!confirm(question)) return;
 
   btn.disabled = true;
@@ -809,7 +809,7 @@ async function decideCalendarReport(reportId, decision, btn){
       await refreshPeopleAndViews();
       showToast(decision === 'block' ? `${name} blocked` : `${name} removed`);
     } else if(decision === 'escalate'){
-      showToast('Sent to the super admin');
+      showToast('Sent to the WhenRUFree admin');
     } else {
       showToast('Report dismissed');
     }
@@ -888,8 +888,8 @@ function setLoading(isLoading, message='Loading...'){
  * Updates UI elements based on current user authentication state.
  * - Submit/Save button: visible only when authenticated
  * - Reset Mine button: visible for all authenticated users
- * - Reset All button: visible only for authenticated admin
- * - Share: admin only
+ * - Reset All button: visible only for the authenticated organiser
+ * - Share: organiser only
  */
 function updateUserUI(){
   const hasUser = !!state.currentUserId;
@@ -916,7 +916,7 @@ function updateUserUI(){
   // Reset Mine: visible for ALL authenticated users
   els.resetMineBtn.style.display = isAuthenticated ? 'inline-flex' : 'none';
   
-  // Reset All: visible only for admin
+  // Reset All: visible only for the organiser
   els.resetAllBtn.style.display = isAdmin ? 'inline-flex' : 'none';
 
   // Reports inbox: organiser only, once the reports table exists

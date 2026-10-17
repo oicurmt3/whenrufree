@@ -21,7 +21,7 @@ Everyone signs in with an account (Google, Facebook or a passkey) before they ca
 
 ### Account gate
 
-Before every action, `accountGate()` (`includes/accounts.php`) requires a signed-in account that has chosen a username and profile name. Exempt: `csrf_token`, `diag`, `get_site_config`, every `account_*` and `oauth_*` action, and every `admin_*` action (super admin has its own session).
+Before every action, `accountGate()` (`includes/accounts.php`) requires a signed-in account that has chosen a username and profile name. Exempt: `csrf_token`, `diag`, `get_site_config`, every `account_*` and `oauth_*` action, and every `admin_*` action (WhenRUFree admin has its own session).
 
 - Not signed in: HTTP 401 `{ code: "ACCOUNT_REQUIRED", message: "Please sign in." }`
 - Signed in but no username / profile name yet: HTTP 403 `{ code: "ACCOUNT_SETUP", message }`
@@ -79,7 +79,7 @@ Names and Hubs created before accounts still have a PIN hash until someone claim
 | 4th and later | 2 days |
 
 - The 5th wrong PIN returns HTTP 429 with code `ACCOUNT_LOCKED`, `message` (e.g. "Too many wrong PINs. This name is locked for 15 minutes.") and `retry_after` (seconds). While locked, every attempt returns the same code with "Try again in 2 hours." style wording.
-- The escalation level (`lockout_level`) survives the lock expiring. It resets on a successful claim, a super admin Unlock, or after 30 days without a lockout (`cleanup.php`).
+- The escalation level (`lockout_level`) survives the lock expiring. It resets on a successful claim, an Unlock by the WhenRUFree admin, or after 30 days without a lockout (`cleanup.php`).
 - Config (optional, `config.php`): `'pin_lockout' => ['max_attempts' => 5, 'schedule_minutes' => [5, 15, 120, 2880], 'reset_after_days' => 30]`. The last step repeats.
 - `migrations/008_drop_pins.sql` (run about 90 days after accounts go live) deletes every remaining PIN hash; after that nothing can be claimed.
 
@@ -151,7 +151,7 @@ Implemented in `includes/reports.php`. Needs `migrations/011_report_users.sql` a
 Every report has an **audience**, decided server-side by `reportAudienceFor()` and never by the client:
 
 - `organiser` - a member reporting another member. That calendar's organiser decides it.
-- `super` - anything involving the organiser: a member reporting them, or the organiser reporting anyone. The super admin decides it, because an organiser cannot adjudicate a complaint about themselves.
+- `super` - anything involving the organiser: a member reporting them, or the organiser reporting anyone. The WhenRUFree admin decides it, because an organiser cannot adjudicate a complaint about themselves.
 
 Reasons come from `reportReasons()`: `inappropriate_name`, `behaviour`, `spam`, `harassment`, `impersonation`, `other`.
 
@@ -164,7 +164,7 @@ CSRF + `c`. Any account with a name on the calendar (a blocked account is refuse
 - Per-IP limit: 20 reports an hour.
 - Reporting only records the report: it never blocks, hides or deletes anyone.
 
-**Response:** `{ status, report_id, audience, message }` - `message` says whether it went to the organiser or the super admin. Errors: 400 invalid reason, 404 not on this calendar, 429 too many reports, 503 before migration 016.
+**Response:** `{ status, report_id, audience, message }` - `message` says whether it went to the organiser or the WhenRUFree admin. Errors: 400 invalid reason, 404 not on this calendar, 429 too many reports, 503 before migration 016.
 
 ### GET calendar_reports
 
@@ -181,7 +181,7 @@ CSRF + `c`, calendar organiser only. Body: `report_id`, `decision`:
 | `dismiss` | Closes the report as `dismissed`. Silent: nothing is sent to the reporter and the person is not changed |
 | `block` | Sets `users.blocked = 1` for the reported person, then closes the report as `blocked` |
 | `remove` | Deletes the person's availability and their name on this calendar, then closes the report as `removed` |
-| `escalate` | Moves the report to the super admin queue (`audience` becomes `super`, `outcome` stays `escalated`) and leaves it open |
+| `escalate` | Moves the report to the WhenRUFree admin queue (`audience` becomes `super`, `outcome` stays `escalated`) and leaves it open |
 
 The report must belong to this calendar and have `audience = 'organiser'` (404 otherwise), and must still be open (409). Block and remove need the person to still be on the calendar (410 if they left) and refuse the organiser (403). **Response:** `{ status, open }` - `open` is the number still waiting.
 
@@ -235,7 +235,7 @@ CSRF + `c`. Any account with a name on that calendar. Removes that person's name
 
 ### POST account_delete_calendar
 
-CSRF + `c`. The calendar's organiser only (403 otherwise). Deletes the calendar for everyone: names, answers, sessions and access grants, and organiser-audience reports. Super-admin reports about that organiser are kept. **Response:** `{ status }`.
+CSRF + `c`. The calendar's organiser only (403 otherwise). Deletes the calendar for everyone: names, answers, sessions and access grants, and organiser-audience reports. Reports for the WhenRUFree admin about that organiser are kept. **Response:** `{ status }`.
 
 ### Passkeys (POST + CSRF)
 
@@ -590,19 +590,19 @@ Shows or hides the organiser's own answers as a coloured left edge on everyone's
 
 ---
 
-## Super Admin Endpoints
+## WhenRUFree Admin Endpoints
 
 These require a separate admin session via `admin_login` or `admin_login_account`. Not exposed to calendar users, and not affected by the account gate.
 
 ### POST admin_login
 
-Authenticates as super admin using the password in `config.php` (`admin.password`, plain or bcrypt), with a per-IP lockout (`admin.max_attempts` / `admin.lockout_minutes`).
+Authenticates as the WhenRUFree admin using the password in `config.php` (`admin.password`, plain or bcrypt), with a per-IP lockout (`admin.max_attempts` / `admin.lockout_minutes`).
 
 **Response:** `{ status, admin_token, csrf_token }` - a 1-hour admin session. Send `admin_token` as the `X-Admin-Token` header on admin actions.
 
 ### POST admin_login_account
 
-CSRF. Opens the same 1-hour admin session for the signed-in account when its id is listed in `config.php` `admin.account_ids` (e.g. `'account_ids' => [1]`). The password login stays as a fallback. `admin.html` tries this silently on load (unless the tab has logged out) and from its **Use my When RU Free account** button.
+CSRF. Opens the same 1-hour admin session for the signed-in account when its id is listed in `config.php` `admin.account_ids` (e.g. `'account_ids' => [1]`). The password login stays as a fallback. `admin.html` tries this silently on load (unless the tab has logged out) and from its **Use my WhenRUFree account** button.
 
 **Response:** `{ status, admin_token, csrf_token }`. Errors: 403 `ADMIN_ACCOUNT_OFF` (no `account_ids` or accounts tables missing), 401 `ACCOUNT_REQUIRED` (not signed in), 403 `NOT_ADMIN` (account not listed; logged as `ADMIN_ACCOUNT_DENIED`).
 
@@ -680,11 +680,11 @@ CSRF + admin session. Deletes every test user (same as `admin_delete_account` fo
 
 ### POST admin_impersonate
 
-CSRF + admin session. Body: `account_id`, which must be a test user (403 otherwise, logged as `ADMIN_IMPERSONATE_DENIED`). Swaps the account cookie to the test user and remembers the admin's own account in the PHP session, so `admin_impersonate_end` can return. Only one test user can be open at a time; opening another replaces it. **Response:** `{ status, account_id }`
+CSRF + admin session. Body: `account_id`, which must be a test user (403 otherwise, logged as `ADMIN_IMPERSONATE_DENIED`). Swaps the account cookie to the test user and remembers the WhenRUFree admin's own account in the PHP session, so `admin_impersonate_end` can return. Only one test user can be open at a time; opening another replaces it. **Response:** `{ status, account_id }`
 
 ### POST admin_impersonate_end
 
-CSRF; deliberately no admin token needed, so a new tab can still return. Restores the admin's own account from the session marker, or signs the test user out when the admin signed in with a password only. **Response:** `{ status, restored }`
+CSRF; deliberately no admin token needed, so a new tab can still return. Restores the WhenRUFree admin's own account from the session marker, or signs the test user out when the WhenRUFree admin signed in with a password only. **Response:** `{ status, restored }`
 
 ### GET admin_reports
 
@@ -729,7 +729,7 @@ All security-relevant actions are logged to `grape_private/logs/security_YYYY-MM
 | USER_BLOCKED | Organiser blocks or unblocks a person on a calendar (`blocked`) |
 | USER_REPORTED | A member or organiser reports someone (`report_id`, `reason`, `audience`) |
 | REPORT_DISMISSED | Calendar organiser silently dismisses a member's report |
-| REPORT_ESCALATED | Calendar organiser hands a report to the super admin |
+| REPORT_ESCALATED | Calendar organiser hands a report to the WhenRUFree admin |
 | CALENDAR_LEFT | A member leaves a calendar from their profile page |
 | CALENDAR_DELETED | Organiser deletes a calendar from their profile page |
 | CHOOSE_SLOT | Organiser locks in a date+slot |
@@ -738,30 +738,30 @@ All security-relevant actions are logged to `grape_private/logs/security_YYYY-MM
 | BOOKINGS_REOPENED | Organiser reopens bookings |
 | ADD_CALENDAR_TO_GROUP | Calendar attached to a Hub |
 | REMOVE_CALENDAR_FROM_GROUP | Calendar detached from a Hub |
-| ADMIN_DELETE_CALENDAR | Super admin deletes a calendar |
-| ADMIN_DELETE_USER | Super admin deletes a user |
-| ADMIN_DELETE_ACCOUNT | Super admin deletes an account |
-| ADMIN_SET_PERMANENT | Super admin toggles never_expires |
-| ADMIN_SET_GROUP_PERMANENT | Super admin toggles never_expires on a Hub |
-| ADMIN_DELETE_GROUP | Super admin deletes a Hub |
-| ADMIN_UNLOCK_USER | Super admin clears a claim lockout on an old name |
-| ADMIN_UNLOCK_GROUP | Super admin clears a claim lockout on an old Hub |
-| ADMIN_SAVE_CONFIG | Super admin saves site config |
+| ADMIN_DELETE_CALENDAR | WhenRUFree admin deletes a calendar |
+| ADMIN_DELETE_USER | WhenRUFree admin deletes a user |
+| ADMIN_DELETE_ACCOUNT | WhenRUFree admin deletes an account |
+| ADMIN_SET_PERMANENT | WhenRUFree admin toggles never_expires |
+| ADMIN_SET_GROUP_PERMANENT | WhenRUFree admin toggles never_expires on a Hub |
+| ADMIN_DELETE_GROUP | WhenRUFree admin deletes a Hub |
+| ADMIN_UNLOCK_USER | WhenRUFree admin clears a claim lockout on an old name |
+| ADMIN_UNLOCK_GROUP | WhenRUFree admin clears a claim lockout on an old Hub |
+| ADMIN_SAVE_CONFIG | WhenRUFree admin saves site config |
 | ACCESS_FAILED | Wrong access emoji picked (includes `kind`, `id`) |
 | ACCESS_LOCKED | 3rd wrong pick locks this IP out of that calendar/Hub (includes `minutes`) |
 | ACCESS_GRANTED | Right emoji picked; grant issued |
 | ACCESS_EMOJI_CHANGED | Organiser sets or removes an emoji (`enabled`) |
-| ADMIN_ACCESS_EMOJI_CLEARED | Super admin removes an emoji |
+| ADMIN_ACCESS_EMOJI_CLEARED | WhenRUFree admin removes an emoji |
 | NOT_FOUND_THROTTLED | IP hit the hourly cap for calendar/Hub codes that do not exist |
 | RATE_LIMIT_ERROR | Rate-limit table unavailable |
-| ADMIN_LOGIN_FAILED | Invalid admin password |
-| ADMIN_LOGIN_LOCKED | Admin login lockout triggered (per IP) |
-| ADMIN_LOGIN_SUCCESS | Successful admin login (`method`: `password` or `account`, with `account_id`) |
-| ADMIN_ACCOUNT_DENIED | Signed-in account not in `admin.account_ids`, or a test user, tried to open the admin panel (`account_id`, `reason`) |
-| ADMIN_CREATE_TEST_USER | Super admin creates one or more test users (`created`, `ids`) |
-| ADMIN_DELETE_TEST_USERS | Super admin deletes every test user (`deleted`) |
-| ADMIN_IMPERSONATE | Super admin opens a test user in this browser (`account_id`) |
+| ADMIN_LOGIN_FAILED | Invalid WhenRUFree admin password |
+| ADMIN_LOGIN_LOCKED | WhenRUFree admin login lockout triggered (per IP) |
+| ADMIN_LOGIN_SUCCESS | Successful WhenRUFree admin login (`method`: `password` or `account`, with `account_id`) |
+| ADMIN_ACCOUNT_DENIED | Signed-in account not in `admin.account_ids`, or a test user, tried to open the WhenRUFree admin panel (`account_id`, `reason`) |
+| ADMIN_CREATE_TEST_USER | WhenRUFree admin creates one or more test users (`created`, `ids`) |
+| ADMIN_DELETE_TEST_USERS | WhenRUFree admin deletes every test user (`deleted`) |
+| ADMIN_IMPERSONATE | WhenRUFree admin opens a test user in this browser (`account_id`) |
 | ADMIN_IMPERSONATE_DENIED | Tried to open an account that is not a test user (`account_id`) |
-| ADMIN_IMPERSONATE_END | Returned to the admin's own account, or signed the test user out (`account_id`; 0 when there was no account to return to) |
-| ADMIN_REPORT_DISMISSED | Super admin dismisses a report |
-| ADMIN_REPORT_DELETE_ACCOUNT | Super admin deletes the account a report names |
+| ADMIN_IMPERSONATE_END | Returned to the WhenRUFree admin's own account, or signed the test user out (`account_id`; 0 when there was no account to return to) |
+| ADMIN_REPORT_DISMISSED | WhenRUFree admin dismisses a report |
+| ADMIN_REPORT_DELETE_ACCOUNT | WhenRUFree admin deletes the account a report names |

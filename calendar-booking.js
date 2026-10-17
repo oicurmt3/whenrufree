@@ -60,7 +60,7 @@ function applyBookingChrome(){
   state.rankLimit = 2;
   const bannerText = els.nameBanner ? els.nameBanner.querySelector('p') : null;
   if(bannerText) bannerText.textContent = 'Add your name, then tap a free slot to book it.';
-  for(const [el, label] of [[els.resetMineBtn, 'Cancel my bookings'], [els.resetAllBtn, 'Cancel ALL bookings (admin)']]){
+  for(const [el, label] of [[els.resetMineBtn, 'Cancel my bookings'], [els.resetAllBtn, 'Cancel ALL bookings (organiser)']]){
     if(!el) continue;
     el.title = label;
     el.setAttribute('aria-label', label);

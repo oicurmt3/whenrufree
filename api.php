@@ -648,7 +648,7 @@ if ($action === 'report_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         respond(409, [
             'status' => 'error',
             'code' => 'ALREADY_REPORTED',
-            'message' => 'You already reported this person here. The organiser or super admin is looking at it.',
+            'message' => 'You already reported this person here. The organiser or the WhenRUFree admin is looking at it.',
         ]);
     }
 
@@ -686,7 +686,7 @@ if ($action === 'report_user' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'report_id' => $reportId,
         'audience' => $audience,
         'message' => $audience === REPORTS_AUDIENCE_SUPER
-            ? 'Reported to the super admin.'
+            ? 'Reported to the WhenRUFree admin.'
             : 'Reported to the organiser of this calendar.',
     ]);
 }
@@ -2019,7 +2019,7 @@ if ($action === 'reset_all' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $session = requireSession($pdo, $calId);
     if ($session['role'] !== 'admin') {
-        respond(403, ['status' => 'error', 'message' => 'Not permitted - admin only']);
+        respond(403, ['status' => 'error', 'message' => 'Only the organiser can do that']);
     }
 
     // Require confirmation code from frontend
@@ -2062,7 +2062,7 @@ if ($action === 'admin_login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $adminPassword = (string)($config['admin']['password'] ?? '');
     if ($adminPassword === '') {
         logSecurityEvent('ADMIN_LOGIN_FAILED', ['reason' => 'No admin password configured']);
-        respond(500, ['status' => 'error', 'message' => 'Admin not configured']);
+        respond(500, ['status' => 'error', 'message' => 'WhenRUFree admin is not configured']);
     }
 
     // Verify password (supports both plain text and hashed)
@@ -2097,7 +2097,7 @@ if ($action === 'admin_login_account' && $_SERVER['REQUEST_METHOD'] === 'POST') 
 
     $allowed = adminAccountIds($config);
     if (!$allowed || !accountsTablesReady($pdo)) {
-        respond(403, ['status' => 'error', 'code' => 'ADMIN_ACCOUNT_OFF', 'message' => 'Admin sign-in with an account is not set up.']);
+        respond(403, ['status' => 'error', 'code' => 'ADMIN_ACCOUNT_OFF', 'message' => 'WhenRUFree admin sign-in with an account is not set up.']);
     }
 
     $acct = accountCurrent($pdo);
@@ -2108,11 +2108,11 @@ if ($action === 'admin_login_account' && $_SERVER['REQUEST_METHOD'] === 'POST') 
     // opening it from the Accounts tab would otherwise hand it full admin rights.
     if (accountIsAdminCreated($pdo, (int)$acct['id'])) {
         logSecurityEvent('ADMIN_ACCOUNT_DENIED', ['account_id' => $acct['id'], 'reason' => 'test_user']);
-        respond(403, ['status' => 'error', 'code' => 'NOT_ADMIN', 'message' => 'Test users cannot open the admin panel.']);
+        respond(403, ['status' => 'error', 'code' => 'NOT_ADMIN', 'message' => 'Test users cannot open the WhenRUFree admin panel.']);
     }
     if (!in_array($acct['id'], $allowed, true)) {
         logSecurityEvent('ADMIN_ACCOUNT_DENIED', ['account_id' => $acct['id']]);
-        respond(403, ['status' => 'error', 'code' => 'NOT_ADMIN', 'message' => 'This account is not an admin.']);
+        respond(403, ['status' => 'error', 'code' => 'NOT_ADMIN', 'message' => 'This account is not a WhenRUFree admin.']);
     }
 
     logSecurityEvent('ADMIN_LOGIN_SUCCESS', ['method' => 'account', 'account_id' => $acct['id']]);
@@ -2480,7 +2480,7 @@ if ($action === 'admin_set_access_emoji' && $_SERVER['REQUEST_METHOD'] === 'POST
         respond(400, ['status' => 'error', 'message' => 'Invalid request']);
     }
     if (($_POST['emoji'] ?? null) !== null) {
-        respond(400, ['status' => 'error', 'message' => 'Admins can only remove an emoji']);
+        respond(400, ['status' => 'error', 'message' => 'Only the WhenRUFree admin can remove an emoji']);
     }
 
     $table = $kind === 'calendar' ? 'calendars' : '`groups`';

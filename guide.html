@@ -340,7 +340,7 @@
     <!-- STEP 5: ORGANISER -->
     <div class="step">
       <span class="step-number">Step 5</span>
-      <h3><span class="material-symbols-outlined icon-inline">admin_panel_settings</span> Organiser (Admin)</h3>
+      <h3><span class="material-symbols-outlined icon-inline">admin_panel_settings</span> Organiser</h3>
       <p>
         As the organiser, you have special privileges. Set up your identity here.
       </p>
@@ -485,7 +485,7 @@
     </p>
     <p>
       A report about another participant goes to the calendar's organiser, who sees who reported it. That person is never told who reported them, and nothing happens to them until the organiser decides.
-      A report about the organiser goes straight to the super admin, because an organiser cannot decide a complaint about themselves; the organiser does not see it.
+      A report about the organiser goes straight to the WhenRUFree admin, because an organiser cannot decide a complaint about themselves; the organiser does not see it.
       You can report the same person on the same calendar once while the report is open, and not again straight after it is decided. Reporting never blocks or removes anyone.
     </p>
 
@@ -584,7 +584,7 @@
       <tr>
         <td><b>Reports</b></td>
         <td><span class="material-symbols-outlined icon-inline">flag</span></td>
-        <td>When a participant reports another, a flag button with a count appears in the header. <b>Dismiss</b> it silently, <b>Block</b> or <b>Remove</b> the person, or <b>Send to super admin</b>. Reports about you go straight to the super admin instead.</td>
+        <td>When a participant reports another, a flag button with a count appears in the header. <b>Dismiss</b> it silently, <b>Block</b> or <b>Remove</b> the person, or <b>Send to WhenRUFree admin</b>. Reports about you go straight to the WhenRUFree admin instead.</td>
       </tr>
       <tr>
         <td><b>Delete calendar</b></td>
@@ -727,7 +727,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>It is private: only you (and the site admin) see it. It is used to confirm big actions such as deleting your account. Other people only see your <b>profile name</b>, or the name you chose for a particular calendar.</p>
+        <p>It is private: only you (and the WhenRUFree admin) see it. It is used to confirm big actions such as deleting your account. Other people only see your <b>profile name</b>, or the name you chose for a particular calendar.</p>
       </div>
     </div>
 
@@ -739,7 +739,7 @@
       <div class="faq-answer">
         <p>Sign in, open the calendar, tap the <span class="material-symbols-outlined icon-inline">group</span> People button and tap your old name (it says <b>Tap to claim it</b>). Enter its old PIN once. The name and its availability then belong to your account and the PIN is deleted.</p>
         <p>Old Hubs work the same way: open the Hub and tap <b>Claim this Hub</b>, then enter the old organiser PIN.</p>
-        <p>Five wrong PINs in a row lock that name for 5 minutes (then longer). The site admin can unlock it. If you forgot the PIN, join again with a new name and ask the organiser to remove the old one.</p>
+        <p>Five wrong PINs in a row lock that name for 5 minutes (then longer). The WhenRUFree admin can unlock it. If you forgot the PIN, join again with a new name and ask the organiser to remove the old one.</p>
       </div>
     </div>
 
@@ -793,7 +793,7 @@
         <span class="material-symbols-outlined faq-icon">expand_more</span>
       </div>
       <div class="faq-answer">
-        <p>Yes. In the <b>People</b> list, the <b>more</b> menu beside a name opens <b>Manage person</b>: choose <b>Block</b> and confirm, and that person sees "The organiser has blocked you from this calendar" while their answers are left out of the calendar and Best Match (their bookings still hold their places). Choose <b>Unblock</b> the same way to restore them. Nothing is deleted. The same menu can remove a person or report them to the super admin.</p>
+        <p>Yes. In the <b>People</b> list, the <b>more</b> menu beside a name opens <b>Manage person</b>: choose <b>Block</b> and confirm, and that person sees "The organiser has blocked you from this calendar" while their answers are left out of the calendar and Best Match (their bookings still hold their places). Choose <b>Unblock</b> the same way to restore them. Nothing is deleted. The same menu can remove a person or report them to the WhenRUFree admin.</p>
       </div>
     </div>
 
@@ -804,7 +804,7 @@
       </div>
       <div class="faq-answer">
         <p>Ask the organiser - it is usually in the message or poster with the link. Organisers can see and change it in <b>Settings</b> on any device where they are signed in.
-        If the organiser forgot it too, the site admin can remove it.</p>
+        If the organiser forgot it too, the WhenRUFree admin can remove it.</p>
       </div>
     </div>
     
@@ -1009,7 +1009,7 @@
     </p>
     <pre style="background:#f5f5f5;padding:12px;border-radius:8px;overflow-x:auto;font-size:.9rem;">0 3 * * * /usr/bin/php /path/to/cleanup.php &gt;&gt; /var/log/grape_cleanup.log 2&gt;&amp;1</pre>
     <p class="muted">
-      Replace <code>/path/to/cleanup.php</code> with the absolute path on your host. The script should run from CLI only (not via the web). It prunes expired sessions, old rate-limit rows, and calendars past the auto-delete threshold set in Admin &rarr; Setup.
+      Replace <code>/path/to/cleanup.php</code> with the absolute path on your host. The script should run from CLI only (not via the web). It prunes expired sessions, old rate-limit rows, and calendars past the auto-delete threshold set in WhenRUFree Admin &rarr; Setup.
     </p>
 
     <h2><span class="material-symbols-outlined">live_help</span> Need More Help?</h2>
@@ -1038,7 +1038,7 @@
   </div>
 
   <!--
-    Replace any `.js-retention-days` spans with the admin-configured auto-delete
+    Replace any `.js-retention-days` spans with the WhenRUFree admin-configured auto-delete
     threshold from site_config. Silent fail keeps the data-default fallback.
   -->
   <script>

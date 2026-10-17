@@ -4,7 +4,7 @@
  */
 'use strict';
 
-// Hub admin state
+// Hub tab state (WhenRUFree admin panel)
 let groups = [];
 let filteredGroups = [];
 let selectedHubIds = new Set();

@@ -230,7 +230,7 @@ function updatePrivacyIndicator(){
 }
 
 /**
- * Checks if the current user is the organiser (admin).
+ * Checks if the current user is the calendar organiser.
  * @returns {boolean}
  */
 function isCurrentUserOrganiser(){
@@ -728,7 +728,7 @@ const els = {
   settingsAccessField: qs('#settingsAccessField'),
   settingsError: qs('#settingsError'),
   settingsClose: qs('#settingsClose'),
-  // Reset buttons (resetMineBtn for all users, resetAllBtn for admin only)
+  // Reset buttons (resetMineBtn for all users, resetAllBtn for the organiser only)
   resetMineBtn: qs('#resetMineBtn'),
   resetAllBtn: qs('#resetAllBtn'),
   currentUserTag:qs('#currentUserTag'),
@@ -798,8 +798,8 @@ const state = {
   currentUserId:null,
   viewUserId:null, // Someone else's answers shown read-only in the grid (People list)
   currentUserName:'',
-  currentUserRole:null, // 'admin' or 'user' - tracks if current user is organiser
-  adminUserId:null, // Cache the admin user ID for organiser dots
+  currentUserRole:null, // 'admin' or 'user' - the role value for the calendar organiser
+  adminUserId:null, // Cache the organiser's user ID for organiser dots
   store:new Map(),
   pending:{},
   isSaving:false,

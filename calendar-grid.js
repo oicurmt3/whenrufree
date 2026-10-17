@@ -56,7 +56,7 @@ function getStatus(userId, dateStr, slotId){
 }
 
 /**
- * Gets the organiser's (admin's) status for a specific slot.
+ * Gets the organiser's status for a specific slot.
  * Used to display organiser dots on slots.
  * @param {string} dateStr - Date in YYYY-MM-DD format
  * @param {string} slotId - The slot ID
@@ -78,7 +78,7 @@ function setSlotClass(el, status){
  * Updates the organiser left-border indicator on a slot element.
  * Shows the organiser's status as a coloured 5px left border.
  * Only displays if the organiser has set a status (not NULL).
- * Hidden when the admin/organiser is viewing (they don't need to see their own indicator).
+ * Hidden when the organiser is viewing (they don't need to see their own indicator).
  * Hidden completely in Blind mode (no individual choices visible).
  * @param {HTMLElement} slotEl - The slot element
  * @param {string} dateStr - Date in YYYY-MM-DD format
@@ -216,7 +216,7 @@ function scheduleDateFilterSave(){
 
 /**
  * Saves the current date_filter_dates to the server.
- * Requires admin auth. Saves are silent when they work (every tap triggers one) and only speak
+ * Requires organiser auth. Saves are silent when they work (every tap triggers one) and only speak
  * up when they fail.
  */
 async function saveDateFilterDates(){
@@ -858,14 +858,14 @@ async function resetMyAvailability(){
 }
 
 /**
- * Reset ALL availability for ALL users (admin only).
+ * Reset ALL availability for ALL users (organiser only).
  * Requires double confirmation (confirm dialog + type "RESET").
  */
 async function resetAllUsers(){
-  // Check if current user is admin
+  // Check if the current user is the organiser
   const currentUser = state.users.find(u => u.id === state.currentUserId);
   if(!currentUser || currentUser.role !== 'admin'){
-    showToast('Only admin can reset the calendar.');
+    showToast('Only the organiser can reset the calendar.');
     return;
   }
   

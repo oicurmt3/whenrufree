@@ -58,7 +58,7 @@ ALTER TABLE calendars
 
 15. **Test users** - run `migrations/015_admin_test_users.sql` (adds `accounts.created_by_admin`, default 0). Safe to re-run. Until it runs, sign-in is unaffected; the admin **Test users** section says to run the migration.
 
-16. **Reports for everyone** - run `migrations/016_report_audience.sql` (adds `reports.audience`, `target_role`, `reporter_user_id`, `reporter_name`, `calendar_title`, `outcome` and an index). Safe to re-run. Until it runs, member reporting and the organiser **Reports** inbox are hidden and the organiser's **Manage person** menu no longer offers Report; blocking, deleting and the existing super-admin reports keep working.
+16. **Reports for everyone** - run `migrations/016_report_audience.sql` (adds `reports.audience`, `target_role`, `reporter_user_id`, `reporter_name`, `calendar_title`, `outcome` and an index). Safe to re-run. Until it runs, member reporting and the organiser **Reports** inbox are hidden and the organiser's **Manage person** menu no longer offers Report; blocking, deleting and the existing WhenRUFree admin reports keep working.
 17. **Hub add policy** - run `migrations/017_hub_add_policy.sql` (adds `groups.allow_member_calendars`, default 0). Safe to re-run. Until it runs, every Hub only accepts calendars from its organiser and the **Let other people add their own calendars** switch is hidden on the create form and in Hub settings.
 
 And fix the known column width issue:

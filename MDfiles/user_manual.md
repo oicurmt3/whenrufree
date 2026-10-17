@@ -2,6 +2,8 @@
 
 A guide for organisers and participants using When RU Free.
 
+**Who is who:** the person who creates or manages a calendar or Hub is the **organiser**. The **WhenRUFree admin** is the site administrator (the panel behind `admin.html`); organisers never see or use that panel.
+
 ---
 
 ## Signing In
@@ -35,7 +37,7 @@ If you used When RU Free with a PIN before accounts, you can claim your old name
 
 - **Calendar name:** sign in, open the calendar, tap the **People** (group) button and tap your old name ("Yours from before? Tap to claim it"). Enter its old PIN. The name, its role and its availability now belong to your account and the PIN is deleted.
 - **Hub:** open the Hub and tap **Claim this Hub**, then enter the old organiser PIN.
-- Five wrong PINs in a row lock that name or Hub for 5 minutes, then 15 minutes, 2 hours, 2 days. The site admin can unlock it. Forgot the PIN? Join with a new name and ask the organiser to remove the old one.
+- Five wrong PINs in a row lock that name or Hub for 5 minutes, then 15 minutes, 2 hours, 2 days. The WhenRUFree admin can unlock it. Forgot the PIN? Join with a new name and ask the organiser to remove the old one.
 
 ---
 
@@ -81,8 +83,8 @@ As the organiser, you can:
 - **Change sort order**: Toggle between "By Match" (highest score first) and "By Date" (chronological) in the analysis panel. Your choice is saved as the default for all users.
 - **Filter dates**: If you chose "only" or "except" mode, tap date column headers to select/deselect which dates participants can see. Changes auto-save.
 - **Block users**: In the People list, tap the **more** menu next to a name to open **Manage person**. Choose **Block** and confirm: that person sees "The organiser has blocked you from this calendar" and their answers are left out of the calendar and Best Match (bookings still hold their places). Choose **Unblock** the same way to restore them; nothing is deleted.
-- **Delete or report a person**: the same **Manage person** menu can delete someone (permanently) or send a report to the super admin. You can combine the choices; a review step shows exactly what will happen before you apply it.
-- **Reports from your people**: when a member reports another member, a **flag** button appears in the header with a count. Open it to see who reported whom, the reason and any details. You can **Dismiss** it (silent: the reporter is not told and the person is unchanged), **Block** or **Remove** the person, or **Send to super admin**. Reports about you never appear there: they go straight to the super admin.
+- **Delete or report a person**: the same **Manage person** menu can delete someone (permanently) or send a report to the WhenRUFree admin. You can combine the choices; a review step shows exactly what will happen before you apply it.
+- **Reports from your people**: when a member reports another member, a **flag** button appears in the header with a count. Open it to see who reported whom, the reason and any details. You can **Dismiss** it (silent: the reporter is not told and the person is unchanged), **Block** or **Remove** the person, or **Send to WhenRUFree admin**. Reports about you never appear there: they go straight to the WhenRUFree admin.
 - **Reset availability**: Use the delete icon to clear your own selections, or the warning icon to reset ALL users (requires typing "RESET" to confirm).
 - **Rename**: Open the **People** list and tap the **person edit** icon on your own line (listed first) to change your name on this calendar, or tap **Use my profile name** to follow your profile name again.
 - **Your coloured edge**: on Open calendars, your own answers show as a coloured left edge on everyone's time slots. If you don't want to steer people's choices, open **Settings** (gear) and untick **Show my answers on everyone's calendar**. People can still see your answers in Best Match and the People list.
@@ -186,7 +188,7 @@ If the organiser set an emoji, a grid of 35 emoji appears before the calendar or
 If someone on a calendar is using an inappropriate name or behaving badly, open **People** (the group icon), find their name and tap the **flag** icon.
 
 - **Reporting another member:** the report goes to that calendar's organiser, who sees who reported. The person you reported is not told who reported them, and nothing happens to them until the organiser decides.
-- **Reporting the organiser:** the report goes straight to the super admin, because an organiser cannot decide a complaint about themselves. The organiser does not see it.
+- **Reporting the organiser:** the report goes straight to the WhenRUFree admin, because an organiser cannot decide a complaint about themselves. The organiser does not see it.
 - Pick a reason and, if you like, add a short note. You can only report the same person on the same calendar once while the report is open, and not again straight after a decision.
 - Reporting never blocks or removes anyone. If the organiser blocks you or leaves a complaint unanswered, you can still use the same flag to report that.
 
@@ -249,7 +251,7 @@ The privacy mode is shown by an icon next to the calendar title (eye, hidden eye
 ## Tips
 
 - Sign out on shared computers (profile page > **Sign out**).
-- The calendar cleans up automatically after 40 days of inactivity (no saves by anyone). The organiser can ask the site admin to make it permanent.
+- The calendar cleans up automatically after 40 days of inactivity (no saves by anyone). The organiser can ask the WhenRUFree admin to make it permanent.
 - Accounts with no calendars or Hubs are deleted after 2 years without use.
 - Slot names support letters, numbers, spaces, hyphens, and periods. Max 20 characters.
 - Names support letters, numbers, spaces, apostrophes, and hyphens. Max 32 characters.
