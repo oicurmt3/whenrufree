@@ -222,7 +222,7 @@ async function init(){
     await ensureDateRangeLoaded();
     renderDateRangeSkeleton();
     refreshCalendarValues();
-    updateDateFilterBanner();
+    updateDateFilterPill();
     updateSubmitButtonState();
     updateUserUI();
     // Initialize toggle UIs before rendering rankings

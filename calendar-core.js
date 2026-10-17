@@ -238,67 +238,43 @@ function isCurrentUserOrganiser(){
 }
 
 /**
- * Shows or hides a date filter instruction banner for the organiser.
- * Includes a save status pill (Unsaved / Saving / Saved) that mirrors
- * the submit button behaviour for normal slot changes.
+ * Live status for the organiser's date filter, in the month label row directly above the date
+ * headers. It names the rule in force ("Only chosen dates"), says how many dates participants
+ * can actually see ("12 of 90 showing") and, while something is still to do, what a tap does.
+ * That is what replaced the old banner: an instruction attached to the control, not a note
+ * parked under the grid.
  */
-function updateDateFilterBanner(){
-  const existingBanner = document.getElementById('dateFilterBanner');
+function updateDateFilterPill(){
+  const pill = document.getElementById('dateFilterPill');
+  const pillText = document.getElementById('dateFilterPillText');
+  const pillIcon = document.getElementById('dateFilterPillIcon');
+  const zeroMsg = document.getElementById('dateFilterZero');
+  if(!pill || !pillText) return;
 
-  // Remove if mode is 'all' or user is not organiser
-  if(state.dateFilterMode === 'all' || !isCurrentUserOrganiser()){
-    if(existingBanner) existingBanner.remove();
+  const active = state.dateFilterMode !== 'all' && isCurrentUserOrganiser();
+  if(!active){
+    pill.style.display = 'none';
+    if(zeroMsg) zeroMsg.style.display = 'none';
     return;
   }
 
+  const counts = dateFilterCounts();
+  const nothingShowing = counts.showing === 0;
   const modeLabel = state.dateFilterMode === 'only' ? 'Only chosen dates' : 'All dates except chosen';
-  const instruction = state.dateFilterMode === 'only'
-    ? 'Click date headers to select which dates participants will see.'
-    : 'Click date headers to choose which dates to hide from participants.';
-  const count = state.dateFilterDates.length;
-  const countText = count === 0 ? 'No dates selected yet.' : `${count} date${count === 1 ? '' : 's'} selected.`;
 
-  if(existingBanner){
-    // Update existing banner text (preserve save status element)
-    const textEl = existingBanner.querySelector('.dfb-text');
-    if(textEl){
-      textEl.innerHTML = `<strong>${modeLabel}</strong> -- ${instruction} <em>${countText}</em>`;
-    }
-    return;
+  let text = `${modeLabel} · ${counts.showing} of ${counts.total} showing`;
+  if(nothingShowing){
+    text = `${modeLabel} · no dates showing · tap a date to show it`;
+  } else if(state.dateFilterMode === 'except' && counts.showing === counts.total){
+    // Everything is still visible, so say which way a tap goes
+    text = `${modeLabel} · all ${counts.total} showing · tap a date to hide it`;
   }
 
-  // Create banner
-  const banner = document.createElement('div');
-  banner.id = 'dateFilterBanner';
-  banner.className = 'date-filter-banner';
-  banner.innerHTML =
-    `<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;flex-shrink:0;">filter_alt</span> `
-    + `<span class="dfb-text"><strong>${modeLabel}</strong> -- ${instruction} <em>${countText}</em></span>`
-    + `<span id="dfSaveStatus" class="date-filter-save-status saved"><span class="material-symbols-outlined" style="font-size:14px;">check</span> Saved</span>`;
-
-  // Insert before the calendar grid section header
-  const calSection = document.querySelector('.calendar-section');
-  if(calSection){
-    calSection.insertBefore(banner, calSection.querySelector('.calendar-header'));
-  }
-}
-
-/**
- * Updates the save status pill in the date filter banner.
- * @param {'unsaved'|'saving'|'saved'} status
- */
-function setDateFilterSaveStatus(status){
-  const el = document.getElementById('dfSaveStatus');
-  if(!el) return;
-  el.classList.remove('unsaved','saving','saved');
-  el.classList.add(status);
-  if(status === 'unsaved'){
-    el.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">edit</span> Unsaved';
-  } else if(status === 'saving'){
-    el.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">hourglass_empty</span> Saving...';
-  } else {
-    el.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">check</span> Saved';
-  }
+  pillText.textContent = text;
+  pill.style.display = '';
+  pill.classList.toggle('is-warn', nothingShowing);
+  if(pillIcon) pillIcon.textContent = nothingShowing ? 'visibility_off' : 'visibility';
+  if(zeroMsg) zeroMsg.style.display = nothingShowing ? '' : 'none';
 }
 
 /**

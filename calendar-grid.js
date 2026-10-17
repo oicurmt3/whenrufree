@@ -133,6 +133,21 @@ function updateOwnEdge(slotEl, dateStr, slotId){
 
 /*** Build grid */
 /**
+ * True when the organiser's date filter keeps this date away from participants.
+ * This is the only place the filter rule lives: the mode decides which dates default to
+ * hidden, and there is no opposite meaning to remember.
+ * - only: hidden until the organiser includes it
+ * - except: visible until the organiser excludes it
+ * @param {string} dateStr - Date in YYYY-MM-DD format
+ * @returns {boolean}
+ */
+function isDateFilterHidden(dateStr){
+  if(state.dateFilterMode === 'all') return false;
+  const marked = state.dateFilterDates.includes(dateStr);
+  return state.dateFilterMode === 'only' ? !marked : marked;
+}
+
+/**
  * Determines if a date should be visible to the current user based on date filter settings.
  * Organiser always sees all dates (to manage selections).
  * @param {string} dateStr - Date in YYYY-MM-DD format
@@ -141,23 +156,26 @@ function updateOwnEdge(slotEl, dateStr, slotId){
 function isDateVisible(dateStr){
   // Organiser always sees all dates so they can manage filter selections
   if(isCurrentUserOrganiser()) return true;
-  // 'all' mode: no filtering
-  if(state.dateFilterMode === 'all') return true;
-  const isMarked = state.dateFilterDates.includes(dateStr);
-  // 'only' mode: show only marked dates
-  if(state.dateFilterMode === 'only') return isMarked;
-  // 'except' mode: show all except marked dates
-  if(state.dateFilterMode === 'except') return !isMarked;
-  return true;
+  return !isDateFilterHidden(dateStr);
 }
 
 /**
- * Checks if a date is marked in the date filter list.
- * @param {string} dateStr - Date in YYYY-MM-DD format
- * @returns {boolean}
+ * Counts the date columns the filter produces, so the month label row can say how much of the
+ * range participants actually see. Weekends are left out when the calendar excludes them.
+ * @returns {{total:number, showing:number}}
  */
-function isDateMarked(dateStr){
-  return state.dateFilterDates.includes(dateStr);
+function dateFilterCounts(){
+  const counts = { total:0, showing:0 };
+  if(!state.startDate || !state.endDate) return counts;
+  const start = new Date(state.startDate + 'T00:00:00');
+  const end = new Date(state.endDate + 'T00:00:00');
+  for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)){
+    const dow = d.getDay();
+    if(state.excludeWeekends && (dow === 0 || dow === 6)) continue;
+    counts.total++;
+    if(!isDateFilterHidden(fmtDate(d))) counts.showing++;
+  }
+  return counts;
 }
 
 /**
@@ -174,8 +192,8 @@ function toggleDateFilter(dateStr){
     state.dateFilterDates.sort();
   }
   state.dateFilterDirty = true;
-  // Show immediate "Unsaved" feedback
-  setDateFilterSaveStatus('unsaved');
+  // The tip has done its job as soon as the organiser taps a header
+  dismissDateFilterCoach();
   // Update visual indicator on the header
   updateDateFilterIndicators();
   // Auto-save filter dates after a short delay
@@ -198,58 +216,127 @@ function scheduleDateFilterSave(){
 
 /**
  * Saves the current date_filter_dates to the server.
- * Requires admin auth. Updates the save status pill in the banner.
+ * Requires admin auth. Saves are silent when they work (every tap triggers one) and only speak
+ * up when they fail.
  */
 async function saveDateFilterDates(){
   if(!state.dateFilterDirty) return;
   if(!state.adminUserId) return;
   const auth = state.auth.get(state.adminUserId);
   if(!auth) return;
-  setDateFilterSaveStatus('saving');
   try{
     const res = await apiPost('save_date_filter', { dates: state.dateFilterDates }, auth.token);
     if(res.status === 'success'){
       state.dateFilterDirty = false;
-      setDateFilterSaveStatus('saved');
-      showToast('Date filter saved');
     } else {
-      setDateFilterSaveStatus('unsaved');
       showToast('Date filter save failed');
     }
   }catch(e){
     console.error('Failed to save date filter:', e);
-    setDateFilterSaveStatus('unsaved');
+    showToast('Date filter save failed');
   }
 }
 
 /**
- * Updates the visual indicators on all day headers to reflect date filter selections.
- * Toggles both the header highlight and column border for selected dates.
- * Only shown to the organiser -- non-admin and unauthenticated users see nothing.
- * Also updates the info banner count.
+ * Paints the date filter state on every day header the organiser can see.
+ *
+ * Bright means participants see the date, dimmed means they don't, in both modes, so the same
+ * look never means opposite things. Each header also carries a visibility icon, which is what
+ * says "this is a control" before anything is tapped (and the only cue on touch, where there is
+ * no hover or tooltip).
+ * @returns {void}
  */
 function updateDateFilterIndicators(){
-  const isOrg = isCurrentUserOrganiser();
+  const togglable = isCurrentUserOrganiser() && state.dateFilterMode !== 'all';
   for(const [dateStr, col] of state.dayCols.entries()){
     const hdr = col.querySelector('.day-header');
     if(!hdr) continue;
-    const marked = isDateMarked(dateStr);
-    // Only show visual indicators to the organiser
-    hdr.classList.toggle('date-filtered', marked && isOrg);
-    col.classList.toggle('date-col-filtered', marked && isOrg);
-    // Only show tooltips to the organiser
-    if(isOrg && state.dateFilterMode !== 'all'){
-      if(state.dateFilterMode === 'only'){
-        hdr.title = marked ? 'Selected - click to deselect' : 'Click to include for participants';
-      } else {
-        hdr.title = marked ? 'Excluded - click to un-exclude' : 'Click to exclude for participants';
-      }
-    } else {
-      hdr.title = '';
+    const hidden = togglable && isDateFilterHidden(dateStr);
+    hdr.classList.toggle('is-off', hidden);
+    col.classList.toggle('is-off', hidden);
+    const icon = hdr.querySelector('.date-toggle-icon');
+    if(icon) icon.textContent = hidden ? 'visibility_off' : 'visibility';
+    // Tooltips are a bonus for mouse users; aria labels are deliberately left off
+    hdr.title = togglable ? (hidden ? 'Hidden from participants - tap to show it' : 'Shown to participants - tap to hide it') : '';
+  }
+  // Update the status in the month label row and the save pill beside it
+  updateDateFilterPill();
+  renderDateFilterCoach();
+}
+
+/** localStorage key for the one-time date filter tip, remembered per calendar. */
+function dateFilterCoachKey(){ return 'wruf_df_coach_' + (state.token || ''); }
+
+/** True when the organiser has already dismissed the tip for this calendar. */
+function dateFilterCoachDismissed(){
+  try{ return localStorage.getItem(dateFilterCoachKey()) === '1'; }catch(e){ return true; }
+}
+
+/** Hides the tip and remembers that it is not to come back for this calendar. */
+function dismissDateFilterCoach(){
+  try{ localStorage.setItem(dateFilterCoachKey(), '1'); }catch(e){ /* private mode: it can come back */ }
+  const el = document.getElementById('dateFilterCoach');
+  if(el) el.remove();
+}
+
+/**
+ * Picks the header the one-time tip hangs from. It walks the grid left to right and takes the
+ * first header that is fully inside the visible area, so the tip is never anchored to a column
+ * that has been scrolled or clipped away. The returned flip flag says whether there is more room
+ * on the left of that header than on the right, so the bubble opens inwards from either edge.
+ * @returns {{hdr:HTMLElement, flip:boolean}|null}
+ */
+function dateFilterCoachAnchor(){
+  const boundsEl = document.querySelector('.calendar-section');
+  const bounds = boundsEl ? boundsEl.getBoundingClientRect() : null;
+  let fallback = null;
+  for(const col of state.dayCols.values()){
+    const hdr = col.querySelector('.day-header.is-toggle');
+    if(!hdr) continue;
+    if(col.offsetParent === null) continue; // hidden by the past-dates toggle
+    const r = hdr.getBoundingClientRect();
+    if(r.width === 0) continue;
+    if(!fallback) fallback = hdr;
+    if(!bounds) return { hdr, flip:false };
+    if(r.left >= bounds.left + 8 && r.right <= bounds.right - 8){
+      // Right edge of the visible area is the constraint: open leftwards when close to it
+      return { hdr, flip: (r.left + r.width / 2) > (bounds.left + bounds.width / 2) };
     }
   }
-  // Update the banner count text and save status
-  updateDateFilterBanner();
+  return fallback ? { hdr: fallback, flip:false } : null;
+}
+
+/**
+ * One-time tip anchored to a date header, so the organiser is told once that the headers are the
+ * control. It opens away from the edge of the grid (rightwards from a left-hand column, leftwards
+ * from a right-hand one), so it stays readable instead of running off the side.
+ * Re-rendering the grid destroys it, so it is re-attached from updateDateFilterIndicators().
+ */
+function renderDateFilterCoach(){
+  if(!isCurrentUserOrganiser() || state.dateFilterMode === 'all') return;
+  if(document.getElementById('dateFilterCoach')) return;
+  if(dateFilterCoachDismissed()) return;
+  const anchor = dateFilterCoachAnchor();
+  if(!anchor) return;
+  const hdr = anchor.hdr;
+
+  const box = document.createElement('div');
+  box.id = 'dateFilterCoach';
+  box.className = 'date-filter-coach' + (anchor.flip ? ' is-flip' : '');
+  const text = document.createElement('span');
+  text.textContent = state.dateFilterMode === 'only'
+    ? 'Tap a date header to show that date.'
+    : 'Tap a date header to hide that date.';
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.className = 'date-filter-coach-btn';
+  ok.textContent = 'Got it';
+  ok.addEventListener('click', (e) => { e.stopPropagation(); dismissDateFilterCoach(); });
+  box.appendChild(text);
+  box.appendChild(ok);
+  // Taps inside the tip must not toggle the date header it is attached to
+  box.addEventListener('click', (e) => e.stopPropagation());
+  hdr.appendChild(box);
 }
 
 function renderDateRangeSkeleton(){
@@ -257,13 +344,16 @@ function renderDateRangeSkeleton(){
   if(!state.startDate || !state.endDate){ els.monthLabel.textContent='No date range set'; return; }
   const start=new Date(state.startDate+'T00:00:00'); const end=new Date(state.endDate+'T00:00:00'); const today=new Date();
 
-  // Show info banner for non-organiser when 'only' mode has no dates selected
-  if(!isCurrentUserOrganiser() && state.dateFilterMode === 'only' && state.dateFilterDates.length === 0){
-    const msg = document.createElement('div');
-    msg.className = 'date-filter-empty-msg';
-    msg.textContent = 'The organiser has not selected any dates yet.';
-    els.calendarGrid.appendChild(msg);
-    return;
+  // Participants see nothing: say so plainly instead of handing them an empty grid
+  if(!isCurrentUserOrganiser()){
+    const counts = dateFilterCounts();
+    if(counts.total > 0 && counts.showing === 0){
+      const msg = document.createElement('div');
+      msg.className = 'date-filter-empty-msg';
+      msg.textContent = 'The organiser has not shown any dates yet.';
+      els.calendarGrid.appendChild(msg);
+      return;
+    }
   }
 
   // Only add leading placeholders to align weeks when weekends are included
@@ -297,9 +387,17 @@ function renderDateRangeSkeleton(){
     const hdr=document.createElement('div'); hdr.className='day-header';
     if(d.getFullYear()===today.getFullYear() && d.getMonth()===today.getMonth() && d.getDate()===today.getDate()){ hdr.classList.add('today'); }
 
-    // Make header clickable for organiser when date filter mode is not 'all'
+    // While a filter is in force, every header is a control: dashed chip plus a visibility icon,
+    // so it reads as something to press rather than as a label (and still reads that way on
+    // touch, where there is no hover or tooltip).
     if(isCurrentUserOrganiser() && state.dateFilterMode !== 'all'){
-      hdr.classList.add('date-header-clickable');
+      hdr.classList.add('is-toggle');
+      if(isDateFilterHidden(dateStr)) hdr.classList.add('is-off');
+      const eye = document.createElement('span');
+      eye.className = 'material-symbols-outlined date-toggle-icon';
+      eye.setAttribute('aria-hidden', 'true');
+      eye.textContent = isDateFilterHidden(dateStr) ? 'visibility_off' : 'visibility';
+      hdr.appendChild(eye);
       hdr.addEventListener('click', ()=> toggleDateFilter(dateStr));
     }
 

@@ -247,6 +247,7 @@ main{
   align-items:center;
   justify-content:space-between;
   gap:8px;
+  flex-wrap:wrap;
   margin-bottom:var(--spacing-sm);
 }
 
@@ -427,53 +428,84 @@ main{
 .time-slot.own-border-5{border-left-color:var(--status-5);}
 
 /* ============================================
-   DATE FILTER INDICATORS
-   Shows organiser which dates are marked for
-   filtering (only/except mode). Clickable headers
-   toggle date selection.
+   DATE FILTER (organiser)
+   The rule is fixed at creation (Only chosen / All
+   except). What the grid shows is a single idea:
+   bright = participants see the date, dimmed =
+   they don't. The mode only decides which state a
+   date starts in, so one look never means two
+   opposite things.
    ============================================ */
 
-/* Clickable date header (organiser only, when filter mode is not 'all') */
-.day-header.date-header-clickable{
-  cursor:pointer;
-  transition:background 0.15s ease, border-color 0.15s ease;
-  border-radius:4px;
+/* Every header is a control while a filter is in force: a chip with a visibility icon, so it
+   reads as something to press and not as a heading. Solid border = participants see this date,
+   dashed = they don't, so the outline itself carries the state as well as the icon. */
+.day-header.is-toggle{
   position:relative;
+  cursor:pointer;
+  min-height:44px;
+  margin-bottom:4px;
+  padding:0 4px;
+  border:1px solid #9e9e9e;
+  border-radius:6px;
+  transition:background 0.15s ease, border-color 0.15s ease;
 }
-.day-header.date-header-clickable:hover{
+/* Hover previews the tap: the chip takes the outline it will have once the date is switched, so
+   a showing date goes dashed under the cursor and a hidden one goes solid. The style is pinned
+   in both hover states so the preview always reads as the opposite of the resting state. */
+.day-header.is-toggle:hover{
   background:rgba(63,81,181,0.10);
+  border-style:dashed;
+  border-color:var(--primary);
+}
+.day-header.is-toggle.is-off:hover{
+  border-style:solid;
+  border-color:#757575;
+  background:rgba(63,81,181,0.06);
 }
 
-/* Visual indicator for marked/filtered dates (organiser view) -
-   Strong background highlight + bottom bar so it is unmistakable */
-.day-header.date-filtered{
-  background:#3f51b5 !important;
-  border-radius:4px;
-  border-bottom:none;
+/* The icon is both the status and the hint: visible before the organiser taps anything */
+.date-toggle-icon{
+  position:absolute;
+  top:2px;
+  right:3px;
+  font-size:14px;
+  line-height:1;
+  opacity:.45;
+  pointer-events:none;
 }
-.day-header.date-filtered .date-num,
-.day-header.date-filtered .date-dow{
-  color:#fff !important;
+.day-header.is-toggle:hover .date-toggle-icon,
+.day-header.is-off .date-toggle-icon{opacity:1;}
+
+/* Hidden from participants: the chip goes dashed, so the outline matches the crossed-out eye */
+.day-header.is-off{
+  background:#f1f1f1;
+  border-style:dashed;
+  border-color:#d2d2d2;
+}
+.day-header.is-off .date-num,
+.day-header.is-off .date-dow{
+  color:#8a8a8a;
   font-weight:500;
-  opacity:1 !important;
+  opacity:1;
 }
-/* Override today styling when date is also filtered */
-.day-header.today.date-filtered .date-num,
-.day-header.today.date-filtered .date-dow{
-  color:#fff !important;
-}
-
-/* Unselected clickable headers get a dashed bottom hint */
-.day-header.date-header-clickable:not(.date-filtered){
-  border-bottom:2px dashed #aaa;
+/* Today is still today, just a muted one */
+.day-header.is-off.today .date-num,
+.day-header.is-off.today .date-dow{
+  color:#a05050;
 }
 
-/* Entire column border highlight when date is filtered */
-.day-column.date-col-filtered{
-  border-color:#3f51b5;
+/* The whole column reads as off: hatch in the gaps, answers dimmed but still legible */
+.day-column.is-off{
+  background-color:#f4f4f4;
+  background-image:repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0 6px, transparent 6px 12px);
+  border-color:#dcdcdc;
+}
+.day-column.is-off .time-slot{
+  opacity:.5;
 }
 
-/* Message shown when 'only' mode has no dates selected (non-organiser view) */
+/* Message shown to participants when the filter leaves them with no dates */
 .date-filter-empty-msg{
   grid-column:1 / -1;
   text-align:center;
@@ -486,46 +518,110 @@ main{
   border:1px dashed #ccc;
 }
 
-/* Date filter instruction banner (organiser only) */
-.date-filter-banner{
-  background:#e8eaf6;
+/* Month label row: the filter status sits directly above the headers it describes */
+.month-label-tools{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+/* Date filter status + live instruction (organiser only) */
+.date-filter-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  max-width:100%;
+  padding:3px 10px;
+  border-radius:20px;
   border:1px solid #9fa8da;
-  border-radius:var(--radius);
-  padding:8px 12px;
-  margin-bottom:8px;
-  font-size:0.85rem;
+  background:#e8eaf6;
   color:#283593;
+  font-size:0.78rem;
+  font-weight:600;
+  line-height:1.3;
+}
+.date-filter-pill .material-symbols-outlined{font-size:16px;}
+/* Nobody can answer: the strongest state the filter can be in */
+.date-filter-pill.is-warn{
+  background:#fff3cd;
+  border-color:#ffe08a;
+  color:#856404;
+}
+
+/* Safety net line under the month label when the filter hides every date */
+.date-filter-zero{
   display:flex;
   align-items:center;
   gap:6px;
-  line-height:1.4;
-}
-
-/* Date filter save indicator (matches submit button pattern) */
-.date-filter-save-status{
-  display:inline-flex;
-  align-items:center;
-  gap:4px;
-  font-size:0.8rem;
-  font-weight:600;
-  margin-left:auto;
-  padding:3px 10px;
-  border-radius:4px;
-  transition:background 0.3s, color 0.3s;
-  white-space:nowrap;
-}
-.date-filter-save-status.unsaved{
+  margin-bottom:var(--spacing-sm);
+  padding:8px 12px;
+  border-radius:var(--radius);
+  border:1px solid #ffe08a;
   background:#fff3cd;
   color:#856404;
+  font-size:0.85rem;
+  font-weight:500;
+  line-height:1.35;
 }
-.date-filter-save-status.saving{
-  background:#cce5ff;
-  color:#004085;
+.date-filter-zero .material-symbols-outlined{font-size:18px;}
+
+/* One-time tip pointing at a date header; opens inwards and is dismissed for good after the
+   first tap. Left-hand columns open to the right, right-hand ones open to the left (is-flip). */
+.date-filter-coach{
+  position:absolute;
+  top:calc(100% + 8px);
+  left:0;
+  z-index:30;
+  width:max-content;
+  max-width:230px;
+  padding:10px 12px;
+  border:1px solid var(--primary);
+  border-radius:var(--radius);
+  background:#fff;
+  box-shadow:0 6px 18px rgba(0,0,0,0.18);
+  color:#222;
+  font-size:0.8rem;
+  font-weight:500;
+  line-height:1.35;
+  text-align:left;
+  cursor:default;
 }
-.date-filter-save-status.saved{
-  background:#d4edda;
-  color:#155724;
+.date-filter-coach::before{
+  content:'';
+  position:absolute;
+  top:-6px;
+  left:22px;
+  width:10px;
+  height:10px;
+  background:#fff;
+  border-left:1px solid var(--primary);
+  border-top:1px solid var(--primary);
+  transform:rotate(45deg);
 }
+/* Anchored near the right edge: open leftwards so the tip never runs off the grid */
+.date-filter-coach.is-flip{
+  left:auto;
+  right:0;
+}
+.date-filter-coach.is-flip::before{
+  left:auto;
+  right:22px;
+}
+.date-filter-coach-btn{
+  display:block;
+  margin-top:8px;
+  padding:4px 12px;
+  border:none;
+  border-radius:6px;
+  background:var(--primary);
+  color:#fff;
+  font-size:0.78rem;
+  font-weight:600;
+  cursor:pointer;
+}
+.date-filter-coach-btn:hover{background:var(--primary-dark);}
 
 /* ============================================
    ANALYSIS SECTION
@@ -1617,6 +1713,15 @@ main{
   .day-header .date-num{font-size:1rem;}
   .day-header .date-dow{font-size:.8rem;}
   .time-slot{font-size:.75rem;}
+
+  /* Date filter: smaller chip, icon scaled to the header, status pill wraps under the label */
+  .day-header.is-toggle{min-height:40px;padding:0 2px;}
+  .day-header.is-toggle .date-num{font-size:.9rem;}
+  .day-header.is-toggle .date-dow{font-size:.66rem;}
+  .date-toggle-icon{top:1px;right:2px;font-size:12px;}
+  .month-label-tools{width:100%;justify-content:flex-start;}
+  .date-filter-pill{font-size:.72rem;padding:2px 8px;}
+  .date-filter-coach{max-width:200px;}
 
   /* Stack title and user on mobile if needed */
   .logo{

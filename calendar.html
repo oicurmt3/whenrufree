@@ -34,7 +34,7 @@
     }
   </style>
   <!-- App styles -->
-  <link rel="stylesheet" href="calendar.css?v=20261017a">
+  <link rel="stylesheet" href="calendar.css?v=20261017g">
   <link rel="stylesheet" href="emoji.css?v=20260926b">
   <link rel="stylesheet" href="account.css?v=20261012a">
 </head>
@@ -151,9 +151,23 @@
     <!-- Month label - scrolls away on mobile -->
     <div class="month-label-wrap">
       <span class="month-label" id="monthLabel">Loading date range...</span>
-      <button type="button" id="togglePastDatesBtn" class="btn btn-ghost btn-sm toggle-past-btn" style="display:none;" title="Toggle past dates">
-        Hide past dates
-      </button>
+      <span class="month-label-tools">
+        <!-- Date filter status (organiser, filtered calendars only). A live instruction rather
+             than a static note: it names the rule in force, how many dates participants can
+             actually see, and what a tap does while something is left to do. -->
+        <span id="dateFilterPill" class="date-filter-pill" style="display:none;">
+          <span class="material-symbols-outlined" id="dateFilterPillIcon" aria-hidden="true">visibility</span>
+          <span id="dateFilterPillText"></span>
+        </span>
+        <button type="button" id="togglePastDatesBtn" class="btn btn-ghost btn-sm toggle-past-btn" style="display:none;" title="Toggle past dates">
+          Hide past dates
+        </button>
+      </span>
+    </div>
+    <!-- Safety net: the organiser cannot see the filtered grid, so say when nobody can answer -->
+    <div id="dateFilterZero" class="date-filter-zero" style="display:none;" role="status">
+      <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+      <span>Participants can't see any dates yet.</span>
     </div>
     <!-- Legend - sticky on all views -->
     <div class="legend-wrap" id="legendWrapContainer">
@@ -387,11 +401,11 @@
 <script src="passkey.js?v=20260927a"></script>
 <script src="account-core.js?v=20261012a"></script>
 <script src="emoji.js?v=20261008b"></script>
-<script src="calendar-core.js?v=20261017a"></script>
-<script src="calendar-users.js?v=20261017a"></script>
-<script src="calendar-grid.js?v=20261010q"></script>
+<script src="calendar-core.js?v=20261017d"></script>
+<script src="calendar-users.js?v=20261017b"></script>
+<script src="calendar-grid.js?v=20261017d"></script>
 <script src="calendar-rank.js?v=20260927b"></script>
 <script src="calendar-booking.js?v=20260927b"></script>
-<script src="calendar-main.js?v=20261017a"></script>
+<script src="calendar-main.js?v=20261017b"></script>
 </body>
 </html>

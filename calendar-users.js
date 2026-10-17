@@ -1189,7 +1189,7 @@ async function afterMyNameChanged(){
   updateUserUI();
   await ensureDateRangeLoaded();
   renderDateRangeSkeleton();
-  updateDateFilterBanner();
+  updateDateFilterPill();
   refreshCalendarValues();
   await ensureCalendarLoadedAllDates();
   renderRankings();
