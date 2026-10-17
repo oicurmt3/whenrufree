@@ -11,6 +11,9 @@ client_secret*.json
 error_log
 *.log
 
+# Local design scratch files (mood boards, mockups, not part of the webapp)
+Designer.png
+
 # OS / editor junk
 .DS_Store
 Thumbs.db
