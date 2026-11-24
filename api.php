@@ -58,6 +58,7 @@ require_once __DIR__ . '/includes/access.php';
 require_once __DIR__ . '/includes/booking.php';
 require_once __DIR__ . '/includes/members.php';
 require_once __DIR__ . '/includes/reports.php';
+require_once __DIR__ . '/includes/app_link.php';
 
 // -------------------------
 // Main routing
@@ -106,6 +107,31 @@ membersGate($pdo, $action);
 // CSRF token endpoint
 if ($action === 'csrf_token' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     respond(200, ['status' => 'success', 'csrf_token' => generateCsrfToken()]);
+}
+
+// -------------------------
+// Android app sign-in handoff (includes/app_link.php)
+// -------------------------
+
+// Signed in on the website: mint a one-time code the app can redeem.
+if ($action === 'account_app_link_mint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf();
+    $acct = requireAccount($pdo, false);
+    enforceActionRateLimit($pdo, clientIp(), 'alm' . gmdate('YmdH'), 20, 'Too many sign-in links. Try again shortly.');
+    $code = appLinkMint($pdo, (int)$acct['id']);
+    logSecurityEvent('APP_LINK_MINTED', ['account_id' => (int)$acct['id']]);
+    respond(200, ['status' => 'success', 'code' => $code, 'expires_in' => APP_LINK_TTL]);
+}
+
+// The app calls this while signed out: trade the code for a session token.
+if ($action === 'account_app_link_exchange' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    enforceActionRateLimit($pdo, clientIp(), 'alx' . gmdate('YmdH'), 60, 'Too many attempts. Try again shortly.');
+    $token = appLinkExchange($pdo, trim((string)($_POST['code'] ?? '')));
+    if ($token === null) {
+        respond(400, ['status' => 'error', 'code' => 'APP_LINK_INVALID', 'message' => 'That sign-in code is invalid or has expired. Ask the browser for a new one.']);
+    }
+    logSecurityEvent('APP_LINK_REDEEMED', []);
+    respond(200, ['status' => 'success', 'token' => $token]);
 }
 
 // Diagnostic endpoint (disabled by default)

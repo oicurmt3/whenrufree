@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noindex" />
+  <title>Open the app - When RU Free</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 24px; max-width: 560px; margin: 0 auto; background: #fff; color: #1b1b1b; }
+    h1 { font-size: 1.5rem; margin: 0 0 8px; font-weight: 700; }
+    p { line-height: 1.5; }
+    .card { border: 1px solid #d8d8d8; border-radius: 14px; padding: 20px; margin: 20px 0; }
+    .btn { display: block; width: 100%; padding: 14px 16px; border-radius: 12px; border: 0; background: #1f5f5b; color: #fff; font-size: 1rem; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
+    .btn.secondary { background: #fff; color: #1f5f5b; border: 1px solid #1f5f5b; margin-top: 10px; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.15rem; letter-spacing: 0.06em; word-break: break-all; background: #f4f4f4; border-radius: 10px; padding: 12px; margin: 12px 0; }
+    .muted { color: #666; font-size: 0.9rem; }
+    .status { font-size: 0.95rem; margin-top: 12px; }
+    .error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>When RU Free for Android</h1>
+  <p id="intro">Checking whether you are signed in&hellip;</p>
+
+  <!-- Signed out: offer the normal sign-in routes, then come back here. -->
+  <div id="signin" class="card" hidden>
+    <p>Sign in first, then you will come back to this page and the app will finish setting up.</p>
+    <a class="btn" id="google" href="api.php?action=oauth_start&amp;provider=google&amp;return=app-link.html">Sign in with Google</a>
+    <a class="btn secondary" id="facebook" href="api.php?action=oauth_start&amp;provider=facebook&amp;return=app-link.html">Sign in with Facebook</a>
+    <a class="btn secondary" href="account.html">Sign in with a passkey</a>
+  </div>
+
+  <!-- Signed in: hand the app a one-time code. -->
+  <div id="handoff" class="card" hidden>
+    <p>Signed in as <strong id="who">you</strong>. Send this to the app:</p>
+    <a class="btn" id="openApp" href="#">Open the When RU Free app</a>
+    <p class="muted">If nothing happens, copy the code below and paste it into the app's sign-in screen.</p>
+    <div class="code" id="code">-</div>
+    <button class="btn secondary" id="copy" type="button">Copy code</button>
+    <p class="status muted" id="status"></p>
+  </div>
+
+  <p class="muted"><a href="index.html">Back to When RU Free</a></p>
+
+  <script>
+  (function () {
+    var api = 'api.php';
+    var signedIn = false;
+    var csrf = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    function getJson(url) {
+      return fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.json(); });
+    }
+
+    function post(action) {
+      return getJson(api + '?action=csrf_token').then(function (t) {
+        csrf = t.csrf_token;
+        return fetch(api + '?action=' + action, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, Accept: 'application/json' },
+          body: '{}'
+        });
+      }).then(function (r) { return r.json(); });
+    }
+
+    function showSignIn(methods) {
+      $('intro').textContent = 'You are not signed in yet.';
+      $('signin').hidden = false;
+      if (methods && methods.google === false) $('google').hidden = true;
+      if (methods && methods.facebook === false) $('facebook').hidden = true;
+    }
+
+    function showHandoff(code, name) {
+      $('intro').textContent = 'Almost done - hand the code to the app.';
+      $('handoff').hidden = false;
+      $('who').textContent = name || 'your account';
+      $('code').textContent = code;
+      var link = 'whenrufree://auth?code=' + encodeURIComponent(code);
+      $('openApp').setAttribute('href', link);
+      $('status').textContent = 'This code works once, for 5 minutes.';
+
+      $('copy').addEventListener('click', function () {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(code).then(function () {
+            $('status').textContent = 'Copied.';
+          });
+        }
+      });
+
+      // Try the hand-off straight away; the button stays as the fallback.
+      window.location.href = link;
+    }
+
+    getJson(api + '?action=account_me').then(function (me) {
+      signedIn = !!(me && me.signed_in);
+      if (!signedIn) {
+        showSignIn(me && me.methods);
+        return;
+      }
+      return post('account_app_link_mint').then(function (res) {
+        if (res && res.code) {
+          showHandoff(res.code, me.display_name || me.username);
+        } else {
+          $('intro').textContent = 'Could not create a sign-in code.';
+          $('intro').className = 'error';
+        }
+      });
+    }).catch(function () {
+      $('intro').textContent = 'Could not reach the server. Check your connection and reload.';
+      $('intro').className = 'error';
+    });
+  })();
+  </script>
+</body>
+</html>
